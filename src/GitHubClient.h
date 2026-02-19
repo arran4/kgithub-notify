@@ -1,0 +1,42 @@
+#ifndef GITHUBCLIENT_H
+#define GITHUBCLIENT_H
+
+#include <QObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QList>
+
+struct Notification {
+    QString id;
+    QString title;
+    QString type;
+    QString repository;
+    QString url; // API URL
+    QString updatedAt;
+    bool unread;
+};
+
+class GitHubClient : public QObject {
+    Q_OBJECT
+public:
+    explicit GitHubClient(QObject *parent = nullptr);
+    void setToken(const QString &token);
+    void checkNotifications();
+    void markAsRead(const QString &id);
+
+signals:
+    void notificationsReceived(const QList<Notification> &notifications);
+    void errorOccurred(const QString &error);
+
+private slots:
+    void onReplyFinished(QNetworkReply *reply);
+
+private:
+    QNetworkAccessManager *manager;
+    QString m_token;
+};
+
+#endif // GITHUBCLIENT_H
