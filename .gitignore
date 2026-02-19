@@ -19,3 +19,8 @@ compile_commands.json
 *.dll
 *.exe
 *.user
+TestMain
+TestMain_autogen/
+Testing/
+CTestTestfile.cmake
+DartConfiguration.tcl

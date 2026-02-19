@@ -4,6 +4,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QHBoxLayout>
+#include <QCoreApplication>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Settings");
@@ -34,12 +35,12 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 }
 
 void SettingsDialog::saveSettings() {
-    QSettings settings("Kgithub-notify", "Kgithub-notify");
+    QSettings settings;
     settings.setValue("token", tokenEdit->text());
     accept();
 }
 
 QString SettingsDialog::getToken() {
-    QSettings settings("Kgithub-notify", "Kgithub-notify");
+    QSettings settings;
     return settings.value("token").toString();
 }

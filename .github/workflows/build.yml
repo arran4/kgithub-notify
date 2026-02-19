@@ -13,13 +13,19 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install Qt
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y qtbase5-dev qttools5-dev-tools libqt5svg5-dev cmake build-essential
+        sudo apt-get install -y qtbase5-dev qttools5-dev-tools libqt5svg5-dev cmake build-essential cppcheck xvfb
+
+    - name: Lint and Vet (Cppcheck)
+      run: cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/ tests/
 
     - name: Configure CMake
       run: cmake .
 
     - name: Build
       run: cmake --build .
+
+    - name: Run Tests
+      run: xvfb-run ctest --output-on-failure

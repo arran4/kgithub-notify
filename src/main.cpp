@@ -5,6 +5,8 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
+    QApplication::setOrganizationName("Kgithub-notify");
+    QApplication::setApplicationName("Kgithub-notify");
     QApplication::setQuitOnLastWindowClosed(false);
 
     MainWindow window;
