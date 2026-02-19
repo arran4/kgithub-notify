@@ -5,6 +5,7 @@
 #include <QSystemTrayIcon>
 #include <QListWidget>
 #include <QMenu>
+#include <QSet>
 #include "GitHubClient.h"
 
 class MainWindow : public QMainWindow {
@@ -16,18 +17,20 @@ public:
 
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
+    void showError(const QString &error);
 
 private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onNotificationItemActivated(QListWidgetItem *item);
     void showSettings();
+    void showContextMenu(const QPoint &pos);
+    void dismissCurrentItem();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
     void createTrayIcon();
-    void createActions();
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -35,10 +38,7 @@ private:
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;
-
-private slots:
-    void showContextMenu(const QPoint &pos);
-    void dismissCurrentItem();
+    QSet<QString> knownNotificationIds;
 };
 
 #endif // MAINWINDOW_H

@@ -50,6 +50,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr) {
 void MainWindow::setClient(GitHubClient *c) {
     client = c;
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
+    connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
 
     QString token = SettingsDialog::getToken();
     if (!token.isEmpty()) {
@@ -96,6 +97,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     notificationList->clear();
     int unreadCount = 0;
+    int newNotifications = 0;
 
     for (const Notification &n : notifications) {
         QString label = QString("[%1] %2 (%3)").arg(n.type, n.title, n.repository);
@@ -109,14 +111,21 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             font.setBold(true);
             item->setFont(font);
             unreadCount++;
+
+            if (!knownNotificationIds.contains(n.id)) {
+                newNotifications++;
+                knownNotificationIds.insert(n.id);
+            }
         }
 
         notificationList->addItem(item);
     }
 
     if (unreadCount > 0) {
-        showTrayMessage("GitHub Notifications", QString("You have %1 unread notifications").arg(unreadCount));
         trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_MessageBoxInformation));
+        if (newNotifications > 0) {
+            showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
+        }
     } else {
         trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
     }
@@ -149,6 +158,7 @@ void MainWindow::showSettings() {
 void MainWindow::showContextMenu(const QPoint &pos) {
     QListWidgetItem *item = notificationList->itemAt(pos);
     if (item) {
+        notificationList->setCurrentItem(item); // Ensure item is selected
         contextMenu->exec(notificationList->mapToGlobal(pos));
     }
 }
@@ -159,11 +169,26 @@ void MainWindow::dismissCurrentItem() {
     QString id = item->data(Qt::UserRole + 1).toString();
     if (client) client->markAsRead(id);
 
+    knownNotificationIds.remove(id);
+
     delete notificationList->takeItem(notificationList->row(item));
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
         trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
+    }
+}
+
+void MainWindow::showError(const QString &error) {
+    // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
+    if (trayIcon && trayIcon->isVisible()) {
+        trayIcon->showMessage("GitHub Error", error, QSystemTrayIcon::Warning, 5000);
+    } else {
+        // Maybe don't show message box on every polling error if window is hidden?
+        // But if window is visible, we should show it.
+        if (isVisible()) {
+             QMessageBox::warning(this, "GitHub Error", error);
+        }
     }
 }
 
