@@ -44,6 +44,19 @@ class GitHubClient:
             logging.error(f"Error marking thread {thread_id} as read: {e}")
             return False
 
+    def unsubscribe_thread(self, thread_id):
+        if not self.token:
+            raise ValueError("Token not set")
+
+        try:
+            # Delete subscription
+            response = self.session.delete(f"{self.BASE_URL}/notifications/threads/{thread_id}/subscription")
+            response.raise_for_status()
+            return True
+        except requests.RequestException as e:
+            logging.error(f"Error unsubscribing thread {thread_id}: {e}")
+            return False
+
     def get_user_info(self):
         if not self.token:
             raise ValueError("Token not set")

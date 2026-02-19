@@ -28,19 +28,26 @@ class NotificationWindow(QMainWindow):
         self.dismiss_btn = QPushButton("Dismiss Selected")
         self.dismiss_btn.clicked.connect(self.dismiss_selected)
 
+        self.unsubscribe_btn = QPushButton("Unsubscribe Selected")
+        self.unsubscribe_btn.clicked.connect(self.unsubscribe_selected)
+
         btn_layout.addWidget(self.refresh_btn)
         btn_layout.addWidget(self.dismiss_btn)
+        btn_layout.addWidget(self.unsubscribe_btn)
         self.layout.addLayout(btn_layout)
 
         self.notifications = []
 
     def refresh_notifications(self):
-        self.list_widget.clear()
         try:
             self.notifications = self.client.get_notifications()
+            self.update_notifications(self.notifications)
         except ValueError:
-            # Token might not be set
-            self.notifications = []
+            pass
+
+    def update_notifications(self, notifications):
+        self.notifications = notifications
+        self.list_widget.clear()
 
         for note in self.notifications:
             item = QListWidgetItem()
@@ -79,4 +86,11 @@ class NotificationWindow(QMainWindow):
         for item in items:
             note = item.data(Qt.UserRole)
             if self.client.mark_thread_as_read(note['id']):
+                self.list_widget.takeItem(self.list_widget.row(item))
+
+    def unsubscribe_selected(self):
+        items = self.list_widget.selectedItems()
+        for item in items:
+            note = item.data(Qt.UserRole)
+            if self.client.unsubscribe_thread(note['id']):
                 self.list_widget.takeItem(self.list_widget.row(item))

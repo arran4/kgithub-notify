@@ -9,6 +9,8 @@ import json
 from github_client import GitHubClient
 from settings_dialog import SettingsDialog, APP_NAME, KEYRING_SERVICE, CONFIG_FILE
 from notification_window import NotificationWindow
+from notification_worker import NotificationWorker
+import logging
 
 def load_token():
     try:
@@ -102,21 +104,23 @@ class SystemTrayApp:
         if not self.token:
             return
 
-        try:
-            notifications = self.client.get_notifications(participating=False) # Check all unread
-            unread_count = len([n for n in notifications if n['unread']])
+        self.worker = NotificationWorker(self.client)
+        self.worker.notifications_ready.connect(self.on_notifications_ready)
+        self.worker.start()
 
-            if unread_count > 0:
-                self.tray_icon.showMessage(
-                    "GitHub Notifications",
-                    f"You have {unread_count} unread notifications.",
-                    QSystemTrayIcon.Information,
-                    5000
-                )
-                # Update icon color to red maybe?
-                # For now just message
-        except Exception as e:
-            print(f"Error checking notifications: {e}")
+    def on_notifications_ready(self, notifications):
+        unread_count = len([n for n in notifications if n['unread']])
+
+        if unread_count > 0:
+            self.tray_icon.showMessage(
+                "GitHub Notifications",
+                f"You have {unread_count} unread notifications.",
+                QSystemTrayIcon.Information,
+                5000
+            )
+
+        # Update window if open or simply push data
+        self.notification_window.update_notifications(notifications)
 
     def run(self):
         sys.exit(self.app.exec_())

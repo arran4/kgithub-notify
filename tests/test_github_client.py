@@ -35,6 +35,16 @@ class TestGitHubClient(unittest.TestCase):
         self.assertTrue(result)
         mock_patch.assert_called_with('https://api.github.com/notifications/threads/123')
 
+    @patch('requests.Session.delete')
+    def test_unsubscribe_thread(self, mock_delete):
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_delete.return_value = mock_response
+
+        result = self.client.unsubscribe_thread("123")
+        self.assertTrue(result)
+        mock_delete.assert_called_with('https://api.github.com/notifications/threads/123/subscription')
+
     @patch('requests.Session.get')
     def test_get_user_info(self, mock_get):
         mock_response = MagicMock()
