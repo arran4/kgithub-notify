@@ -1,21 +1,21 @@
 # Kgithub-notify
 
-A GitHub KDE task program written in C++ that notifies you when there is a new GitHub notification.
+A GitHub Notification Tool written in Python that notifies you when there is a new GitHub notification.
+It sits in the system tray and provides a window to view and manage notifications.
 
-When you click on the notification, it presents you with its own version of:
-*   [GitHub Notifications](https://github.com/notifications)
-*   [GitHub Pull Requests](https://github.com/pulls)
-*   The GitHub feed/wall
-*   Explore
+## Features
 
-## Build Instructions
+*   **System Tray Integration**: Quietly runs in the background.
+*   **Desktop Notifications**: Alerts you of new notifications.
+*   **Notification Window**: View, dismiss, or open notifications in the browser.
+*   **Authentication**: Supports Personal Access Tokens (PAT).
 
-### Prerequisites
+## Prerequisites
 
-*   C++ Compiler (C++17 support required)
-*   CMake (version 3.10 or higher)
+*   Python 3.6 or higher
+*   pip
 
-### Building
+## Installation & Running
 
 1.  Clone the repository:
     ```bash
@@ -23,22 +23,24 @@ When you click on the notification, it presents you with its own version of:
     cd Kgithub-notify
     ```
 
-2.  Create a build directory:
+2.  Run the application using the provided script:
     ```bash
-    mkdir build
-    cd build
+    ./run.sh
     ```
 
-3.  Configure and build the project:
+    Alternatively, you can install dependencies manually and run:
     ```bash
-    cmake ..
-    cmake --build .
+    pip install -r requirements.txt
+    python3 src/main.py
     ```
 
-4.  Run the application:
-    ```bash
-    ./Kgithub-notify
-    ```
+## Configuration
+
+On the first run, the application will prompt you for your GitHub Personal Access Token.
+You can generate one [here](https://github.com/settings/tokens).
+Make sure to grant the `notifications` scope.
+
+To change the token later, right-click the tray icon and select "Settings".
 
 ## License
 
