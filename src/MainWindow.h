@@ -18,9 +18,11 @@ public:
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
     void showError(const QString &error);
+    void onAuthError(const QString &message);
 
 private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
+    void onTrayMessageClicked();
     void onNotificationItemActivated(QListWidgetItem *item);
     void showSettings();
     void showContextMenu(const QPoint &pos);
@@ -39,6 +41,8 @@ private:
     QMenu *contextMenu;
     QAction *dismissAction;
     QSet<QString> knownNotificationIds;
+    bool pendingAuthError;
+    QString lastError;
 };
 
 #endif // MAINWINDOW_H
