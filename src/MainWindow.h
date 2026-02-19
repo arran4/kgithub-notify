@@ -42,6 +42,7 @@ private:
     QAction *dismissAction;
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
+    QString lastError;
 };
 
 #endif // MAINWINDOW_H

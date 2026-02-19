@@ -77,7 +77,11 @@ void MainWindow::createTrayIcon() {
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
 
-    trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
+    QIcon icon(":/assets/icon.png");
+    if (icon.isNull()) {
+        icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+    }
+    trayIcon->setIcon(icon);
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
@@ -98,6 +102,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 
 void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
+    lastError.clear();
     notificationList->clear();
     int unreadCount = 0;
     int newNotifications = 0;
@@ -130,7 +135,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
         }
     } else {
-        trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
+        QIcon icon(":/assets/icon.png");
+        if (icon.isNull()) {
+            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+        }
+        trayIcon->setIcon(icon);
     }
 }
 
@@ -199,11 +208,18 @@ void MainWindow::dismissCurrentItem() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
+        QIcon icon(":/assets/icon.png");
+        if (icon.isNull()) {
+            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+        }
+        trayIcon->setIcon(icon);
     }
 }
 
 void MainWindow::showError(const QString &error) {
+    if (error == lastError) return;
+    lastError = error;
+
     // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
     if (trayIcon && trayIcon->isVisible()) {
         trayIcon->showMessage("GitHub Error", error, QSystemTrayIcon::Warning, 5000);

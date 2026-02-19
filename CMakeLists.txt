@@ -18,6 +18,7 @@ add_executable(Kgithub-notify
     src/SettingsDialog.h
     src/MainWindow.cpp
     src/MainWindow.h
+    src/resources.qrc
 )
 
 target_link_libraries(Kgithub-notify
