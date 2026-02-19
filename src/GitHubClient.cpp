@@ -1,0 +1,109 @@
+#include "GitHubClient.h"
+#include <QNetworkRequest>
+#include <QUrl>
+#include <QDebug>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QList>
+
+GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
+    manager = new QNetworkAccessManager(this);
+    // Connect to the signal manually or define a slot?
+    // Using connect in constructor is fine.
+    connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
+}
+
+void GitHubClient::setToken(const QString &token) {
+    m_token = token;
+}
+
+void GitHubClient::checkNotifications() {
+    if (m_token.isEmpty()) {
+        emit errorOccurred("No token provided");
+        return;
+    }
+
+    QUrl url("https://api.github.com/notifications");
+    QNetworkRequest request(url);
+
+    // Add Authorization header
+    QString authHeader = "token " + m_token;
+    request.setRawHeader("Authorization", authHeader.toUtf8());
+    request.setRawHeader("Accept", "application/vnd.github.v3+json");
+
+    // Add user-agent header as required by GitHub API
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    manager->get(request);
+}
+
+void GitHubClient::markAsRead(const QString &id) {
+    if (m_token.isEmpty()) return;
+
+    QUrl url("https://api.github.com/notifications/threads/" + id);
+    QNetworkRequest request(url);
+
+    QString authHeader = "token " + m_token;
+    request.setRawHeader("Authorization", authHeader.toUtf8());
+    request.setRawHeader("Accept", "application/vnd.github.v3+json");
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    manager->sendCustomRequest(request, "PATCH");
+}
+
+void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    if (reply->error() != QNetworkReply::NoError) {
+        emit errorOccurred(reply->errorString());
+        reply->deleteLater();
+        return;
+    }
+
+    // Check if this was a PATCH request (mark as read)
+    if (reply->operation() == QNetworkAccessManager::CustomOperation && reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH") {
+        // Notification marked as read. Maybe refresh?
+        checkNotifications();
+        reply->deleteLater();
+        return;
+    }
+
+    QByteArray data = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+
+    if (!doc.isArray()) {
+        // It might be an empty array or valid response for empty notifications
+        // Or if error occurred.
+        // For notifications endpoint, it returns array.
+        // If not array, maybe error message?
+        emit errorOccurred("Invalid JSON response (expected array)");
+        reply->deleteLater();
+        return;
+    }
+
+    QJsonArray array = doc.array();
+
+    QList<Notification> notifications;
+    for (const QJsonValue &value : array) {
+        if (!value.isObject()) continue;
+
+        QJsonObject obj = value.toObject();
+        Notification n;
+        n.id = obj["id"].toString();
+
+        QJsonObject subject = obj["subject"].toObject();
+        n.title = subject["title"].toString();
+        n.type = subject["type"].toString();
+        n.url = subject["url"].toString(); // API URL
+
+        QJsonObject repo = obj["repository"].toObject();
+        n.repository = repo["full_name"].toString();
+
+        n.updatedAt = obj["updated_at"].toString();
+        n.unread = obj["unread"].toBool();
+
+        notifications.append(n);
+    }
+
+    emit notificationsReceived(notifications);
+    reply->deleteLater();
+}
