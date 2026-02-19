@@ -43,3 +43,17 @@ target_link_libraries(TestMain
 )
 
 add_test(NAME TestMain COMMAND TestMain)
+
+add_executable(TestAuth
+    tests/TestAuth.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+)
+
+target_link_libraries(TestAuth
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+)
+
+add_test(NAME TestAuth COMMAND TestAuth)

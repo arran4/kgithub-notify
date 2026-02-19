@@ -10,7 +10,7 @@
 #include <QStyle>
 #include "SettingsDialog.h"
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false) {
     setWindowTitle("Kgithub-notify");
     resize(400, 600);
 
@@ -51,6 +51,7 @@ void MainWindow::setClient(GitHubClient *c) {
     client = c;
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
+    connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
     QString token = SettingsDialog::getToken();
     if (!token.isEmpty()) {
@@ -79,6 +80,7 @@ void MainWindow::createTrayIcon() {
     trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_ComputerIcon));
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
+    connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
 
     trayIcon->show();
 }
@@ -95,6 +97,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 }
 
 void MainWindow::updateNotifications(const QList<Notification> &notifications) {
+    pendingAuthError = false;
     notificationList->clear();
     int unreadCount = 0;
     int newNotifications = 0;
@@ -152,6 +155,27 @@ void MainWindow::showSettings() {
             client->setToken(dialog.getToken());
             client->checkNotifications();
         }
+    }
+}
+
+void MainWindow::onAuthError(const QString &message) {
+    pendingAuthError = true;
+    if (trayIcon && trayIcon->isVisible()) {
+        trayIcon->showMessage("GitHub Error", message + "\nClick to open settings.", QSystemTrayIcon::Warning, 10000);
+    } else {
+        // If tray not visible, should we force settings?
+        // Maybe better to just show settings if window is visible, or open it.
+        // For now rely on tray message or if window is open, show dialog.
+        if (isVisible()) {
+            showSettings();
+        }
+    }
+}
+
+void MainWindow::onTrayMessageClicked() {
+    if (pendingAuthError) {
+        showSettings();
+        pendingAuthError = false;
     }
 }
 

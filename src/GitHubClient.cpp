@@ -12,19 +12,24 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     // Connect to the signal manually or define a slot?
     // Using connect in constructor is fine.
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
+    m_apiUrl = "https://api.github.com";
 }
 
 void GitHubClient::setToken(const QString &token) {
     m_token = token;
 }
 
+void GitHubClient::setApiUrl(const QString &url) {
+    m_apiUrl = url;
+}
+
 void GitHubClient::checkNotifications() {
     if (m_token.isEmpty()) {
-        emit errorOccurred("No token provided");
+        emit authError("No token provided");
         return;
     }
 
-    QUrl url("https://api.github.com/notifications");
+    QUrl url(m_apiUrl + "/notifications");
     QNetworkRequest request(url);
 
     // Add Authorization header
@@ -41,7 +46,7 @@ void GitHubClient::checkNotifications() {
 void GitHubClient::markAsRead(const QString &id) {
     if (m_token.isEmpty()) return;
 
-    QUrl url("https://api.github.com/notifications/threads/" + id);
+    QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request(url);
 
     QString authHeader = "token " + m_token;
@@ -54,7 +59,11 @@ void GitHubClient::markAsRead(const QString &id) {
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     if (reply->error() != QNetworkReply::NoError) {
-        emit errorOccurred(reply->errorString());
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            emit authError("Invalid Token");
+        } else {
+            emit errorOccurred(reply->errorString());
+        }
         reply->deleteLater();
         return;
     }

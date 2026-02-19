@@ -24,12 +24,14 @@ class GitHubClient : public QObject {
 public:
     explicit GitHubClient(QObject *parent = nullptr);
     void setToken(const QString &token);
+    void setApiUrl(const QString &url);
     void checkNotifications();
     void markAsRead(const QString &id);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
     void errorOccurred(const QString &error);
+    void authError(const QString &message);
 
 private slots:
     void onReplyFinished(QNetworkReply *reply);
@@ -37,6 +39,7 @@ private slots:
 private:
     QNetworkAccessManager *manager;
     QString m_token;
+    QString m_apiUrl;
 };
 
 #endif // GITHUBCLIENT_H
