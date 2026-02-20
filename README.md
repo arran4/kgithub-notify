@@ -2,6 +2,8 @@
 
 A GitHub notification system tray application written in C++ using Qt5. It notifies you when there are new GitHub notifications, allowing you to view them in your browser or dismiss them directly from the application.
 
+![logo.png](logo.png)
+
 ## Features
 
 *   **System Tray Integration**: Runs in the background and sits in your system tray.
