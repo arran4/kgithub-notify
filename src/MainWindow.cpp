@@ -42,30 +42,36 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
 
     toolbar->addSeparator();
 
     selectAllAction = new QAction("Select All", this);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
     connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
     toolbar->addAction(selectAllAction);
 
     selectNoneAction = new QAction("Select None", this);
+    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
     toolbar->addAction(selectNoneAction);
 
     selectTop10Action = new QAction("Top 10", this);
+    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
     connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
     toolbar->addAction(selectTop10Action);
 
     toolbar->addSeparator();
 
     dismissSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+    dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
 
     openSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+    openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
 
@@ -90,6 +96,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     fileMenu->addAction(settingsAction);
 
     QAction *quitAction = new QAction("&Quit", this);
+    quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
 
