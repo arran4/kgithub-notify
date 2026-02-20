@@ -10,8 +10,9 @@ A GitHub notification system tray application written in C++ using Qt5. It notif
 *   **Periodic Polling**: Checks for new notifications every 5 minutes.
 *   **Desktop Notifications**: Shows system notifications when new items arrive.
 *   **Quick Actions**:
-    *   **Click**: Opens the notification URL in your default browser.
-    *   **Right-Click**: Dismisses the notification (marks it as read on GitHub).
+    *   **Open**: Opens the notification URL in your default browser. This also marks the notification as read.
+    *   **Copy Link**: Copies the link to the notification (without referrer ID) to your clipboard.
+    *   **Right-Click**: Access "Open", "Copy Link", or "Dismiss" (marks as read).
 *   **Secure**: Stores your Personal Access Token (PAT) securely using Qt settings.
 
 ## Prerequisites
