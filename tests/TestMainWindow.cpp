@@ -1,38 +1,69 @@
 #include <QTest>
 #include <QSignalSpy>
+#include <QSettings>
 #include "../src/MainWindow.h"
 #include "../src/GitHubClient.h"
+#include "../src/SettingsDialog.h"
 
 class TestMainWindow : public QObject {
     Q_OBJECT
 
 private slots:
-    void testAuthErrorSwitch() {
-        // MainWindow requires QApplication (created by QTEST_MAIN)
+    void initTestCase() {
+        QCoreApplication::setOrganizationName("Kgithub-notify-test");
+        QCoreApplication::setApplicationName("Kgithub-notify-test");
+    }
+
+    void testInitialStateNoToken() {
+        // Clear token
+        QSettings settings;
+        settings.setValue("token", "");
+
         MainWindow w;
         GitHubClient client;
         w.setClient(&client);
 
-        // Initially should be on notification list (or at least index 0, which is notification list)
-        // Wait, MainWindow constructor checks token. If token is empty, it might do something.
-        // But let's assume default state.
+        QVERIFY(w.getLoginPage() != nullptr);
+        // Should show login page when no token
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getLoginPage());
+    }
 
-        QStackedWidget* stack = w.getStackWidget();
-        QVERIFY(stack != nullptr);
+    void testInitialStateWithToken() {
+        // Set token
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
+        MainWindow w;
+        GitHubClient client;
+        w.setClient(&client);
+
         QVERIFY(w.getNotificationList() != nullptr);
-        QVERIFY(w.getErrorPage() != nullptr);
+        // Should show notification list when token exists
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getNotificationList());
+    }
 
-        // Initially notification list is visible
-        QCOMPARE(stack->currentWidget(), w.getNotificationList());
+    void testAuthErrorSwitch() {
+        // Ensure we start with token so we are on notification list
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
+        MainWindow w;
+        GitHubClient client;
+        w.setClient(&client);
+
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getNotificationList());
 
         // Trigger Auth Error
         emit client.authError("Test Error");
 
         // Should switch to error page
-        QCOMPARE(stack->currentWidget(), w.getErrorPage());
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getErrorPage());
     }
 
     void testUpdateNotificationsSwitch() {
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
         MainWindow w;
         GitHubClient client;
         w.setClient(&client);

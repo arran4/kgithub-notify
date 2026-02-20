@@ -38,6 +38,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     createErrorPage();
     stackWidget->addWidget(errorPage);
 
+    // Login Page
+    createLoginPage();
+    stackWidget->addWidget(loginPage);
+
     createTrayIcon();
 
     // Menu
@@ -50,11 +54,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
 
-    // Check if token exists, if not show settings
+    // Initial State Check
     QString token = SettingsDialog::getToken();
     if (token.isEmpty()) {
-        // We can't show modal dialog in constructor usually, but let's try or defer it.
-        // Better to defer it or let the main loop handle it.
+        stackWidget->setCurrentWidget(loginPage);
+    } else {
+        stackWidget->setCurrentWidget(notificationList);
     }
 }
 
@@ -72,6 +77,22 @@ void MainWindow::createErrorPage() {
 
     layout->addWidget(errorLabel);
     layout->addWidget(settingsButton);
+}
+
+void MainWindow::createLoginPage() {
+    loginPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(loginPage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    loginLabel = new QLabel("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started.", loginPage);
+    loginLabel->setWordWrap(true);
+    loginLabel->setAlignment(Qt::AlignCenter);
+
+    loginButton = new QPushButton("Open Settings", loginPage);
+    connect(loginButton, &QPushButton::clicked, this, &MainWindow::showSettings);
+
+    layout->addWidget(loginLabel);
+    layout->addWidget(loginButton);
 }
 
 void MainWindow::setClient(GitHubClient *c) {
@@ -131,7 +152,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
     lastError.clear();
 
-    // Switch to list view
+    // Switch to list view on successful update
     if (stackWidget->currentWidget() != notificationList) {
         stackWidget->setCurrentWidget(notificationList);
     }
@@ -193,9 +214,16 @@ void MainWindow::showTrayMessage(const QString &title, const QString &message) {
 void MainWindow::showSettings() {
     SettingsDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
+        QString newToken = dialog.getToken();
         if (client) {
-            client->setToken(dialog.getToken());
-            client->checkNotifications();
+            client->setToken(newToken);
+            client->checkNotifications(); // Force check immediately
+
+            // If we were on login page and now have a token, we might want to switch
+            // to notification list immediately or wait for callback.
+            // But waiting for callback is safer as token might be invalid.
+            // However, visually it's nice to switch away from "Please login".
+            // Let's rely on updateNotifications or onAuthError to switch.
         }
     }
 }

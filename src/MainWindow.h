@@ -22,6 +22,7 @@ public:
     QStackedWidget* getStackWidget() const { return stackWidget; }
     QWidget* getErrorPage() const { return errorPage; }
     QListWidget* getNotificationList() const { return notificationList; }
+    QWidget* getLoginPage() const { return loginPage; }
 
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
@@ -42,6 +43,7 @@ protected:
 private:
     void createTrayIcon();
     void createErrorPage();
+    void createLoginPage();
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -58,6 +60,11 @@ private:
     QWidget *errorPage;
     QLabel *errorLabel;
     QPushButton *settingsButton;
+
+    // Login page components
+    QWidget *loginPage;
+    QLabel *loginLabel;
+    QPushButton *loginButton;
 };
 
 #endif // MAINWINDOW_H
