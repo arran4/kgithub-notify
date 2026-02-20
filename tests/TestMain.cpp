@@ -32,6 +32,28 @@ private slots:
         // Check if SettingsDialog reads it correctly
         QCOMPARE(SettingsDialog::getToken(), testToken);
     }
+
+    void testUrlConversion() {
+        // Issue
+        QString issueApi = "https://api.github.com/repos/owner/repo/issues/1";
+        QString issueHtml = "https://github.com/owner/repo/issues/1";
+        QCOMPARE(GitHubClient::apiToHtmlUrl(issueApi), issueHtml);
+
+        // Pull Request
+        QString prApi = "https://api.github.com/repos/owner/repo/pulls/1";
+        QString prHtml = "https://github.com/owner/repo/pull/1";
+        QCOMPARE(GitHubClient::apiToHtmlUrl(prApi), prHtml);
+
+        // Commit
+        QString commitApi = "https://api.github.com/repos/owner/repo/commits/6dcb09b5b57875f334f61aebed695e2e4193db5e";
+        QString commitHtml = "https://github.com/owner/repo/commit/6dcb09b5b57875f334f61aebed695e2e4193db5e";
+        QCOMPARE(GitHubClient::apiToHtmlUrl(commitApi), commitHtml);
+
+        // General Repo URL (if ever used)
+        QString repoApi = "https://api.github.com/repos/owner/repo";
+        QString repoHtml = "https://github.com/owner/repo";
+        QCOMPARE(GitHubClient::apiToHtmlUrl(repoApi), repoHtml);
+    }
 };
 
 QTEST_MAIN(TestGitHubClient)

@@ -23,6 +23,14 @@ void GitHubClient::setApiUrl(const QString &url) {
     m_apiUrl = url;
 }
 
+QString GitHubClient::apiToHtmlUrl(const QString &apiUrl) {
+    QString htmlUrl = apiUrl;
+    htmlUrl.replace("api.github.com/repos", "github.com");
+    htmlUrl.replace("/pulls/", "/pull/");
+    htmlUrl.replace("/commits/", "/commit/");
+    return htmlUrl;
+}
+
 void GitHubClient::checkNotifications() {
     if (m_token.isEmpty()) {
         emit authError("No token provided");

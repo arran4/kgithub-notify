@@ -212,9 +212,7 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
 
-    QString htmlUrl = apiUrl;
-    htmlUrl.replace("api.github.com/repos", "github.com");
-    htmlUrl.replace("/pulls/", "/pull/");
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
 
     QDesktopServices::openUrl(QUrl(htmlUrl));
 }

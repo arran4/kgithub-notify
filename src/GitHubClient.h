@@ -28,6 +28,8 @@ public:
     void checkNotifications();
     void markAsRead(const QString &id);
 
+    static QString apiToHtmlUrl(const QString &apiUrl);
+
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
     void errorOccurred(const QString &error);
