@@ -9,6 +9,7 @@
 #include <QStackedWidget>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolBar>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
 
@@ -42,6 +43,14 @@ private slots:
     void dismissCurrentItem();
     void onAuthNotificationSettingsClicked();
 
+    // Toolbar slots
+    void onRefreshClicked();
+    void onSelectAllClicked();
+    void onSelectNoneClicked();
+    void onSelectTop10Clicked();
+    void onDismissSelectedClicked();
+    void onOpenSelectedClicked();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
@@ -49,6 +58,7 @@ private:
     void createTrayIcon();
     void createErrorPage();
     void createLoginPage();
+    void openNotificationUrl(const QString &apiUrl);
     void createEmptyStatePage();
 
     QSystemTrayIcon *trayIcon;
@@ -60,6 +70,15 @@ private:
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
+
+    // Toolbar
+    QToolBar *toolbar;
+    QAction *refreshAction;
+    QAction *selectAllAction;
+    QAction *selectNoneAction;
+    QAction *selectTop10Action;
+    QAction *dismissSelectedAction;
+    QAction *openSelectedAction;
 
     // New UI components
     QStackedWidget *stackWidget;
