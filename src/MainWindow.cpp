@@ -43,6 +43,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     createLoginPage();
     stackWidget->addWidget(loginPage);
 
+    // Empty State Page
+    createEmptyStatePage();
+    stackWidget->addWidget(emptyStatePage);
+
     createTrayIcon();
 
     // Menu
@@ -94,6 +98,17 @@ void MainWindow::createLoginPage() {
 
     layout->addWidget(loginLabel);
     layout->addWidget(loginButton);
+}
+
+void MainWindow::createEmptyStatePage() {
+    emptyStatePage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    emptyStateLabel = new QLabel("No new notifications", emptyStatePage);
+    emptyStateLabel->setAlignment(Qt::AlignCenter);
+
+    layout->addWidget(emptyStateLabel);
 }
 
 void MainWindow::setClient(GitHubClient *c) {
@@ -168,8 +183,14 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 
     // Switch to list view on successful update
-    if (stackWidget->currentWidget() != notificationList) {
-        stackWidget->setCurrentWidget(notificationList);
+    if (notifications.isEmpty()) {
+        if (stackWidget->currentWidget() != emptyStatePage) {
+            stackWidget->setCurrentWidget(emptyStatePage);
+        }
+    } else {
+        if (stackWidget->currentWidget() != notificationList) {
+            stackWidget->setCurrentWidget(notificationList);
+        }
     }
 
     notificationList->clear();

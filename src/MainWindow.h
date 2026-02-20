@@ -24,6 +24,7 @@ public:
     QWidget* getErrorPage() const { return errorPage; }
     QListWidget* getNotificationList() const { return notificationList; }
     QWidget* getLoginPage() const { return loginPage; }
+    QWidget* getEmptyStatePage() const { return emptyStatePage; }
     AuthErrorNotification* getAuthNotification() const { return authNotification; }
     QMenu* getTrayIconMenu() const { return trayIconMenu; }
 
@@ -48,6 +49,7 @@ private:
     void createTrayIcon();
     void createErrorPage();
     void createLoginPage();
+    void createEmptyStatePage();
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -69,6 +71,10 @@ private:
     QWidget *loginPage;
     QLabel *loginLabel;
     QPushButton *loginButton;
+
+    // Empty state components
+    QWidget *emptyStatePage;
+    QLabel *emptyStateLabel;
 
     // Custom notification
     AuthErrorNotification *authNotification;

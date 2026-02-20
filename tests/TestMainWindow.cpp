@@ -75,6 +75,10 @@ private slots:
 
         // Simulate success
         QList<Notification> notifications;
+        Notification n;
+        n.id = "1";
+        n.title = "Test";
+        notifications.append(n);
         emit client.notificationsReceived(notifications);
 
         // Should switch back to notification list
@@ -98,11 +102,25 @@ private slots:
         QVERIFY(notif->isVisible());
     }
 
+    void testUpdateNotificationsEmpty() {
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
     void testTrayMenuStructure() {
         MainWindow w;
         GitHubClient client;
         w.setClient(&client);
 
+        // Verify initially (assuming dummy_token puts us in list)
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getNotificationList());
+
+        // Emit empty notifications
+        QList<Notification> notifications;
+        emit client.notificationsReceived(notifications);
+
+        // Verify switch to empty state page
+        QVERIFY(w.getEmptyStatePage() != nullptr);
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getEmptyStatePage());
         QMenu *menu = w.getTrayIconMenu();
         QVERIFY(menu != nullptr);
 
