@@ -6,6 +6,9 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QSet>
+#include <QStackedWidget>
+#include <QLabel>
+#include <QPushButton>
 #include "GitHubClient.h"
 
 class MainWindow : public QMainWindow {
@@ -14,6 +17,12 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
+
+    // For testing purposes
+    QStackedWidget* getStackWidget() const { return stackWidget; }
+    QWidget* getErrorPage() const { return errorPage; }
+    QListWidget* getNotificationList() const { return notificationList; }
+    QWidget* getLoginPage() const { return loginPage; }
 
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
@@ -33,6 +42,8 @@ protected:
 
 private:
     void createTrayIcon();
+    void createErrorPage();
+    void createLoginPage();
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -43,6 +54,17 @@ private:
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
+
+    // New UI components
+    QStackedWidget *stackWidget;
+    QWidget *errorPage;
+    QLabel *errorLabel;
+    QPushButton *settingsButton;
+
+    // Login page components
+    QWidget *loginPage;
+    QLabel *loginLabel;
+    QPushButton *loginButton;
 };
 
 #endif // MAINWINDOW_H
