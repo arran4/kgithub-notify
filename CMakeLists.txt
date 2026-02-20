@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(Kgithub-notify)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -62,3 +64,18 @@ target_link_libraries(TestAuth
 )
 
 add_test(NAME TestAuth COMMAND TestAuth)
+
+# Installation
+install(TARGETS Kgithub-notify
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION .
+)
+
+install(FILES kgithub-notify.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)
+
+install(FILES src/assets/icon.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/1024x1024/apps
+    RENAME kgithub-notify.png
+)
