@@ -17,10 +17,5 @@ int main(int argc, char *argv[]) {
     // Initial check
     client.checkNotifications();
 
-    // Timer for polling
-    QTimer timer;
-    QObject::connect(&timer, &QTimer::timeout, &client, &GitHubClient::checkNotifications);
-    timer.start(5 * 60 * 1000); // 5 minutes
-
     return app.exec();
 }

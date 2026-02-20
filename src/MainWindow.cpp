@@ -93,6 +93,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
 
+    // Status Bar
+    statusBar = new QStatusBar(this);
+    setStatusBar(statusBar);
+
+    countLabel = new QLabel("Items: 0", this);
+    timerLabel = new QLabel("Next refresh: --:--", this);
+
+    statusBar->addWidget(countLabel);
+    statusBar->addPermanentWidget(timerLabel);
+
+    refreshTimer = new QTimer(this);
+    countdownTimer = new QTimer(this);
+
+    connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
+    countdownTimer->start(1000);
+
     // Initial State Check
     QString token = SettingsDialog::getToken();
     if (token.isEmpty()) {
@@ -150,6 +166,12 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
+
+    if (refreshTimer) {
+        connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
+        refreshTimer->setInterval(300000); // 5 minutes
+        refreshTimer->start();
+    }
 
     QString token = SettingsDialog::getToken();
     if (!token.isEmpty()) {
@@ -211,6 +233,10 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
     lastError.clear();
+
+    if (countLabel) {
+        countLabel->setText(QString("Items: %1").arg(notifications.count()));
+    }
 
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
@@ -418,6 +444,10 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::onRefreshClicked() {
     if (client) {
         client->checkNotifications();
+        if (refreshTimer) {
+            refreshTimer->start(); // Restart timer
+            updateStatusBar(); // Force update
+        }
     }
 }
 
@@ -480,4 +510,21 @@ void MainWindow::openNotificationUrl(const QString &apiUrl) {
     htmlUrl.replace("api.github.com/repos", "github.com");
     htmlUrl.replace("/pulls/", "/pull/");
     QDesktopServices::openUrl(QUrl(htmlUrl));
+}
+
+void MainWindow::updateStatusBar() {
+    if (refreshTimer && refreshTimer->isActive()) {
+        qint64 remaining = refreshTimer->remainingTime();
+        if (remaining >= 0) {
+            int seconds = (remaining / 1000) % 60;
+            int minutes = (remaining / 60000);
+            timerLabel->setText(QString("Next refresh: %1:%2")
+                                .arg(minutes, 2, 10, QChar('0'))
+                                .arg(seconds, 2, 10, QChar('0')));
+            return;
+        }
+    }
+    if (timerLabel) {
+        timerLabel->setText("Next refresh: --:--");
+    }
 }

@@ -10,6 +10,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QToolBar>
+#include <QStatusBar>
+#include <QTimer>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
 
@@ -45,6 +47,7 @@ private slots:
 
     // Toolbar slots
     void onRefreshClicked();
+    void updateStatusBar();
     void onSelectAllClicked();
     void onSelectNoneClicked();
     void onSelectTop10Clicked();
@@ -97,6 +100,13 @@ private:
 
     // Custom notification
     AuthErrorNotification *authNotification;
+
+    // Status Bar
+    QStatusBar *statusBar;
+    QLabel *countLabel;
+    QLabel *timerLabel;
+    QTimer *refreshTimer;
+    QTimer *countdownTimer;
 };
 
 #endif // MAINWINDOW_H

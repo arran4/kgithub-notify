@@ -102,10 +102,6 @@ private slots:
         QVERIFY(notif->isVisible());
     }
 
-    void testUpdateNotificationsEmpty() {
-        QSettings settings;
-        settings.setValue("token", "dummy_token");
-
     void testTrayMenuStructure() {
         MainWindow w;
         GitHubClient client;
