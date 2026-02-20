@@ -20,6 +20,8 @@ add_executable(Kgithub-notify
     src/MainWindow.h
     src/AuthErrorNotification.cpp
     src/AuthErrorNotification.h
+    src/NotificationItemWidget.cpp
+    src/NotificationItemWidget.h
     src/resources.qrc
 )
 
@@ -60,3 +62,22 @@ target_link_libraries(TestAuth
 )
 
 add_test(NAME TestAuth COMMAND TestAuth)
+
+add_executable(TestMainWindow
+    tests/TestMainWindow.cpp
+    src/MainWindow.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+    src/AuthErrorNotification.cpp
+    src/NotificationItemWidget.cpp
+    src/NotificationItemWidget.h
+    src/resources.qrc
+)
+
+target_link_libraries(TestMainWindow
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+)
+
+add_test(NAME TestMainWindow COMMAND TestMainWindow)

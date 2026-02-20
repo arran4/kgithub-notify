@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "NotificationItemWidget.h"
 #include <QApplication>
 #include <QScreen>
 #include <QDesktopServices>
@@ -10,10 +11,12 @@
 #include <QDebug>
 #include <QStyle>
 #include <QVBoxLayout>
+#include <QClipboard>
 #include "SettingsDialog.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
+    setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
 
     // Initialize Stacked Widget
@@ -22,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
 
     // Notification List
     notificationList = new QListWidget(this);
+    notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
     connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
 
     // Context menu for list
@@ -29,11 +33,59 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
 
     contextMenu = new QMenu(this);
+
+    openAction = new QAction("Open", this);
+    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
+    contextMenu->addAction(openAction);
+
+    copyLinkAction = new QAction("Copy Link", this);
+    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
+    contextMenu->addAction(copyLinkAction);
+
     dismissAction = new QAction("Dismiss", this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
 
     stackWidget->addWidget(notificationList);
+
+    // Toolbar
+    toolbar = new QToolBar(this);
+    toolbar->setMovable(false);
+    addToolBar(Qt::TopToolBarArea, toolbar);
+
+    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
+    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    toolbar->addAction(refreshAction);
+
+    toolbar->addSeparator();
+
+    selectAllAction = new QAction("Select All", this);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    toolbar->addAction(selectAllAction);
+
+    selectNoneAction = new QAction("Select None", this);
+    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    toolbar->addAction(selectNoneAction);
+
+    selectTop10Action = new QAction("Top 10", this);
+    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
+    connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
+    toolbar->addAction(selectTop10Action);
+
+    toolbar->addSeparator();
+
+    dismissSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+    dismissSelectedAction->setShortcut(QKeySequence::Delete);
+    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
+    toolbar->addAction(dismissSelectedAction);
+
+    openSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+    openSelectedAction->setShortcut(Qt::Key_Return);
+    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
+    toolbar->addAction(openSelectedAction);
 
     // Error Page
     createErrorPage();
@@ -56,8 +108,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     fileMenu->addAction(settingsAction);
 
     QAction *quitAction = new QAction("&Quit", this);
+    quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
+
+    // Status Bar
+    statusBar = new QStatusBar(this);
+    setStatusBar(statusBar);
+
+    countLabel = new QLabel("Items: 0", this);
+    timerLabel = new QLabel("Next refresh: --:--", this);
+
+    statusBar->addWidget(countLabel);
+    statusBar->addPermanentWidget(timerLabel);
+
+    refreshTimer = new QTimer(this);
+    countdownTimer = new QTimer(this);
+
+    connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
+    countdownTimer->start(1000);
 
     // Initial State Check
     QString token = SettingsDialog::getToken();
@@ -116,6 +185,12 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
+
+    if (refreshTimer) {
+        connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
+        refreshTimer->setInterval(300000); // 5 minutes
+        refreshTimer->start();
+    }
 
     QString token = SettingsDialog::getToken();
     if (!token.isEmpty()) {
@@ -178,6 +253,10 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
     lastError.clear();
 
+    if (countLabel) {
+        countLabel->setText(QString("Items: %1").arg(notifications.count()));
+    }
+
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
     }
@@ -198,16 +277,14 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     int newNotifications = 0;
 
     for (const Notification &n : notifications) {
-        QString label = QString("[%1] %2 (%3)").arg(n.type, n.title, n.repository);
-        QListWidgetItem *item = new QListWidgetItem(label);
+        QListWidgetItem *item = new QListWidgetItem();
+        NotificationItemWidget *widget = new NotificationItemWidget(n);
 
         item->setData(Qt::UserRole, n.url);
         item->setData(Qt::UserRole + 1, n.id);
+        item->setSizeHint(widget->sizeHint());
 
         if (n.unread) {
-            QFont font = item->font();
-            font.setBold(true);
-            item->setFont(font);
             unreadCount++;
 
             if (!knownNotificationIds.contains(n.id)) {
@@ -217,10 +294,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
 
         notificationList->addItem(item);
+        notificationList->setItemWidget(item, widget);
     }
 
     if (unreadCount > 0) {
-        trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_MessageBoxInformation));
+        trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
         if (newNotifications > 0) {
             showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
         }
@@ -242,12 +320,39 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
+    QString id = item->data(Qt::UserRole + 1).toString();
 
-    QString htmlUrl = apiUrl;
-    htmlUrl.replace("api.github.com/repos", "github.com");
-    htmlUrl.replace("/pulls/", "/pull/");
+    if (client) {
+        client->markAsRead(id);
+    }
 
+    // Visual update
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
     QDesktopServices::openUrl(QUrl(htmlUrl));
+    openNotificationUrl(apiUrl);
+}
+
+void MainWindow::openCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        onNotificationItemActivated(item);
+    }
+}
+
+void MainWindow::copyLinkCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        // Don't include notification_referrer_id for copied links
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+        QApplication::clipboard()->setText(htmlUrl);
+    }
 }
 
 void MainWindow::showTrayMessage(const QString &title, const QString &message) {
@@ -383,5 +488,93 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     if (trayIcon->isVisible()) {
         hide();
         event->ignore();
+    }
+}
+
+void MainWindow::onRefreshClicked() {
+    if (client) {
+        client->checkNotifications();
+        if (refreshTimer) {
+            refreshTimer->start(); // Restart timer
+            updateStatusBar(); // Force update
+        }
+    }
+}
+
+void MainWindow::onSelectAllClicked() {
+    if (notificationList) {
+        notificationList->selectAll();
+    }
+}
+
+void MainWindow::onSelectNoneClicked() {
+    if (notificationList) {
+        notificationList->clearSelection();
+    }
+}
+
+void MainWindow::onSelectTop10Clicked() {
+    if (!notificationList) return;
+    notificationList->clearSelection();
+    int count = notificationList->count();
+    int limit = qMin(10, count);
+    for (int i = 0; i < limit; ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item) item->setSelected(true);
+    }
+}
+
+void MainWindow::onDismissSelectedClicked() {
+    if (!notificationList || !client) return;
+
+    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString id = item->data(Qt::UserRole + 1).toString();
+        client->markAsRead(id);
+        knownNotificationIds.remove(id);
+        delete notificationList->takeItem(notificationList->row(item));
+    }
+
+    // Update icon if list is empty
+    if (notificationList->count() == 0) {
+        QIcon icon(":/assets/icon.png");
+        if (icon.isNull()) {
+            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+        }
+        trayIcon->setIcon(icon);
+    }
+}
+
+void MainWindow::onOpenSelectedClicked() {
+    if (!notificationList) return;
+
+    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        openNotificationUrl(apiUrl);
+    }
+}
+
+void MainWindow::openNotificationUrl(const QString &apiUrl) {
+    QString htmlUrl = apiUrl;
+    htmlUrl.replace("api.github.com/repos", "github.com");
+    htmlUrl.replace("/pulls/", "/pull/");
+    QDesktopServices::openUrl(QUrl(htmlUrl));
+}
+
+void MainWindow::updateStatusBar() {
+    if (refreshTimer && refreshTimer->isActive()) {
+        qint64 remaining = refreshTimer->remainingTime();
+        if (remaining >= 0) {
+            int seconds = (remaining / 1000) % 60;
+            int minutes = (remaining / 60000);
+            timerLabel->setText(QString("Next refresh: %1:%2")
+                                .arg(minutes, 2, 10, QChar('0'))
+                                .arg(seconds, 2, 10, QChar('0')));
+            return;
+        }
+    }
+    if (timerLabel) {
+        timerLabel->setText("Next refresh: --:--");
     }
 }

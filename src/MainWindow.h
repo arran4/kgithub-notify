@@ -9,6 +9,9 @@
 #include <QStackedWidget>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolBar>
+#include <QStatusBar>
+#include <QTimer>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
 
@@ -40,7 +43,18 @@ private slots:
     void showSettings();
     void showContextMenu(const QPoint &pos);
     void dismissCurrentItem();
+    void openCurrentItem();
+    void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
+
+    // Toolbar slots
+    void onRefreshClicked();
+    void updateStatusBar();
+    void onSelectAllClicked();
+    void onSelectNoneClicked();
+    void onSelectTop10Clicked();
+    void onDismissSelectedClicked();
+    void onOpenSelectedClicked();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -49,6 +63,7 @@ private:
     void createTrayIcon();
     void createErrorPage();
     void createLoginPage();
+    void openNotificationUrl(const QString &apiUrl);
     void createEmptyStatePage();
 
     QSystemTrayIcon *trayIcon;
@@ -57,9 +72,20 @@ private:
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;
+    QAction *openAction;
+    QAction *copyLinkAction;
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
+
+    // Toolbar
+    QToolBar *toolbar;
+    QAction *refreshAction;
+    QAction *selectAllAction;
+    QAction *selectNoneAction;
+    QAction *selectTop10Action;
+    QAction *dismissSelectedAction;
+    QAction *openSelectedAction;
 
     // New UI components
     QStackedWidget *stackWidget;
@@ -78,6 +104,13 @@ private:
 
     // Custom notification
     AuthErrorNotification *authNotification;
+
+    // Status Bar
+    QStatusBar *statusBar;
+    QLabel *countLabel;
+    QLabel *timerLabel;
+    QTimer *refreshTimer;
+    QTimer *countdownTimer;
 };
 
 #endif // MAINWINDOW_H
