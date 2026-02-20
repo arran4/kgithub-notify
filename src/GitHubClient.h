@@ -28,7 +28,6 @@ public:
     void setApiUrl(const QString &url);
     void checkNotifications();
     void markAsRead(const QString &id);
-    static QString apiToHtmlUrl(const QString &url);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
