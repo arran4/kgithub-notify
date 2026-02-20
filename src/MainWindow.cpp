@@ -77,6 +77,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     createLoginPage();
     stackWidget->addWidget(loginPage);
 
+    // Empty State Page
+    createEmptyStatePage();
+    stackWidget->addWidget(emptyStatePage);
+
     createTrayIcon();
 
     // Menu
@@ -130,6 +134,17 @@ void MainWindow::createLoginPage() {
     layout->addWidget(loginButton);
 }
 
+void MainWindow::createEmptyStatePage() {
+    emptyStatePage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    emptyStateLabel = new QLabel("No new notifications", emptyStatePage);
+    emptyStateLabel->setAlignment(Qt::AlignCenter);
+
+    layout->addWidget(emptyStateLabel);
+}
+
 void MainWindow::setClient(GitHubClient *c) {
     client = c;
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
@@ -145,13 +160,23 @@ void MainWindow::setClient(GitHubClient *c) {
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
 
-    QAction *showAction = new QAction("Show", this);
-    connect(showAction, &QAction::triggered, this, &QWidget::showNormal);
-    trayIconMenu->addAction(showAction);
+    QAction *openAction = new QAction("Open", this);
+    connect(openAction, &QAction::triggered, this, &QWidget::showNormal);
+    trayIconMenu->addAction(openAction);
+
+    QAction *refreshAction = new QAction("Force Refresh", this);
+    connect(refreshAction, &QAction::triggered, [this]() {
+        if (client) {
+            client->checkNotifications();
+        }
+    });
+    trayIconMenu->addAction(refreshAction);
 
     QAction *settingsAction = new QAction("Settings", this);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
+
+    trayIconMenu->addSeparator();
 
     QAction *quitAction = new QAction("Quit", this);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
@@ -192,8 +217,14 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 
     // Switch to list view on successful update
-    if (stackWidget->currentWidget() != notificationList) {
-        stackWidget->setCurrentWidget(notificationList);
+    if (notifications.isEmpty()) {
+        if (stackWidget->currentWidget() != emptyStatePage) {
+            stackWidget->setCurrentWidget(emptyStatePage);
+        }
+    } else {
+        if (stackWidget->currentWidget() != notificationList) {
+            stackWidget->setCurrentWidget(notificationList);
+        }
     }
 
     notificationList->clear();
