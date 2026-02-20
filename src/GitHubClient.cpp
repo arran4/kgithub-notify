@@ -10,8 +10,6 @@
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
-    // Connect to the signal manually or define a slot?
-    // Using connect in constructor is fine.
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
 }
@@ -74,13 +72,6 @@ void GitHubClient::markAsRead(const QString &id) {
     manager->sendCustomRequest(request, "PATCH");
 }
 
-QString GitHubClient::apiToHtmlUrl(const QString &apiUrl) {
-    QString htmlUrl = apiUrl;
-    htmlUrl.replace("api.github.com/repos", "github.com");
-    htmlUrl.replace("/pulls/", "/pull/");
-    return htmlUrl;
-}
-
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
@@ -94,7 +85,6 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
 
     // Check if this was a PATCH request (mark as read)
     if (reply->operation() == QNetworkAccessManager::CustomOperation && reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH") {
-        // Notification marked as read. Maybe refresh?
         checkNotifications();
         reply->deleteLater();
         return;
@@ -104,10 +94,6 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
     if (!doc.isArray()) {
-        // It might be an empty array or valid response for empty notifications
-        // Or if error occurred.
-        // For notifications endpoint, it returns array.
-        // If not array, maybe error message?
         emit errorOccurred("Invalid JSON response (expected array)");
         reply->deleteLater();
         return;

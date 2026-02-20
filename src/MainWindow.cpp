@@ -332,10 +332,7 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     item->setFont(font);
 
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
     QDesktopServices::openUrl(QUrl(htmlUrl));
-    openNotificationUrl(apiUrl);
 }
 
 void MainWindow::openCurrentItem() {
@@ -366,12 +363,6 @@ void MainWindow::showSettings() {
         if (client) {
             client->setToken(newToken);
             client->checkNotifications(); // Force check immediately
-
-            // If we were on login page and now have a token, we might want to switch
-            // to notification list immediately or wait for callback.
-            // But waiting for callback is safer as token might be invalid.
-            // However, visually it's nice to switch away from "Please login".
-            // Let's rely on updateNotifications or onAuthError to switch.
         }
     }
 }
@@ -551,15 +542,10 @@ void MainWindow::onOpenSelectedClicked() {
     QList<QListWidgetItem*> items = notificationList->selectedItems();
     for (auto item : items) {
         QString apiUrl = item->data(Qt::UserRole).toString();
-        openNotificationUrl(apiUrl);
+        QString id = item->data(Qt::UserRole + 1).toString();
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+        QDesktopServices::openUrl(QUrl(htmlUrl));
     }
-}
-
-void MainWindow::openNotificationUrl(const QString &apiUrl) {
-    QString htmlUrl = apiUrl;
-    htmlUrl.replace("api.github.com/repos", "github.com");
-    htmlUrl.replace("/pulls/", "/pull/");
-    QDesktopServices::openUrl(QUrl(htmlUrl));
 }
 
 void MainWindow::updateStatusBar() {

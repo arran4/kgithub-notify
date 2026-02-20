@@ -22,15 +22,6 @@ public:
     void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
 
-    // For testing purposes
-    QStackedWidget* getStackWidget() const { return stackWidget; }
-    QWidget* getErrorPage() const { return errorPage; }
-    QListWidget* getNotificationList() const { return notificationList; }
-    QWidget* getLoginPage() const { return loginPage; }
-    QWidget* getEmptyStatePage() const { return emptyStatePage; }
-    AuthErrorNotification* getAuthNotification() const { return authNotification; }
-    QMenu* getTrayIconMenu() const { return trayIconMenu; }
-
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
     void showError(const QString &error);
@@ -63,7 +54,6 @@ private:
     void createTrayIcon();
     void createErrorPage();
     void createLoginPage();
-    void openNotificationUrl(const QString &apiUrl);
     void createEmptyStatePage();
 
     QSystemTrayIcon *trayIcon;
