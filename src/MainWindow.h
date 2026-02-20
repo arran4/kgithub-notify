@@ -38,6 +38,8 @@ private slots:
     void showSettings();
     void showContextMenu(const QPoint &pos);
     void dismissCurrentItem();
+    void openCurrentItem();
+    void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
 
 protected:
@@ -54,6 +56,8 @@ private:
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;
+    QAction *openAction;
+    QAction *copyLinkAction;
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
