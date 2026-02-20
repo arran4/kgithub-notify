@@ -6,7 +6,6 @@ Makefile
 *.o
 *.moc
 moc_*.cpp
-*.qrc
 qrc_*.cpp
 ui_*.h
 Kgithub-notify
