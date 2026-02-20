@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Widgets Network REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Test REQUIRED)
 
 add_executable(Kgithub-notify
     src/main.cpp
@@ -29,3 +29,36 @@ target_link_libraries(Kgithub-notify
     Qt5::Widgets
     Qt5::Network
 )
+
+enable_testing()
+
+add_executable(TestMain
+    tests/TestMain.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+    # MainWindow depends on widgets and might be hard to test headless if we included it, but we only test Client/Settings.
+    # However SettingsDialog depends on QDialog which is widgets.
+    # So we need widgets linked.
+)
+
+target_link_libraries(TestMain
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+)
+
+add_test(NAME TestMain COMMAND TestMain)
+
+add_executable(TestAuth
+    tests/TestAuth.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+)
+
+target_link_libraries(TestAuth
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+)
+
+add_test(NAME TestAuth COMMAND TestAuth)
