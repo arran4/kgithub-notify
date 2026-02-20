@@ -111,13 +111,23 @@ void MainWindow::setClient(GitHubClient *c) {
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
 
-    QAction *showAction = new QAction("Show", this);
-    connect(showAction, &QAction::triggered, this, &QWidget::showNormal);
-    trayIconMenu->addAction(showAction);
+    QAction *openAction = new QAction("Open", this);
+    connect(openAction, &QAction::triggered, this, &QWidget::showNormal);
+    trayIconMenu->addAction(openAction);
+
+    QAction *refreshAction = new QAction("Force Refresh", this);
+    connect(refreshAction, &QAction::triggered, [this]() {
+        if (client) {
+            client->checkNotifications();
+        }
+    });
+    trayIconMenu->addAction(refreshAction);
 
     QAction *settingsAction = new QAction("Settings", this);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
+
+    trayIconMenu->addSeparator();
 
     QAction *quitAction = new QAction("Quit", this);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);

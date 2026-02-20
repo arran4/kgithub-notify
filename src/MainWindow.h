@@ -25,6 +25,7 @@ public:
     QListWidget* getNotificationList() const { return notificationList; }
     QWidget* getLoginPage() const { return loginPage; }
     AuthErrorNotification* getAuthNotification() const { return authNotification; }
+    QMenu* getTrayIconMenu() const { return trayIconMenu; }
 
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
