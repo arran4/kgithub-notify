@@ -8,6 +8,7 @@
 #include "../src/GitHubClient.h"
 #include "../src/SettingsDialog.h"
 #include "../src/AuthErrorNotification.h"
+#include "../src/NotificationItemWidget.h"
 
 class TestMainWindow : public QObject {
     Q_OBJECT
@@ -105,6 +106,57 @@ private slots:
         QVERIFY(notif->isVisible());
     }
 
+    void testNotificationItemContent() {
+        // Create dummy notification
+        Notification n;
+        n.id = "1";
+        n.title = "Test Title";
+        n.type = "Issue";
+        n.repository = "owner/repo";
+        n.url = "https://api.github.com/repos/owner/repo/issues/123";
+        n.updatedAt = "2023-01-01T12:00:00Z";
+        n.unread = true;
+
+        QList<Notification> notifications;
+        notifications.append(n);
+
+        // Setup MainWindow
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
+        MainWindow w;
+        GitHubClient client;
+        w.setClient(&client);
+        // Inject notifications
+        w.updateNotifications(notifications);
+
+        // Verify list item
+        QListWidget *list = w.getNotificationList();
+        QCOMPARE(list->count(), 1);
+
+        QListWidgetItem *item = list->item(0);
+        QVERIFY(item != nullptr);
+
+        QWidget *widget = list->itemWidget(item);
+        QVERIFY(widget != nullptr);
+
+        NotificationItemWidget *itemWidget = qobject_cast<NotificationItemWidget*>(widget);
+        QVERIFY(itemWidget != nullptr);
+
+        // Verify content
+        QCOMPARE(itemWidget->getTitle(), QString("Test Title"));
+        QVERIFY(itemWidget->titleLabel->font().bold()); // Check bold for unread
+        QCOMPARE(itemWidget->repoLabel->text(), QString("Repo: <b>owner/repo</b>"));
+        QCOMPARE(itemWidget->typeLabel->text(), QString("Type: Issue"));
+
+        QVERIFY(itemWidget->dateLabel->text().startsWith("Date: "));
+
+        // URL check
+        // "https://github.com/owner/repo/issues/123"
+        QString expectedUrl = "https://github.com/owner/repo/issues/123";
+        QCOMPARE(itemWidget->urlLabel->text(), expectedUrl);
+    }
+  
     void testTrayMenuStructure() {
         QSettings settings;
         settings.setValue("token", "dummy_token");

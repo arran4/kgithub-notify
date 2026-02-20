@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "NotificationItemWidget.h"
 #include <QApplication>
 #include <QScreen>
 #include <QDesktopServices>
@@ -240,16 +241,14 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     int newNotifications = 0;
 
     for (const Notification &n : notifications) {
-        QString label = QString("[%1] %2 (%3)").arg(n.type, n.title, n.repository);
-        QListWidgetItem *item = new QListWidgetItem(label);
+        QListWidgetItem *item = new QListWidgetItem();
+        NotificationItemWidget *widget = new NotificationItemWidget(n);
 
         item->setData(Qt::UserRole, n.url);
         item->setData(Qt::UserRole + 1, n.id);
+        item->setSizeHint(widget->sizeHint());
 
         if (n.unread) {
-            QFont font = item->font();
-            font.setBold(true);
-            item->setFont(font);
             unreadCount++;
 
             if (!knownNotificationIds.contains(n.id)) {
@@ -259,6 +258,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
 
         notificationList->addItem(item);
+        notificationList->setItemWidget(item, widget);
     }
 
     if (unreadCount > 0) {
@@ -284,6 +284,8 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+    QDesktopServices::openUrl(QUrl(htmlUrl));
     openNotificationUrl(apiUrl);
 }
 
