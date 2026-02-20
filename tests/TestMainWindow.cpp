@@ -1,6 +1,9 @@
 #include <QTest>
 #include <QSignalSpy>
 #include <QSettings>
+#include <QMenuBar>
+#include <QToolBar>
+#include <QAction>
 #include "../src/MainWindow.h"
 #include "../src/GitHubClient.h"
 #include "../src/SettingsDialog.h"
@@ -76,6 +79,10 @@ private slots:
 
         // Simulate success
         QList<Notification> notifications;
+        Notification n;
+        n.id = "1";
+        n.title = "Test";
+        notifications.append(n);
         emit client.notificationsReceived(notifications);
 
         // Should switch back to notification list
@@ -120,7 +127,6 @@ private slots:
         MainWindow w;
         GitHubClient client;
         w.setClient(&client);
-
         // Inject notifications
         w.updateNotifications(notifications);
 
@@ -149,6 +155,104 @@ private slots:
         // "https://github.com/owner/repo/issues/123"
         QString expectedUrl = "https://github.com/owner/repo/issues/123";
         QCOMPARE(itemWidget->urlLabel->text(), expectedUrl);
+    }
+  
+    void testTrayMenuStructure() {
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
+        MainWindow w;
+        GitHubClient client;
+        w.setClient(&client);
+
+        // Verify initially (assuming dummy_token puts us in list)
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getNotificationList());
+
+        // Emit empty notifications
+        QList<Notification> notifications;
+        emit client.notificationsReceived(notifications);
+
+        // Verify switch to empty state page
+        QVERIFY(w.getEmptyStatePage() != nullptr);
+        QCOMPARE(w.getStackWidget()->currentWidget(), w.getEmptyStatePage());
+        QMenu *menu = w.getTrayIconMenu();
+        QVERIFY(menu != nullptr);
+
+        QList<QAction*> actions = menu->actions();
+        // Open, Force Refresh, Settings, Separator, Quit
+        QCOMPARE(actions.count(), 5);
+
+        QCOMPARE(actions[0]->text(), "Open");
+        QCOMPARE(actions[1]->text(), "Force Refresh");
+        QCOMPARE(actions[2]->text(), "Settings");
+        QVERIFY(actions[3]->isSeparator());
+        QCOMPARE(actions[4]->text(), "Quit");
+    }
+
+    void testShortcuts() {
+        MainWindow w;
+
+        // Toolbar actions
+        QToolBar *toolbar = w.findChild<QToolBar*>();
+        QVERIFY(toolbar != nullptr);
+
+        QList<QAction*> actions = toolbar->actions();
+
+        QAction *refreshAction = nullptr;
+        QAction *selectAllAction = nullptr;
+        QAction *selectNoneAction = nullptr;
+        QAction *selectTop10Action = nullptr;
+        QAction *dismissSelectedAction = nullptr;
+        QAction *openSelectedAction = nullptr;
+
+        for (QAction *action : actions) {
+            if (action->text() == "Refresh") refreshAction = action;
+            else if (action->text() == "Select All") selectAllAction = action;
+            else if (action->text() == "Select None") selectNoneAction = action;
+            else if (action->text() == "Top 10") selectTop10Action = action;
+            else if (action->text() == "Dismiss Selected") dismissSelectedAction = action;
+            else if (action->text() == "Open Selected") openSelectedAction = action;
+        }
+
+        QVERIFY(refreshAction);
+        QCOMPARE(refreshAction->shortcut(), QKeySequence::Refresh);
+
+        QVERIFY(selectAllAction);
+        QCOMPARE(selectAllAction->shortcut(), QKeySequence::SelectAll);
+
+        QVERIFY(selectNoneAction);
+        QCOMPARE(selectNoneAction->shortcut(), QKeySequence("Ctrl+Shift+A"));
+
+        QVERIFY(selectTop10Action);
+        QCOMPARE(selectTop10Action->shortcut(), QKeySequence("Ctrl+1"));
+
+        QVERIFY(dismissSelectedAction);
+        QCOMPARE(dismissSelectedAction->shortcut(), QKeySequence::Delete);
+
+        QVERIFY(openSelectedAction);
+        QCOMPARE(openSelectedAction->shortcut(), QKeySequence(Qt::Key_Return));
+
+        // File Menu
+        QMenuBar *menuBar = w.menuBar();
+        QMenu *fileMenu = nullptr;
+        for (QAction* action : menuBar->actions()) {
+            if (action->menu() && action->menu()->title() == "&File") {
+                fileMenu = action->menu();
+                break;
+            }
+        }
+        QVERIFY(fileMenu);
+
+        QAction *quitAction = nullptr;
+        for (QAction *action : fileMenu->actions()) {
+            if (action->text() == "&Quit") {
+                quitAction = action;
+                break;
+            }
+        }
+
+        QVERIFY(quitAction);
+        QCOMPARE(quitAction->shortcut(), QKeySequence::Quit);
     }
 };
 
