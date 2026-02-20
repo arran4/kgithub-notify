@@ -106,6 +106,7 @@ private slots:
         QSettings settings;
         settings.setValue("token", "dummy_token");
 
+    void testTrayMenuStructure() {
         MainWindow w;
         GitHubClient client;
         w.setClient(&client);
@@ -120,6 +121,18 @@ private slots:
         // Verify switch to empty state page
         QVERIFY(w.getEmptyStatePage() != nullptr);
         QCOMPARE(w.getStackWidget()->currentWidget(), w.getEmptyStatePage());
+        QMenu *menu = w.getTrayIconMenu();
+        QVERIFY(menu != nullptr);
+
+        QList<QAction*> actions = menu->actions();
+        // Open, Force Refresh, Settings, Separator, Quit
+        QCOMPARE(actions.count(), 5);
+
+        QCOMPARE(actions[0]->text(), "Open");
+        QCOMPARE(actions[1]->text(), "Force Refresh");
+        QCOMPARE(actions[2]->text(), "Settings");
+        QVERIFY(actions[3]->isSeparator());
+        QCOMPARE(actions[4]->text(), "Quit");
     }
 };
 
