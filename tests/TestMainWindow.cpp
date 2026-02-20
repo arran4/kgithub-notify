@@ -4,6 +4,7 @@
 #include "../src/MainWindow.h"
 #include "../src/GitHubClient.h"
 #include "../src/SettingsDialog.h"
+#include "../src/AuthErrorNotification.h"
 
 class TestMainWindow : public QObject {
     Q_OBJECT
@@ -78,6 +79,23 @@ private slots:
 
         // Should switch back to notification list
         QCOMPARE(w.getStackWidget()->currentWidget(), w.getNotificationList());
+    }
+
+    void testAuthNotificationShown() {
+        QSettings settings;
+        settings.setValue("token", "dummy_token");
+
+        MainWindow w;
+        GitHubClient client;
+        w.setClient(&client);
+
+        // Trigger Auth Error
+        emit client.authError("Notification Test Error");
+
+        // Verify notification is created and shown
+        AuthErrorNotification *notif = w.getAuthNotification();
+        QVERIFY(notif != nullptr);
+        QVERIFY(notif->isVisible());
     }
 };
 
