@@ -74,6 +74,13 @@ void GitHubClient::markAsRead(const QString &id) {
     manager->sendCustomRequest(request, "PATCH");
 }
 
+QString GitHubClient::apiToHtmlUrl(const QString &apiUrl) {
+    QString htmlUrl = apiUrl;
+    htmlUrl.replace("api.github.com/repos", "github.com");
+    htmlUrl.replace("/pulls/", "/pull/");
+    return htmlUrl;
+}
+
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {

@@ -20,6 +20,8 @@ add_executable(Kgithub-notify
     src/MainWindow.h
     src/AuthErrorNotification.cpp
     src/AuthErrorNotification.h
+    src/NotificationItemWidget.cpp
+    src/NotificationItemWidget.h
     src/resources.qrc
 )
 
@@ -67,6 +69,8 @@ add_executable(TestMainWindow
     src/GitHubClient.cpp
     src/SettingsDialog.cpp
     src/AuthErrorNotification.cpp
+    src/NotificationItemWidget.cpp
+    src/NotificationItemWidget.h
     src/resources.qrc
 )
 
