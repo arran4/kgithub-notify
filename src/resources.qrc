@@ -2,6 +2,6 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>assets/icon.png</file>
-        <file alias="assets/icon-dotted.png">assets/logo-dotted.png</file>
+        <file>assets/icon-dotted.png</file>
     </qresource>
 </RCC>
