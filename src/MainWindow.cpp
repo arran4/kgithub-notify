@@ -8,17 +8,22 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QStyle>
+#include <QVBoxLayout>
 #include "SettingsDialog.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false) {
     setWindowTitle("Kgithub-notify");
     resize(400, 600);
 
+    // Initialize Stacked Widget
+    stackWidget = new QStackedWidget(this);
+    setCentralWidget(stackWidget);
+
+    // Notification List
     notificationList = new QListWidget(this);
-    setCentralWidget(notificationList);
     connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
 
-    // Context menu
+    // Context menu for list
     notificationList->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
 
@@ -26,6 +31,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     dismissAction = new QAction("Dismiss", this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
+
+    stackWidget->addWidget(notificationList);
+
+    // Error Page
+    createErrorPage();
+    stackWidget->addWidget(errorPage);
 
     createTrayIcon();
 
@@ -45,6 +56,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
         // We can't show modal dialog in constructor usually, but let's try or defer it.
         // Better to defer it or let the main loop handle it.
     }
+}
+
+void MainWindow::createErrorPage() {
+    errorPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(errorPage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    errorLabel = new QLabel("Authentication Error", errorPage);
+    errorLabel->setWordWrap(true);
+    errorLabel->setAlignment(Qt::AlignCenter);
+
+    settingsButton = new QPushButton("Open Settings", errorPage);
+    connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
+
+    layout->addWidget(errorLabel);
+    layout->addWidget(settingsButton);
 }
 
 void MainWindow::setClient(GitHubClient *c) {
@@ -103,6 +130,12 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
     lastError.clear();
+
+    // Switch to list view
+    if (stackWidget->currentWidget() != notificationList) {
+        stackWidget->setCurrentWidget(notificationList);
+    }
+
     notificationList->clear();
     int unreadCount = 0;
     int newNotifications = 0;
@@ -169,12 +202,15 @@ void MainWindow::showSettings() {
 
 void MainWindow::onAuthError(const QString &message) {
     pendingAuthError = true;
+
+    // Update error page
+    errorLabel->setText("Authentication Error: " + message + "\n\nPlease update your token in Settings.");
+    stackWidget->setCurrentWidget(errorPage);
+
     if (trayIcon && trayIcon->isVisible()) {
-        trayIcon->showMessage("GitHub Error", message + "\nClick to open settings.", QSystemTrayIcon::Warning, 10000);
+        trayIcon->showMessage("GitHub Error", message + "\nClick this notification to open settings.", QSystemTrayIcon::Warning, 10000);
     } else {
-        // If tray not visible, should we force settings?
-        // Maybe better to just show settings if window is visible, or open it.
-        // For now rely on tray message or if window is open, show dialog.
+        // If tray not visible, show settings or ensure window is visible
         if (isVisible()) {
             showSettings();
         }
@@ -184,7 +220,7 @@ void MainWindow::onAuthError(const QString &message) {
 void MainWindow::onTrayMessageClicked() {
     if (pendingAuthError) {
         showSettings();
-        pendingAuthError = false;
+        // Don't clear pendingAuthError here, wait for successful update
     }
 }
 
