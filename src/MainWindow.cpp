@@ -14,6 +14,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
+    setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
 
     // Initialize Stacked Widget
@@ -254,7 +255,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 
     if (unreadCount > 0) {
-        trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_MessageBoxInformation));
+        trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
         if (newNotifications > 0) {
             showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
         }
