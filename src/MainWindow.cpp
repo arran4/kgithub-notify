@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "NotificationItemWidget.h"
 #include <QApplication>
 #include <QScreen>
 #include <QDesktopServices>
@@ -10,10 +11,12 @@
 #include <QDebug>
 #include <QStyle>
 #include <QVBoxLayout>
+#include <QClipboard>
 #include "SettingsDialog.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
+    setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
 
     // Initialize Stacked Widget
@@ -30,6 +33,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
 
     contextMenu = new QMenu(this);
+
+    openAction = new QAction("Open", this);
+    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
+    contextMenu->addAction(openAction);
+
+    copyLinkAction = new QAction("Copy Link", this);
+    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
+    contextMenu->addAction(copyLinkAction);
+
     dismissAction = new QAction("Dismiss", this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
@@ -42,30 +54,36 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
 
     toolbar->addSeparator();
 
     selectAllAction = new QAction("Select All", this);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
     connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
     toolbar->addAction(selectAllAction);
 
     selectNoneAction = new QAction("Select None", this);
+    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
     toolbar->addAction(selectNoneAction);
 
     selectTop10Action = new QAction("Top 10", this);
+    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
     connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
     toolbar->addAction(selectTop10Action);
 
     toolbar->addSeparator();
 
     dismissSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+    dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
 
     openSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+    openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
 
@@ -90,6 +108,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     fileMenu->addAction(settingsAction);
 
     QAction *quitAction = new QAction("&Quit", this);
+    quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
 
@@ -258,16 +277,14 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     int newNotifications = 0;
 
     for (const Notification &n : notifications) {
-        QString label = QString("[%1] %2 (%3)").arg(n.type, n.title, n.repository);
-        QListWidgetItem *item = new QListWidgetItem(label);
+        QListWidgetItem *item = new QListWidgetItem();
+        NotificationItemWidget *widget = new NotificationItemWidget(n);
 
         item->setData(Qt::UserRole, n.url);
         item->setData(Qt::UserRole + 1, n.id);
+        item->setSizeHint(widget->sizeHint());
 
         if (n.unread) {
-            QFont font = item->font();
-            font.setBold(true);
-            item->setFont(font);
             unreadCount++;
 
             if (!knownNotificationIds.contains(n.id)) {
@@ -277,10 +294,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
 
         notificationList->addItem(item);
+        notificationList->setItemWidget(item, widget);
     }
 
     if (unreadCount > 0) {
-        trayIcon->setIcon(QApplication::style()->standardIcon(QStyle::SP_MessageBoxInformation));
+        trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
         if (newNotifications > 0) {
             showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
         }
@@ -302,7 +320,39 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
+    QString id = item->data(Qt::UserRole + 1).toString();
+
+    if (client) {
+        client->markAsRead(id);
+    }
+
+    // Visual update
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+    QDesktopServices::openUrl(QUrl(htmlUrl));
     openNotificationUrl(apiUrl);
+}
+
+void MainWindow::openCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        onNotificationItemActivated(item);
+    }
+}
+
+void MainWindow::copyLinkCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        // Don't include notification_referrer_id for copied links
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+        QApplication::clipboard()->setText(htmlUrl);
+    }
 }
 
 void MainWindow::showTrayMessage(const QString &title, const QString &message) {
