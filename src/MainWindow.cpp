@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QStyle>
 #include <QVBoxLayout>
+#include <QClipboard>
 #include "SettingsDialog.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
@@ -32,6 +33,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
 
     contextMenu = new QMenu(this);
+
+    openAction = new QAction("Open", this);
+    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
+    contextMenu->addAction(openAction);
+
+    copyLinkAction = new QAction("Copy Link", this);
+    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
+    contextMenu->addAction(copyLinkAction);
+
     dismissAction = new QAction("Dismiss", this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
@@ -284,9 +294,39 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
+    QString id = item->data(Qt::UserRole + 1).toString();
+
+    if (client) {
+        client->markAsRead(id);
+    }
+
+    // Visual update
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
     QDesktopServices::openUrl(QUrl(htmlUrl));
     openNotificationUrl(apiUrl);
+}
+
+void MainWindow::openCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        onNotificationItemActivated(item);
+    }
+}
+
+void MainWindow::copyLinkCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        // Don't include notification_referrer_id for copied links
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+        QApplication::clipboard()->setText(htmlUrl);
+    }
 }
 
 void MainWindow::showTrayMessage(const QString &title, const QString &message) {

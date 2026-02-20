@@ -23,6 +23,7 @@ class GitHubClient : public QObject {
     Q_OBJECT
 public:
     explicit GitHubClient(QObject *parent = nullptr);
+    static QString apiToHtmlUrl(const QString &apiUrl, const QString &notificationId = "");
     void setToken(const QString &token);
     void setApiUrl(const QString &url);
     void checkNotifications();

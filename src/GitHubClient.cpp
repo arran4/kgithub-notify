@@ -1,6 +1,7 @@
 #include "GitHubClient.h"
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QUrlQuery>
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -13,6 +14,22 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     // Using connect in constructor is fine.
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
+}
+
+QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
+    QString htmlUrl = apiUrl;
+    htmlUrl.replace("api.github.com/repos", "github.com");
+    htmlUrl.replace("/pulls/", "/pull/");
+    htmlUrl.replace("/commits/", "/commit/");
+
+    if (!notificationId.isEmpty()) {
+        QUrl url(htmlUrl);
+        QUrlQuery query(url.query());
+        query.addQueryItem("notification_referrer_id", notificationId);
+        url.setQuery(query);
+        return url.toString();
+    }
+    return htmlUrl;
 }
 
 void GitHubClient::setToken(const QString &token) {
