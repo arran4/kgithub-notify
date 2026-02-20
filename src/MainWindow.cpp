@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include <QApplication>
+#include <QScreen>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QAction>
@@ -11,7 +12,7 @@
 #include <QVBoxLayout>
 #include "SettingsDialog.h"
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
     resize(400, 600);
 
@@ -152,6 +153,10 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     pendingAuthError = false;
     lastError.clear();
 
+    if (authNotification && authNotification->isVisible()) {
+        authNotification->close();
+    }
+
     // Switch to list view on successful update
     if (stackWidget->currentWidget() != notificationList) {
         stackWidget->setCurrentWidget(notificationList);
@@ -197,6 +202,13 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 }
 
+void MainWindow::onAuthNotificationSettingsClicked() {
+    if (authNotification) {
+        authNotification->close();
+    }
+    showSettings();
+}
+
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
 
@@ -235,9 +247,49 @@ void MainWindow::onAuthError(const QString &message) {
     errorLabel->setText("Authentication Error: " + message + "\n\nPlease update your token in Settings.");
     stackWidget->setCurrentWidget(errorPage);
 
+    if (!authNotification) {
+        authNotification = new AuthErrorNotification(this);
+        connect(authNotification, &AuthErrorNotification::settingsClicked, this, &MainWindow::onAuthNotificationSettingsClicked);
+        // dismissed signal is handled by AuthErrorNotification internally closing itself, but we can hook if needed.
+    }
+
+    authNotification->setMessage(message);
+
+    // Position near tray icon if possible
+    QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
+    bool positioned = false;
+
     if (trayIcon && trayIcon->isVisible()) {
-        trayIcon->showMessage("GitHub Error", message + "\nClick this notification to open settings.", QSystemTrayIcon::Warning, 10000);
-    } else {
+        QRect trayGeom = trayIcon->geometry();
+        if (!trayGeom.isEmpty()) {
+             int x = trayGeom.center().x() - authNotification->width() / 2;
+             int y;
+
+             // If tray is in top half, show below
+             if (trayGeom.center().y() < screenGeom.height() / 2) {
+                 y = trayGeom.bottom() + 10;
+             } else {
+                 // Show above
+                 y = trayGeom.top() - authNotification->height() - 10;
+             }
+
+             // Clamp X
+             if (x < screenGeom.left()) x = screenGeom.left() + 10;
+             if (x + authNotification->width() > screenGeom.right()) x = screenGeom.right() - authNotification->width() - 10;
+
+             authNotification->move(x, y);
+             positioned = true;
+        }
+    }
+
+    if (!positioned) {
+        // Fallback: Bottom right
+        authNotification->move(screenGeom.bottomRight() - QPoint(authNotification->width() + 10, authNotification->height() + 10));
+    }
+
+    authNotification->show();
+
+    if (!trayIcon || !trayIcon->isVisible()) {
         // If tray not visible, show settings or ensure window is visible
         if (isVisible()) {
             showSettings();

@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include "GitHubClient.h"
+#include "AuthErrorNotification.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -23,6 +24,7 @@ public:
     QWidget* getErrorPage() const { return errorPage; }
     QListWidget* getNotificationList() const { return notificationList; }
     QWidget* getLoginPage() const { return loginPage; }
+    AuthErrorNotification* getAuthNotification() const { return authNotification; }
 
 public slots:
     void updateNotifications(const QList<Notification> &notifications);
@@ -36,6 +38,7 @@ private slots:
     void showSettings();
     void showContextMenu(const QPoint &pos);
     void dismissCurrentItem();
+    void onAuthNotificationSettingsClicked();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -65,6 +68,9 @@ private:
     QWidget *loginPage;
     QLabel *loginLabel;
     QPushButton *loginButton;
+
+    // Custom notification
+    AuthErrorNotification *authNotification;
 };
 
 #endif // MAINWINDOW_H
