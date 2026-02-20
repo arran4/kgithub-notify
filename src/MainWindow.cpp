@@ -22,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
 
     // Notification List
     notificationList = new QListWidget(this);
+    notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
     connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
 
     // Context menu for list
@@ -34,6 +35,39 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     contextMenu->addAction(dismissAction);
 
     stackWidget->addWidget(notificationList);
+
+    // Toolbar
+    toolbar = new QToolBar(this);
+    toolbar->setMovable(false);
+    addToolBar(Qt::TopToolBarArea, toolbar);
+
+    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this);
+    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    toolbar->addAction(refreshAction);
+
+    toolbar->addSeparator();
+
+    selectAllAction = new QAction("Select All", this);
+    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    toolbar->addAction(selectAllAction);
+
+    selectNoneAction = new QAction("Select None", this);
+    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    toolbar->addAction(selectNoneAction);
+
+    selectTop10Action = new QAction("Top 10", this);
+    connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
+    toolbar->addAction(selectTop10Action);
+
+    toolbar->addSeparator();
+
+    dismissSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
+    toolbar->addAction(dismissSelectedAction);
+
+    openSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
+    toolbar->addAction(openSelectedAction);
 
     // Error Page
     createErrorPage();
@@ -211,12 +245,7 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString apiUrl = item->data(Qt::UserRole).toString();
-
-    QString htmlUrl = apiUrl;
-    htmlUrl.replace("api.github.com/repos", "github.com");
-    htmlUrl.replace("/pulls/", "/pull/");
-
-    QDesktopServices::openUrl(QUrl(htmlUrl));
+    openNotificationUrl(apiUrl);
 }
 
 void MainWindow::showTrayMessage(const QString &title, const QString &message) {
@@ -353,4 +382,71 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         hide();
         event->ignore();
     }
+}
+
+void MainWindow::onRefreshClicked() {
+    if (client) {
+        client->checkNotifications();
+    }
+}
+
+void MainWindow::onSelectAllClicked() {
+    if (notificationList) {
+        notificationList->selectAll();
+    }
+}
+
+void MainWindow::onSelectNoneClicked() {
+    if (notificationList) {
+        notificationList->clearSelection();
+    }
+}
+
+void MainWindow::onSelectTop10Clicked() {
+    if (!notificationList) return;
+    notificationList->clearSelection();
+    int count = notificationList->count();
+    int limit = qMin(10, count);
+    for (int i = 0; i < limit; ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item) item->setSelected(true);
+    }
+}
+
+void MainWindow::onDismissSelectedClicked() {
+    if (!notificationList || !client) return;
+
+    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString id = item->data(Qt::UserRole + 1).toString();
+        client->markAsRead(id);
+        knownNotificationIds.remove(id);
+        delete notificationList->takeItem(notificationList->row(item));
+    }
+
+    // Update icon if list is empty
+    if (notificationList->count() == 0) {
+        QIcon icon(":/assets/icon.png");
+        if (icon.isNull()) {
+            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+        }
+        trayIcon->setIcon(icon);
+    }
+}
+
+void MainWindow::onOpenSelectedClicked() {
+    if (!notificationList) return;
+
+    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        openNotificationUrl(apiUrl);
+    }
+}
+
+void MainWindow::openNotificationUrl(const QString &apiUrl) {
+    QString htmlUrl = apiUrl;
+    htmlUrl.replace("api.github.com/repos", "github.com");
+    htmlUrl.replace("/pulls/", "/pull/");
+    QDesktopServices::openUrl(QUrl(htmlUrl));
 }
