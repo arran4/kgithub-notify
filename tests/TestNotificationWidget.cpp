@@ -74,8 +74,8 @@ private slots:
 
         // Check URL Label
         if (urlLabel) {
-            // URL label should also be PlainText
-            QCOMPARE(urlLabel->textFormat(), Qt::PlainText);
+            // URL label is now RichText (link)
+            QCOMPARE(urlLabel->textFormat(), Qt::RichText);
         }
     }
 };

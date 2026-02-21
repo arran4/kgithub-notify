@@ -16,6 +16,8 @@
 #include "AuthErrorNotification.h"
 #include <KNotification>
 
+class NotificationItemWidget;
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -72,6 +74,18 @@ private:
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
+
+    struct NotificationDetails {
+        QString author;
+        QString avatarUrl;
+        QString htmlUrl;
+        QPixmap avatar;
+        bool hasDetails = false;
+        bool hasImage = false;
+    };
+    QMap<QString, NotificationDetails> detailsCache;
+
+    NotificationItemWidget* findNotificationWidget(const QString &id);
 
     // Toolbar
     QToolBar *toolbar;

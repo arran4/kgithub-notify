@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
+#include <QPixmap>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -71,6 +72,27 @@ void GitHubClient::markAsRead(const QString &id) {
     manager->sendCustomRequest(request, "PATCH");
 }
 
+void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
+    if (m_token.isEmpty()) return;
+    QUrl qUrl(url);
+    QNetworkRequest request = createRequest(qUrl);
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "details");
+    reply->setProperty("notificationId", notificationId);
+}
+
+void GitHubClient::fetchImage(const QString &imageUrl, const QString &notificationId) {
+    QUrl qUrl(imageUrl);
+    QNetworkRequest request(qUrl);
+    // Images (avatars) are usually public, so no auth header needed.
+    // Also, User-Agent is good practice.
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "image");
+    reply->setProperty("notificationId", notificationId);
+}
+
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
@@ -86,6 +108,50 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    QString type = reply->property("type").toString();
+    QString notificationId = reply->property("notificationId").toString();
+
+    if (!type.isEmpty()) {
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "Error fetching" << type << ":" << reply->errorString();
+            reply->deleteLater();
+            return;
+        }
+
+        if (type == "details") {
+            QByteArray data = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                QString authorName;
+                QString avatarUrl;
+
+                if (obj.contains("user")) {
+                    QJsonObject user = obj["user"].toObject();
+                    authorName = user["login"].toString();
+                    avatarUrl = user["avatar_url"].toString();
+                } else if (obj.contains("author")) {
+                    QJsonObject author = obj["author"].toObject();
+                    authorName = author["login"].toString();
+                    avatarUrl = author["avatar_url"].toString();
+                }
+
+                QString htmlUrl = obj["html_url"].toString();
+
+                emit detailsReceived(notificationId, authorName, avatarUrl, htmlUrl);
+            }
+        } else if (type == "image") {
+            QByteArray data = reply->readAll();
+            QPixmap pixmap;
+            if (pixmap.loadFromData(data)) {
+                emit imageReceived(notificationId, pixmap);
+            }
+        }
+
+        reply->deleteLater();
+        return;
+    }
+
     // Check for verification request
     if (reply->url().toString().endsWith("/user")) {
         if (reply->error() == QNetworkReply::NoError) {

@@ -199,6 +199,35 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
+    connect(client, &GitHubClient::detailsReceived, this, [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl){
+        NotificationDetails &details = detailsCache[id];
+        details.author = author;
+        details.avatarUrl = avatarUrl;
+        details.htmlUrl = htmlUrl;
+        details.hasDetails = true;
+
+        NotificationItemWidget *widget = findNotificationWidget(id);
+        if (widget) {
+            widget->setAuthor(author, details.avatar);
+            widget->setHtmlUrl(htmlUrl);
+        }
+
+        if (!details.hasImage && !avatarUrl.isEmpty()) {
+            if (client) client->fetchImage(avatarUrl, id);
+        }
+    });
+
+    connect(client, &GitHubClient::imageReceived, this, [this](const QString &id, const QPixmap &pixmap){
+        NotificationDetails &details = detailsCache[id];
+        details.avatar = pixmap;
+        details.hasImage = true;
+
+        NotificationItemWidget *widget = findNotificationWidget(id);
+        if (widget) {
+            widget->setAuthor(details.author, pixmap);
+        }
+    });
+
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
         int interval = SettingsDialog::getInterval();
@@ -367,6 +396,16 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     for (const Notification &n : notifications) {
         QListWidgetItem *item = new QListWidgetItem();
         NotificationItemWidget *widget = new NotificationItemWidget(n);
+
+        if (detailsCache.contains(n.id)) {
+            const NotificationDetails &details = detailsCache[n.id];
+            if (details.hasDetails) {
+                widget->setAuthor(details.author, details.avatar);
+                widget->setHtmlUrl(details.htmlUrl);
+            }
+        } else {
+            if (client) client->fetchNotificationDetails(n.url, n.id);
+        }
 
         item->setData(Qt::UserRole, n.url);
         item->setData(Qt::UserRole + 1, n.id);
@@ -730,4 +769,15 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
     notification->sendEvent();
+}
+
+NotificationItemWidget* MainWindow::findNotificationWidget(const QString &id) {
+    if (!notificationList) return nullptr;
+    for(int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == id) {
+            return qobject_cast<NotificationItemWidget*>(notificationList->itemWidget(item));
+        }
+    }
+    return nullptr;
 }
