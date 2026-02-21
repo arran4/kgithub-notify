@@ -1,22 +1,24 @@
 #include "MainWindow.h"
-#include "NotificationItemWidget.h"
-#include <QApplication>
-#include <QScreen>
-#include <QDesktopServices>
-#include <QUrl>
+
 #include <QAction>
-#include <QMenuBar>
-#include <QCloseEvent>
-#include <QMessageBox>
-#include <QDebug>
-#include <QStyle>
-#include <QVBoxLayout>
+#include <QApplication>
 #include <QClipboard>
-#include "SettingsDialog.h"
+#include <QCloseEvent>
+#include <QDebug>
+#include <QDesktopServices>
+#include <QMenuBar>
+#include <QMessageBox>
+#include <QScreen>
+#include <QStyle>
+#include <QUrl>
+#include <QVBoxLayout>
 #include <limits>
 
+#include "NotificationItemWidget.h"
+#include "SettingsDialog.h"
+
 static int calculateSafeInterval(int minutes) {
-    if (minutes <= 0) minutes = 1; // Minimum 1 minute
+    if (minutes <= 0) minutes = 1;  // Minimum 1 minute
     qint64 msec = static_cast<qint64>(minutes) * 60 * 1000;
     if (msec > std::numeric_limits<int>::max()) {
         return std::numeric_limits<int>::max();
@@ -24,7 +26,8 @@ static int calculateSafeInterval(int minutes) {
     return static_cast<int>(msec);
 }
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
@@ -87,12 +90,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
 
     toolbar->addSeparator();
 
-    dismissSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+    dismissSelectedAction =
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
     dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
 
-    openSelectedAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+    openSelectedAction =
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
     openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
@@ -147,8 +152,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     }
 }
 
-MainWindow::~MainWindow() {
-}
+MainWindow::~MainWindow() {}
 
 void MainWindow::createErrorPage() {
     errorPage = new QWidget(this);
@@ -171,7 +175,8 @@ void MainWindow::createLoginPage() {
     QVBoxLayout *layout = new QVBoxLayout(loginPage);
     layout->setAlignment(Qt::AlignCenter);
 
-    loginLabel = new QLabel("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started.", loginPage);
+    loginLabel = new QLabel(
+        "Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started.", loginPage);
     loginLabel->setWordWrap(true);
     loginLabel->setAlignment(Qt::AlignCenter);
 
@@ -245,10 +250,10 @@ void MainWindow::updateTrayMenu() {
     trayIconMenu->addSeparator();
 
     int unreadCount = 0;
-    QList<QListWidgetItem*> unreadItems;
-    for(int i=0; i<notificationList->count(); ++i) {
-        QListWidgetItem* item = notificationList->item(i);
-        if(item->font().bold()) {
+    QList<QListWidgetItem *> unreadItems;
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->font().bold()) {
             unreadCount++;
             unreadItems.append(item);
         }
@@ -260,8 +265,8 @@ void MainWindow::updateTrayMenu() {
         trayIconMenu->addAction(header);
 
         int limit = qMin(unreadCount, 5);
-        for(int i=0; i<limit; ++i) {
-            QListWidgetItem* item = unreadItems[i];
+        for (int i = 0; i < limit; ++i) {
+            QListWidgetItem *item = unreadItems[i];
             QString title = item->data(Qt::UserRole + 2).toString();
             QString repo = item->data(Qt::UserRole + 3).toString();
             QString apiUrl = item->data(Qt::UserRole).toString();
@@ -276,15 +281,15 @@ void MainWindow::updateTrayMenu() {
                 QDesktopServices::openUrl(QUrl(htmlUrl));
 
                 // Update local state and refresh menu
-                for(int i=0; i<notificationList->count(); ++i) {
-                     QListWidgetItem* item = notificationList->item(i);
-                     if (item->data(Qt::UserRole + 1).toString() == id) {
-                         QFont font = item->font();
-                         font.setBold(false);
-                         item->setFont(font);
-                         QTimer::singleShot(0, this, &MainWindow::updateTrayMenu);
-                         break;
-                     }
+                for (int i = 0; i < notificationList->count(); ++i) {
+                    QListWidgetItem *item = notificationList->item(i);
+                    if (item->data(Qt::UserRole + 1).toString() == id) {
+                        QFont font = item->font();
+                        font.setBold(false);
+                        item->setFont(font);
+                        QTimer::singleShot(0, this, &MainWindow::updateTrayMenu);
+                        break;
+                    }
                 }
             });
             trayIconMenu->addAction(itemAction);
@@ -461,7 +466,7 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
-            client->checkNotifications(); // Force check immediately
+            client->checkNotifications();  // Force check immediately
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
@@ -480,7 +485,8 @@ void MainWindow::onAuthError(const QString &message) {
 
     if (!authNotification) {
         authNotification = new AuthErrorNotification(this);
-        connect(authNotification, &AuthErrorNotification::settingsClicked, this, &MainWindow::onAuthNotificationSettingsClicked);
+        connect(authNotification, &AuthErrorNotification::settingsClicked, this,
+                &MainWindow::onAuthNotificationSettingsClicked);
         // dismissed signal is handled by AuthErrorNotification internally closing itself, but we can hook if needed.
     }
 
@@ -507,7 +513,7 @@ void MainWindow::onTrayMessageClicked() {
 void MainWindow::showContextMenu(const QPoint &pos) {
     QListWidgetItem *item = notificationList->itemAt(pos);
     if (item) {
-        notificationList->setCurrentItem(item); // Ensure item is selected
+        notificationList->setCurrentItem(item);  // Ensure item is selected
         contextMenu->exec(notificationList->mapToGlobal(pos));
     }
 }
@@ -544,7 +550,7 @@ void MainWindow::showError(const QString &error) {
         // Maybe don't show message box on every polling error if window is hidden?
         // But if window is visible, we should show it.
         if (isVisible()) {
-             QMessageBox::warning(this, "GitHub Error", error);
+            QMessageBox::warning(this, "GitHub Error", error);
         }
     }
 }
@@ -560,8 +566,8 @@ void MainWindow::onRefreshClicked() {
     if (client) {
         client->checkNotifications();
         if (refreshTimer) {
-            refreshTimer->start(); // Restart timer
-            updateStatusBar(); // Force update
+            refreshTimer->start();  // Restart timer
+            updateStatusBar();      // Force update
         }
     }
 }
@@ -592,7 +598,7 @@ void MainWindow::onSelectTop10Clicked() {
 void MainWindow::onDismissSelectedClicked() {
     if (!notificationList || !client) return;
 
-    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    QList<QListWidgetItem *> items = notificationList->selectedItems();
     for (auto item : items) {
         QString id = item->data(Qt::UserRole + 1).toString();
         client->markAsRead(id);
@@ -614,7 +620,7 @@ void MainWindow::onDismissSelectedClicked() {
 void MainWindow::onOpenSelectedClicked() {
     if (!notificationList) return;
 
-    QList<QListWidgetItem*> items = notificationList->selectedItems();
+    QList<QListWidgetItem *> items = notificationList->selectedItems();
     for (auto item : items) {
         QString apiUrl = item->data(Qt::UserRole).toString();
         QString id = item->data(Qt::UserRole + 1).toString();
@@ -629,9 +635,7 @@ void MainWindow::updateStatusBar() {
         if (remaining >= 0) {
             int seconds = (remaining / 1000) % 60;
             int minutes = (remaining / 60000);
-            timerLabel->setText(QString("Next refresh: %1:%2")
-                                .arg(minutes, 2, 10, QChar('0'))
-                                .arg(seconds, 2, 10, QChar('0')));
+            timerLabel->setText(QString::asprintf("Next refresh: %02d:%02d", minutes, seconds));
             return;
         }
     }
@@ -649,23 +653,23 @@ void MainWindow::positionPopup(QWidget *popup) {
     if (trayIcon && trayIcon->isVisible()) {
         QRect trayGeom = trayIcon->geometry();
         if (!trayGeom.isEmpty()) {
-             int x = trayGeom.center().x() - popup->width() / 2;
-             int y;
+            int x = trayGeom.center().x() - popup->width() / 2;
+            int y;
 
-             // If tray is in top half, show below
-             if (trayGeom.center().y() < screenGeom.height() / 2) {
-                 y = trayGeom.bottom() + 10;
-             } else {
-                 // Show above
-                 y = trayGeom.top() - popup->height() - 10;
-             }
+            // If tray is in top half, show below
+            if (trayGeom.center().y() < screenGeom.height() / 2) {
+                y = trayGeom.bottom() + 10;
+            } else {
+                // Show above
+                y = trayGeom.top() - popup->height() - 10;
+            }
 
-             // Clamp X
-             if (x < screenGeom.left()) x = screenGeom.left() + 10;
-             if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
+            // Clamp X
+            if (x < screenGeom.left()) x = screenGeom.left() + 10;
+            if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
 
-             popup->move(x, y);
-             positioned = true;
+            popup->move(x, y);
+            positioned = true;
         }
     }
 
@@ -685,12 +689,12 @@ void MainWindow::sendNotification(const Notification &n) {
     actions << "Open";
     notification->setActions(actions);
 
-    connect(notification, &KNotification::action1Activated, this, [this, n](){
+    connect(notification, &KNotification::action1Activated, this, [this, n]() {
         QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
         QDesktopServices::openUrl(QUrl(htmlUrl));
     });
 
-    connect(notification, QOverload<>::of(&KNotification::activated), this, [this](){
+    connect(notification, QOverload<>::of(&KNotification::activated), this, [this]() {
         this->showNormal();
         this->activateWindow();
     });
@@ -705,7 +709,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
 
     QString summary;
     int limit = qMin(count, 5);
-    for(int i=0; i<limit; ++i) {
+    for (int i = 0; i < limit; ++i) {
         summary += "- " + notifications[i].title + "\n";
     }
     if (count > limit) {
@@ -718,12 +722,12 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     actions << "Open Client";
     notification->setActions(actions);
 
-    connect(notification, &KNotification::action1Activated, this, [this](){
+    connect(notification, &KNotification::action1Activated, this, [this]() {
         this->showNormal();
         this->activateWindow();
     });
 
-    connect(notification, QOverload<>::of(&KNotification::activated), this, [this](){
+    connect(notification, QOverload<>::of(&KNotification::activated), this, [this]() {
         this->showNormal();
         this->activateWindow();
     });
