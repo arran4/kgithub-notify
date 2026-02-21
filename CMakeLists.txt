@@ -28,6 +28,8 @@ add_executable(Kgithub-notify
     src/AuthErrorNotification.h
     src/NotificationItemWidget.cpp
     src/NotificationItemWidget.h
+    src/NotificationTextFormatter.cpp
+    src/NotificationTextFormatter.h
     src/resources.qrc
 )
 
@@ -101,15 +103,13 @@ target_link_libraries(TestJsonError
     KF5::Wallet
 )
 
-add_executable(TestNotificationWidget
-    tests/TestNotificationWidget.cpp
-    src/NotificationItemWidget.cpp
+add_executable(TestNotificationTextFormatter
+    tests/TestNotificationTextFormatter.cpp
+    src/NotificationTextFormatter.cpp
     src/GitHubClient.cpp
-    src/SettingsDialog.cpp
-    src/WalletManager.cpp
 )
 
-target_link_libraries(TestNotificationWidget
+target_link_libraries(TestNotificationTextFormatter
     Qt5::Widgets
     Qt5::Network
     Qt5::Test
@@ -117,11 +117,12 @@ target_link_libraries(TestNotificationWidget
 )
 
 add_test(NAME TestJsonError COMMAND TestJsonError)
-add_test(NAME TestNotificationWidget COMMAND TestNotificationWidget)
+add_test(NAME TestNotificationTextFormatter COMMAND TestNotificationTextFormatter)
 
 add_executable(BenchmarkListUpdate
     tests/BenchmarkListUpdate.cpp
     src/NotificationItemWidget.cpp
+    src/NotificationTextFormatter.cpp
     src/GitHubClient.cpp
 )
 

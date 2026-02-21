@@ -18,8 +18,25 @@ compile_commands.json
 *.dll
 *.exe
 *.user
-TestMain
-TestMain_autogen/
 Testing/
 CTestTestfile.cmake
 DartConfiguration.tcl
+
+# Tests
+TestMain
+TestMain_autogen/
+TestAuth
+TestAuth_autogen/
+TestVerifyToken
+TestVerifyToken_autogen/
+TestJsonError
+TestJsonError_autogen/
+TestNotificationTextFormatter
+TestNotificationTextFormatter_autogen/
+BenchmarkListUpdate
+BenchmarkListUpdate_autogen/
+
+# Temporary test files
+server.py
+verify_server.py
+server_json_error.py

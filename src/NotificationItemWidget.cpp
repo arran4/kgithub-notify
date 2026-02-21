@@ -1,4 +1,5 @@
 #include "NotificationItemWidget.h"
+#include "NotificationTextFormatter.h"
 
 #include <QDateTime>
 #include <QFont>
@@ -26,8 +27,10 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     QVBoxLayout *contentLayout = new QVBoxLayout();
 
     // Title
-    titleLabel = new QLabel(n.title, this);
-    titleLabel->setTextFormat(Qt::PlainText);
+    TextWithFormat titleData = NotificationTextFormatter::formatTitle(n);
+    titleLabel = new QLabel(titleData.text, this);
+    titleLabel->setTextFormat(titleData.format);
+
     QFont titleFont = titleLabel->font();
     if (n.unread) {
         titleFont.setBold(true);
@@ -38,14 +41,16 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
 
     // Repo, Author and Type
     QHBoxLayout *repoTypeLayout = new QHBoxLayout();
-    repoLabel = new QLabel(
-        QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped()), this);
-    repoLabel->setTextFormat(Qt::RichText);
+
+    TextWithFormat repoData = NotificationTextFormatter::formatRepo(n);
+    repoLabel = new QLabel(repoData.text, this);
+    repoLabel->setTextFormat(repoData.format);
 
     authorLabel = new QLabel("Author: ...", this);
 
-    typeLabel = new QLabel(QString("Type: %1").arg(n.type), this);
-    typeLabel->setTextFormat(Qt::PlainText);
+    TextWithFormat typeData = NotificationTextFormatter::formatType(n);
+    typeLabel = new QLabel(typeData.text, this);
+    typeLabel->setTextFormat(typeData.format);
 
     repoTypeLayout->addWidget(repoLabel);
     repoTypeLayout->addSpacing(10);
@@ -59,20 +64,17 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     // Date and URL
     QHBoxLayout *dateUrlLayout = new QHBoxLayout();
 
-    // Parse date
-    QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid()
-                          ? QLocale::system().toString(dt, QLocale::ShortFormat)
-                          : n.updatedAt;
+    // Date
+    TextWithFormat dateData = NotificationTextFormatter::formatDate(n);
+    dateLabel = new QLabel(dateData.text, this);
+    dateLabel->setTextFormat(dateData.format);
 
-    dateLabel = new QLabel("Date: " + dateStr, this);
-
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
-    urlLabel = new QLabel(QString("<a href=\"%1\">Open on GitHub</a>").arg(htmlUrl.toHtmlEscaped()), this);
-    urlLabel->setTextFormat(Qt::RichText);
+    // URL
+    TextWithFormat urlData = NotificationTextFormatter::formatUrl(n);
+    urlLabel = new QLabel(urlData.text, this);
+    urlLabel->setTextFormat(urlData.format);
     urlLabel->setOpenExternalLinks(true);
-    urlLabel->setTextInteractionFlags(
-        Qt::TextSelectableByMouse);  // Allow selection
+    urlLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);  // Allow selection
 
     dateUrlLayout->addWidget(dateLabel);
     dateUrlLayout->addSpacing(10);
@@ -93,5 +95,7 @@ void NotificationItemWidget::setAuthor(const QString &name, const QPixmap &avata
 }
 
 void NotificationItemWidget::setHtmlUrl(const QString &url) {
-     urlLabel->setText(QString("<a href=\"%1\">Open on GitHub</a>").arg(url.toHtmlEscaped()));
+    TextWithFormat urlData = NotificationTextFormatter::formatUrlStr(url);
+    urlLabel->setText(urlData.text);
+    urlLabel->setTextFormat(urlData.format);
 }
