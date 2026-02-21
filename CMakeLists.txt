@@ -85,6 +85,20 @@ target_link_libraries(TestVerifyToken
 
 add_test(NAME TestVerifyToken COMMAND TestVerifyToken)
 
+add_executable(TestJsonError
+    tests/TestJsonError.cpp
+    src/GitHubClient.cpp
+)
+
+target_link_libraries(TestJsonError
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+    KF5::Wallet
+)
+
+add_test(NAME TestJsonError COMMAND TestJsonError)
+
 # Installation
 install(TARGETS Kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
