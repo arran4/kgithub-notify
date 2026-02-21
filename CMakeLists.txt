@@ -85,6 +85,18 @@ target_link_libraries(TestVerifyToken
 
 add_test(NAME TestVerifyToken COMMAND TestVerifyToken)
 
+add_executable(TestJsonError
+    tests/TestJsonError.cpp
+    src/GitHubClient.cpp
+)
+
+target_link_libraries(TestJsonError
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+    KF5::Wallet
+)
+
 add_executable(TestNotificationWidget
     tests/TestNotificationWidget.cpp
     src/NotificationItemWidget.cpp
@@ -99,6 +111,7 @@ target_link_libraries(TestNotificationWidget
     KF5::Wallet
 )
 
+add_test(NAME TestJsonError COMMAND TestJsonError)
 add_test(NAME TestNotificationWidget COMMAND TestNotificationWidget)
 
 # Installation
