@@ -19,11 +19,17 @@ public:
     QLabel *typeLabel;
     QLabel *dateLabel;
     QLabel *urlLabel;
+    QLabel *authorLabel;
 
     QString getTitle() const { return titleLabel->text(); }
+    void setDetails(const QString &details);
 
 signals:
-    // No specific signals yet
+    void linkActivated(const QString &id, const QString &apiUrl, const QString &htmlUrl);
+
+private:
+    QString m_notificationId;
+    QString m_apiUrl;
 };
 
 #endif // NOTIFICATIONITEMWIDGET_H

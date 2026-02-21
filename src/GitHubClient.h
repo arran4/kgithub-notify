@@ -29,12 +29,14 @@ public:
     void checkNotifications();
     void verifyToken();
     void markAsRead(const QString &id);
+    void fetchSubjectDetails(const QString &apiUrl, const QString &notificationId);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
     void tokenVerified(bool valid, const QString &message);
+    void subjectDetailsReceived(const QString &notificationId, const QString &details);
 
 private slots:
     void onReplyFinished(QNetworkReply *reply);

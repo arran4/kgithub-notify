@@ -26,11 +26,13 @@ public slots:
     void updateNotifications(const QList<Notification> &notifications);
     void showError(const QString &error);
     void onAuthError(const QString &message);
+    void onSubjectDetailsReceived(const QString &id, const QString &details);
 
 private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayMessageClicked();
     void onNotificationItemActivated(QListWidgetItem *item);
+    void onItemLinkActivated(const QString &id, const QString &apiUrl, const QString &htmlUrl);
     void showSettings();
     void showContextMenu(const QPoint &pos);
     void dismissCurrentItem();

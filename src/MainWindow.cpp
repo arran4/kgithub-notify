@@ -185,6 +185,7 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
+    connect(client, &GitHubClient::subjectDetailsReceived, this, &MainWindow::onSubjectDetailsReceived);
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
@@ -294,6 +295,9 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             }
         }
 
+        connect(widget, &NotificationItemWidget::linkActivated, this, &MainWindow::onItemLinkActivated);
+        client->fetchSubjectDetails(n.url, n.id);
+
         notificationList->addItem(item);
         notificationList->setItemWidget(item, widget);
     }
@@ -317,6 +321,42 @@ void MainWindow::onAuthNotificationSettingsClicked() {
         authNotification->close();
     }
     showSettings();
+}
+
+void MainWindow::onSubjectDetailsReceived(const QString &id, const QString &details) {
+    if (!notificationList) return;
+
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == id) {
+            QWidget *w = notificationList->itemWidget(item);
+            if (NotificationItemWidget *widget = qobject_cast<NotificationItemWidget*>(w)) {
+                widget->setDetails(details);
+            }
+            break;
+        }
+    }
+}
+
+void MainWindow::onItemLinkActivated(const QString &id, const QString &apiUrl, const QString &htmlUrl) {
+    if (client) {
+        client->markAsRead(id);
+    }
+
+    // Visual update - find item by id
+    if (notificationList) {
+        for (int i = 0; i < notificationList->count(); ++i) {
+            QListWidgetItem *item = notificationList->item(i);
+            if (item->data(Qt::UserRole + 1).toString() == id) {
+                QFont font = item->font();
+                font.setBold(false);
+                item->setFont(font);
+                break;
+            }
+        }
+    }
+
+    QDesktopServices::openUrl(QUrl(htmlUrl));
 }
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {

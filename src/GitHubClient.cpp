@@ -89,7 +89,66 @@ void GitHubClient::markAsRead(const QString &id) {
     manager->sendCustomRequest(request, "PATCH");
 }
 
+void GitHubClient::fetchSubjectDetails(const QString &apiUrl, const QString &notificationId) {
+    if (m_token.isEmpty()) return;
+
+    QUrl url(apiUrl);
+    QNetworkRequest request(url);
+
+    QString authHeader = "token " + m_token;
+    request.setRawHeader("Authorization", authHeader.toUtf8());
+    request.setRawHeader("Accept", "application/vnd.github.v3+json");
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    request.setAttribute(QNetworkRequest::User, notificationId);
+
+    manager->get(request);
+}
+
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    // Check for subject details request
+    if (reply->request().attribute(QNetworkRequest::User).isValid()) {
+        QString notificationId = reply->request().attribute(QNetworkRequest::User).toString();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit subjectDetailsReceived(notificationId, "Details unavailable");
+        } else {
+            QByteArray data = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                QString details = "";
+
+                // Author
+                if (obj.contains("user")) {
+                    QString author = obj["user"].toObject()["login"].toString();
+                    if (!author.isEmpty()) {
+                        details += "Author: " + author;
+                    }
+                }
+
+                // Assignees
+                if (obj.contains("assignees")) {
+                    QJsonArray assignees = obj["assignees"].toArray();
+                    QStringList assigneeNames;
+                    for (const QJsonValue &val : assignees) {
+                        assigneeNames << val.toObject()["login"].toString();
+                    }
+                    if (!assigneeNames.isEmpty()) {
+                        if (!details.isEmpty()) details += ", ";
+                        details += "Assignees: " + assigneeNames.join(", ");
+                    }
+                }
+
+                if (details.isEmpty()) details = "No details available";
+                emit subjectDetailsReceived(notificationId, details);
+            } else {
+                emit subjectDetailsReceived(notificationId, "Invalid response");
+            }
+        }
+        reply->deleteLater();
+        return;
+    }
+
     // Check for verification request
     if (reply->url().toString().endsWith("/user")) {
         if (reply->error() == QNetworkReply::NoError) {

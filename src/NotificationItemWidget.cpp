@@ -5,6 +5,9 @@
 #include <QLocale>
 
 NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *parent) : QWidget(parent) {
+    m_notificationId = n.id;
+    m_apiUrl = n.url;
+
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
 
@@ -36,6 +39,11 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
 
     contentLayout->addLayout(repoTypeLayout);
 
+    // Author/Details
+    authorLabel = new QLabel("Loading details...", this);
+    authorLabel->setStyleSheet("color: gray; font-style: italic;");
+    contentLayout->addWidget(authorLabel);
+
     // Date and URL
     QHBoxLayout *dateUrlLayout = new QHBoxLayout();
 
@@ -45,10 +53,17 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
 
     dateLabel = new QLabel("Date: " + dateStr, this);
 
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
-    urlLabel = new QLabel(htmlUrl, this);
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
+    QString linkText = QString("<a href=\"%1\">%1</a>").arg(htmlUrl);
+    urlLabel = new QLabel(linkText, this);
     urlLabel->setWordWrap(true);
-    urlLabel->setTextInteractionFlags(Qt::TextSelectableByMouse); // Allow selection
+    urlLabel->setTextFormat(Qt::RichText);
+    urlLabel->setOpenExternalLinks(false); // We handle link clicks manually via signal
+
+    // Forward link activation
+    connect(urlLabel, &QLabel::linkActivated, [this](const QString &link) {
+        emit linkActivated(m_notificationId, m_apiUrl, link);
+    });
 
     dateUrlLayout->addWidget(dateLabel);
     dateUrlLayout->addSpacing(10);
@@ -59,4 +74,10 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
     mainLayout->addLayout(contentLayout);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+}
+
+void NotificationItemWidget::setDetails(const QString &details) {
+    authorLabel->setText(details);
+    // Use normal style for content
+    authorLabel->setStyleSheet("");
 }
