@@ -53,8 +53,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
 
     dateLabel = new QLabel("Date: " + dateStr, this);
 
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
-    urlLabel = new QLabel(htmlUrl, this);
+    urlLabel = new QLabel(n.htmlUrl, this);
     urlLabel->setTextFormat(Qt::PlainText);
     urlLabel->setWordWrap(true);
     urlLabel->setTextInteractionFlags(

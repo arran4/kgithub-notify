@@ -147,6 +147,7 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         n.title = subject["title"].toString();
         n.type = subject["type"].toString();
         n.url = subject["url"].toString(); // API URL
+        n.htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
 
         QJsonObject repo = obj["repository"].toObject();
         n.repository = repo["full_name"].toString();
