@@ -30,9 +30,13 @@ public:
     void checkNotifications();
     void verifyToken();
     void markAsRead(const QString &id);
+    void fetchNotificationDetails(const QString &url, const QString &notificationId);
+    void fetchImage(const QString &imageUrl, const QString &notificationId);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
+    void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl, const QString &htmlUrl);
+    void imageReceived(const QString &notificationId, const QPixmap &avatar);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
     void tokenVerified(bool valid, const QString &message);
