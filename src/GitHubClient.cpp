@@ -58,6 +58,23 @@ void GitHubClient::checkNotifications() {
     manager->get(request);
 }
 
+void GitHubClient::verifyToken() {
+    if (m_token.isEmpty()) {
+        emit tokenVerified(false, "No token provided");
+        return;
+    }
+
+    QUrl url(m_apiUrl + "/user");
+    QNetworkRequest request(url);
+
+    QString authHeader = "token " + m_token;
+    request.setRawHeader("Authorization", authHeader.toUtf8());
+    request.setRawHeader("Accept", "application/vnd.github.v3+json");
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    manager->get(request);
+}
+
 void GitHubClient::markAsRead(const QString &id) {
     if (m_token.isEmpty()) return;
 
@@ -73,6 +90,27 @@ void GitHubClient::markAsRead(const QString &id) {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    // Check for verification request
+    if (reply->url().toString().endsWith("/user")) {
+        if (reply->error() == QNetworkReply::NoError) {
+             QByteArray data = reply->readAll();
+             QJsonDocument doc = QJsonDocument::fromJson(data);
+             if (doc.isObject()) {
+                 QJsonObject obj = doc.object();
+                 QString login = obj["login"].toString();
+                 emit tokenVerified(true, "Token valid for user: " + login);
+             } else {
+                 emit tokenVerified(true, "Token valid");
+             }
+        } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            emit tokenVerified(false, "Invalid Token");
+        } else {
+            emit tokenVerified(false, reply->errorString());
+        }
+        reply->deleteLater();
+        return;
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
             emit authError("Invalid Token");
