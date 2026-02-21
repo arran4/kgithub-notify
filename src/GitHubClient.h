@@ -43,6 +43,8 @@ private:
     QNetworkAccessManager *manager;
     QString m_token;
     QString m_apiUrl;
+
+    QNetworkRequest createRequest(const QUrl &url) const;
 };
 
 #endif // GITHUBCLIENT_H
