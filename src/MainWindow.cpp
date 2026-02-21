@@ -13,6 +13,16 @@
 #include <QVBoxLayout>
 #include <QClipboard>
 #include "SettingsDialog.h"
+#include <limits>
+
+static int calculateSafeInterval(int minutes) {
+    if (minutes <= 0) minutes = 1; // Minimum 1 minute
+    qint64 msec = static_cast<qint64>(minutes) * 60 * 1000;
+    if (msec > std::numeric_limits<int>::max()) {
+        return std::numeric_limits<int>::max();
+    }
+    return static_cast<int>(msec);
+}
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
@@ -189,7 +199,7 @@ void MainWindow::setClient(GitHubClient *c) {
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
         int interval = SettingsDialog::getInterval();
-        refreshTimer->setInterval(interval * 60 * 1000);
+        refreshTimer->setInterval(calculateSafeInterval(interval));
         refreshTimer->start();
     }
 
@@ -367,7 +377,7 @@ void MainWindow::showSettings() {
             client->checkNotifications(); // Force check immediately
         }
         if (refreshTimer) {
-            refreshTimer->setInterval(interval * 60 * 1000);
+            refreshTimer->setInterval(calculateSafeInterval(interval));
             refreshTimer->start();
             updateStatusBar();
         }
