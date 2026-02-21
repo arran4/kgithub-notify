@@ -114,6 +114,17 @@ target_link_libraries(TestNotificationWidget
 add_test(NAME TestJsonError COMMAND TestJsonError)
 add_test(NAME TestNotificationWidget COMMAND TestNotificationWidget)
 
+add_executable(BenchmarkListUpdate
+    tests/BenchmarkListUpdate.cpp
+    src/NotificationItemWidget.cpp
+    src/GitHubClient.cpp
+)
+
+target_link_libraries(BenchmarkListUpdate
+    Qt5::Widgets
+    Qt5::Network
+)
+
 # Installation
 install(TARGETS Kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

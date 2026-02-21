@@ -359,6 +359,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
     }
 
+    notificationList->setUpdatesEnabled(false);
     notificationList->clear();
     int unreadCount = 0;
     int newNotifications = 0;
@@ -387,6 +388,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         notificationList->addItem(item);
         notificationList->setItemWidget(item, widget);
     }
+    notificationList->setUpdatesEnabled(true);
 
     if (unreadCount > 0) {
         trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
