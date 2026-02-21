@@ -1,10 +1,13 @@
 #include "NotificationItemWidget.h"
-#include <QFont>
-#include <QDateTime>
-#include <QStyle>
-#include <QLocale>
 
-NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *parent) : QWidget(parent) {
+#include <QDateTime>
+#include <QFont>
+#include <QLocale>
+#include <QStyle>
+
+NotificationItemWidget::NotificationItemWidget(const Notification &n,
+                                               QWidget *parent)
+    : QWidget(parent) {
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
 
@@ -15,6 +18,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
 
     // Title
     titleLabel = new QLabel(n.title, this);
+    titleLabel->setTextFormat(Qt::PlainText);
     QFont titleFont = titleLabel->font();
     if (n.unread) {
         titleFont.setBold(true);
@@ -25,9 +29,11 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
 
     // Repo and Type
     QHBoxLayout *repoTypeLayout = new QHBoxLayout();
-    repoLabel = new QLabel(QString("Repo: <b>%1</b>").arg(n.repository), this);
+    repoLabel = new QLabel(
+        QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped()), this);
     repoLabel->setTextFormat(Qt::RichText);
     typeLabel = new QLabel(QString("Type: %1").arg(n.type), this);
+    typeLabel->setTextFormat(Qt::PlainText);
 
     repoTypeLayout->addWidget(repoLabel);
     repoTypeLayout->addSpacing(10);
@@ -41,14 +47,18 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
 
     // Parse date
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid() ? QLocale::system().toString(dt, QLocale::ShortFormat) : n.updatedAt;
+    QString dateStr = dt.isValid()
+                          ? QLocale::system().toString(dt, QLocale::ShortFormat)
+                          : n.updatedAt;
 
     dateLabel = new QLabel("Date: " + dateStr, this);
 
     QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
     urlLabel = new QLabel(htmlUrl, this);
+    urlLabel->setTextFormat(Qt::PlainText);
     urlLabel->setWordWrap(true);
-    urlLabel->setTextInteractionFlags(Qt::TextSelectableByMouse); // Allow selection
+    urlLabel->setTextInteractionFlags(
+        Qt::TextSelectableByMouse);  // Allow selection
 
     dateUrlLayout->addWidget(dateLabel);
     dateUrlLayout->addSpacing(10);

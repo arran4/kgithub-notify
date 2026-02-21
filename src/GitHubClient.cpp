@@ -45,15 +45,7 @@ void GitHubClient::checkNotifications() {
     }
 
     QUrl url(m_apiUrl + "/notifications");
-    QNetworkRequest request(url);
-
-    // Add Authorization header
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("Accept", "application/vnd.github.v3+json");
-
-    // Add user-agent header as required by GitHub API
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkRequest request = createRequest(url);
 
     manager->get(request);
 }
@@ -65,12 +57,7 @@ void GitHubClient::verifyToken() {
     }
 
     QUrl url(m_apiUrl + "/user");
-    QNetworkRequest request(url);
-
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("Accept", "application/vnd.github.v3+json");
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkRequest request = createRequest(url);
 
     manager->get(request);
 }
@@ -79,14 +66,23 @@ void GitHubClient::markAsRead(const QString &id) {
     if (m_token.isEmpty()) return;
 
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
+    QNetworkRequest request = createRequest(url);
+
+    manager->sendCustomRequest(request, "PATCH");
+}
+
+QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
+    // Add Authorization header
     QString authHeader = "token " + m_token;
     request.setRawHeader("Authorization", authHeader.toUtf8());
     request.setRawHeader("Accept", "application/vnd.github.v3+json");
+
+    // Add user-agent header as required by GitHub API
     request.setRawHeader("User-Agent", "Kgithub-notify");
 
-    manager->sendCustomRequest(request, "PATCH");
+    return request;
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {

@@ -14,7 +14,7 @@
 #include <QTimer>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
-#include "NotificationPopup.h"
+#include <KNotification>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -39,6 +39,7 @@ private slots:
     void openCurrentItem();
     void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
+    void dismissAllNotifications();
 
     // Toolbar slots
     void onRefreshClicked();
@@ -54,6 +55,7 @@ protected:
 
 private:
     void createTrayIcon();
+    void updateTrayMenu();
     void positionPopup(QWidget *popup);
     void createErrorPage();
     void createLoginPage();
@@ -97,7 +99,9 @@ private:
 
     // Custom notification
     AuthErrorNotification *authNotification;
-    NotificationPopup *notificationPopup;
+
+    void sendNotification(const Notification &n);
+    void sendSummaryNotification(int count, const QList<Notification> &notifications);
 
     // Status Bar
     QStatusBar *statusBar;
