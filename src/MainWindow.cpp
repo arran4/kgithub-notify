@@ -188,7 +188,8 @@ void MainWindow::setClient(GitHubClient *c) {
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
-        refreshTimer->setInterval(300000); // 5 minutes
+        int interval = SettingsDialog::getInterval();
+        refreshTimer->setInterval(interval * 60 * 1000);
         refreshTimer->start();
     }
 
@@ -360,9 +361,15 @@ void MainWindow::showSettings() {
     SettingsDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
         QString newToken = dialog.getToken();
+        int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
             client->checkNotifications(); // Force check immediately
+        }
+        if (refreshTimer) {
+            refreshTimer->setInterval(interval * 60 * 1000);
+            refreshTimer->start();
+            updateStatusBar();
         }
     }
 }

@@ -27,12 +27,14 @@ public:
     void setToken(const QString &token);
     void setApiUrl(const QString &url);
     void checkNotifications();
+    void verifyToken();
     void markAsRead(const QString &id);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
+    void tokenVerified(bool valid, const QString &message);
 
 private slots:
     void onReplyFinished(QNetworkReply *reply);
