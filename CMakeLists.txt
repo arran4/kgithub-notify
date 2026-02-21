@@ -84,6 +84,7 @@ target_link_libraries(TestVerifyToken
 
 add_test(NAME TestVerifyToken COMMAND TestVerifyToken)
 
+
 # Installation
 install(TARGETS Kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
