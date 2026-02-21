@@ -1,0 +1,161 @@
+name: Qt C++ CI/CD
+
+on:
+  push:
+    # Disable branch pushes to save minutes
+    branches-ignore:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+    # Disable PR runs to save minutes
+    branches-ignore:
+      - '**'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'lint-fix'
+        type: choice
+        options:
+        - 'lint-fix'
+        - 'build-test'
+        - 'release'
+      release_mode:
+        description: 'Release Mode (only for release action)'
+        required: false
+        default: 'snapshot'
+        type: choice
+        options:
+        - 'snapshot'
+        - 'release'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  lint-and-fmt:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lint Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format cppcheck
+
+      - name: Run clang-format
+        run: |
+          find src tests -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/ tests/
+
+      - name: Check for changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git diff --exit-code; then
+            echo "clang-format found changes."
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.action }}" == "lint-fix" ]; then
+              # Create PR if manually triggered for lint-fix
+              git config --global user.email "actions@github.com"
+              git config --global user.name "GitHub Actions"
+              BRANCH_NAME="fix-lint-${{ github.run_id }}"
+              git checkout -b $BRANCH_NAME
+              git add .
+              git commit -m "fix: clang-format"
+              git push origin $BRANCH_NAME
+              gh pr create --title "fix: auto-linting" --body "Automated lint fixes triggered by workflow_dispatch" --base main --head $BRANCH_NAME
+            else
+              # Fail if not manual fix request
+              exit 1
+            fi
+          fi
+
+  build-and-test:
+    name: Build & Test on ${{ matrix.os }}
+    needs: lint-and-fmt
+    if: ${{ github.event.inputs.action != 'lint-fix' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qtbase5-dev qttools5-dev-tools libqt5svg5-dev cmake build-essential xvfb
+
+    - name: Configure CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Test
+      if: runner.os == 'Linux'
+      run: xvfb-run ctest --test-dir build --output-on-failure
+
+    - name: Verify Binary
+      run: |
+        if [ -f build/Kgithub-notify ]; then
+          echo "Binary built successfully"
+        else
+          echo "Binary not found"
+          exit 1
+        fi
+
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts-${{ matrix.os }}
+        path: build/Kgithub-notify
+
+  release:
+    name: Release
+    needs: [build-and-test]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'release') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-ubuntu-latest
+          path: build
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build/Kgithub-notify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Snapshot Release (Manual)
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: snapshot-${{ github.run_id }}
+          name: Snapshot ${{ github.run_id }}
+          draft: false
+          prerelease: ${{ github.event.inputs.release_mode == 'snapshot' }}
+          files: build/Kgithub-notify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
