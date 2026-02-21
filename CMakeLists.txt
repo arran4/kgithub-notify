@@ -20,6 +20,8 @@ add_executable(Kgithub-notify
     src/GitHubClient.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
+    src/WalletManager.cpp
+    src/WalletManager.h
     src/MainWindow.cpp
     src/MainWindow.h
     src/AuthErrorNotification.cpp
@@ -42,6 +44,7 @@ add_executable(TestMain
     tests/TestMain.cpp
     src/GitHubClient.cpp
     src/SettingsDialog.cpp
+    src/WalletManager.cpp
     # MainWindow depends on widgets and might be hard to test headless if we included it, but we only test Client/Settings.
     # However SettingsDialog depends on QDialog which is widgets.
     # So we need widgets linked.
@@ -60,6 +63,7 @@ add_executable(TestAuth
     tests/TestAuth.cpp
     src/GitHubClient.cpp
     src/SettingsDialog.cpp
+    src/WalletManager.cpp
 )
 
 target_link_libraries(TestAuth
@@ -102,6 +106,7 @@ add_executable(TestNotificationWidget
     src/NotificationItemWidget.cpp
     src/GitHubClient.cpp
     src/SettingsDialog.cpp
+    src/WalletManager.cpp
 )
 
 target_link_libraries(TestNotificationWidget

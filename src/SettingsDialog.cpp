@@ -1,11 +1,11 @@
 #include "SettingsDialog.h"
 #include "GitHubClient.h"
+#include "WalletManager.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QCoreApplication>
-#include <KWallet>
 #include <QComboBox>
 #include <QSettings>
 
@@ -62,15 +62,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
 }
 
 void SettingsDialog::saveSettings() {
-    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
-    if (wallet) {
-        if (!wallet->hasFolder("Kgithub-notify")) {
-             wallet->createFolder("Kgithub-notify");
-        }
-        wallet->setFolder("Kgithub-notify");
-        wallet->writePassword("token", tokenEdit->text());
-        delete wallet;
-    }
+    WalletManager::saveToken(tokenEdit->text());
 
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
@@ -79,18 +71,7 @@ void SettingsDialog::saveSettings() {
 }
 
 QString SettingsDialog::getToken() {
-    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
-    if (wallet) {
-        if (!wallet->hasFolder("Kgithub-notify")) {
-             wallet->createFolder("Kgithub-notify");
-        }
-        wallet->setFolder("Kgithub-notify");
-        QString token;
-        wallet->readPassword("token", token);
-        delete wallet;
-        return token;
-    }
-    return QString();
+    return WalletManager::loadToken();
 }
 
 int SettingsDialog::getInterval() {
