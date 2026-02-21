@@ -13,7 +13,10 @@ A GitHub notification system tray application written in C++ using Qt5. It notif
     *   **Open**: Opens the notification URL in your default browser. This also marks the notification as read.
     *   **Copy Link**: Copies the link to the notification (without referrer ID) to your clipboard.
     *   **Right-Click**: Access "Open", "Copy Link", or "Dismiss" (marks as read).
-*   **Secure**: Stores your Personal Access Token (PAT) securely using Qt settings.
+*   **Secure**: Stores your Personal Access Token (PAT) securely using Kwallet.
+
+![Screenshot_20260221_210604.png](docs/Screenshot_20260221_210604.png)
+![Screenshot_20260221_210702.png](docs/Screenshot_20260221_210702.png)
 
 ## Prerequisites
 
