@@ -14,7 +14,7 @@
 #include <QClipboard>
 #include "SettingsDialog.h"
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr), notificationPopup(nullptr) {
     setWindowTitle("Kgithub-notify");
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
@@ -128,6 +128,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
     countdownTimer->start(1000);
 
+    // Notification Popup
+    notificationPopup = new NotificationPopup(nullptr);
+    connect(notificationPopup, &NotificationPopup::openUrlClicked, [](const QString &url){
+        QDesktopServices::openUrl(QUrl(url));
+    });
+    connect(notificationPopup, &NotificationPopup::openClientClicked, [this](){
+        this->showNormal();
+        this->activateWindow();
+    });
+
     // Initial State Check
     QString token = SettingsDialog::getToken();
     if (token.isEmpty()) {
@@ -135,6 +145,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     } else {
         stackWidget->setCurrentWidget(notificationList);
     }
+}
+
+MainWindow::~MainWindow() {
+    delete notificationPopup;
 }
 
 void MainWindow::createErrorPage() {
@@ -276,6 +290,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     notificationList->clear();
     int unreadCount = 0;
     int newNotifications = 0;
+    QList<Notification> newlyAddedNotifications;
 
     for (const Notification &n : notifications) {
         QListWidgetItem *item = new QListWidgetItem();
@@ -291,6 +306,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             if (!knownNotificationIds.contains(n.id)) {
                 newNotifications++;
                 knownNotificationIds.insert(n.id);
+                newlyAddedNotifications.append(n);
             }
         }
 
@@ -301,7 +317,27 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     if (unreadCount > 0) {
         trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
         if (newNotifications > 0) {
-            showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
+            if (newNotifications == 1) {
+                const Notification &n = newlyAddedNotifications.first();
+                notificationPopup->setTitle("New Notification");
+                notificationPopup->setMessage(QString("%1: %2").arg(n.repository, n.title));
+                notificationPopup->setOpenUrl(GitHubClient::apiToHtmlUrl(n.url, n.id));
+                notificationPopup->showOpenButton(true);
+            } else {
+                notificationPopup->setTitle(QString("%1 New Notifications").arg(newNotifications));
+                QString summary;
+                int limit = qMin(newNotifications, 5);
+                for(int i=0; i<limit; ++i) {
+                    summary += "- " + newlyAddedNotifications[i].title + "\n";
+                }
+                if (newNotifications > limit) {
+                    summary += QString("... and %1 more").arg(newNotifications - limit);
+                }
+                notificationPopup->setMessage(summary.trimmed());
+                notificationPopup->showOpenButton(false);
+            }
+            positionPopup(notificationPopup);
+            notificationPopup->show();
         }
     } else {
         QIcon icon(":/assets/icon.png");
@@ -389,38 +425,7 @@ void MainWindow::onAuthError(const QString &message) {
 
     authNotification->setMessage(message);
 
-    // Position near tray icon if possible
-    QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
-    bool positioned = false;
-
-    if (trayIcon && trayIcon->isVisible()) {
-        QRect trayGeom = trayIcon->geometry();
-        if (!trayGeom.isEmpty()) {
-             int x = trayGeom.center().x() - authNotification->width() / 2;
-             int y;
-
-             // If tray is in top half, show below
-             if (trayGeom.center().y() < screenGeom.height() / 2) {
-                 y = trayGeom.bottom() + 10;
-             } else {
-                 // Show above
-                 y = trayGeom.top() - authNotification->height() - 10;
-             }
-
-             // Clamp X
-             if (x < screenGeom.left()) x = screenGeom.left() + 10;
-             if (x + authNotification->width() > screenGeom.right()) x = screenGeom.right() - authNotification->width() - 10;
-
-             authNotification->move(x, y);
-             positioned = true;
-        }
-    }
-
-    if (!positioned) {
-        // Fallback: Bottom right
-        authNotification->move(screenGeom.bottomRight() - QPoint(authNotification->width() + 10, authNotification->height() + 10));
-    }
-
+    positionPopup(authNotification);
     authNotification->show();
 
     if (!trayIcon || !trayIcon->isVisible()) {
@@ -569,5 +574,40 @@ void MainWindow::updateStatusBar() {
     }
     if (timerLabel) {
         timerLabel->setText("Next refresh: --:--");
+    }
+}
+
+void MainWindow::positionPopup(QWidget *popup) {
+    if (!popup) return;
+
+    QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
+    bool positioned = false;
+
+    if (trayIcon && trayIcon->isVisible()) {
+        QRect trayGeom = trayIcon->geometry();
+        if (!trayGeom.isEmpty()) {
+             int x = trayGeom.center().x() - popup->width() / 2;
+             int y;
+
+             // If tray is in top half, show below
+             if (trayGeom.center().y() < screenGeom.height() / 2) {
+                 y = trayGeom.bottom() + 10;
+             } else {
+                 // Show above
+                 y = trayGeom.top() - popup->height() - 10;
+             }
+
+             // Clamp X
+             if (x < screenGeom.left()) x = screenGeom.left() + 10;
+             if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
+
+             popup->move(x, y);
+             positioned = true;
+        }
+    }
+
+    if (!positioned) {
+        // Fallback: Bottom right
+        popup->move(screenGeom.bottomRight() - QPoint(popup->width() + 10, popup->height() + 10));
     }
 }
