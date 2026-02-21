@@ -12,6 +12,9 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
+
+    m_baseRequest.setRawHeader("Accept", "application/vnd.github.v3+json");
+    m_baseRequest.setRawHeader("User-Agent", "Kgithub-notify");
 }
 
 QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
@@ -32,6 +35,8 @@ QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notific
 
 void GitHubClient::setToken(const QString &token) {
     m_token = token;
+    QString authHeader = "token " + m_token;
+    m_baseRequest.setRawHeader("Authorization", authHeader.toUtf8());
 }
 
 void GitHubClient::setApiUrl(const QString &url) {
@@ -45,15 +50,8 @@ void GitHubClient::checkNotifications() {
     }
 
     QUrl url(m_apiUrl + "/notifications");
-    QNetworkRequest request(url);
-
-    // Add Authorization header
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("Accept", "application/vnd.github.v3+json");
-
-    // Add user-agent header as required by GitHub API
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkRequest request = m_baseRequest;
+    request.setUrl(url);
 
     manager->get(request);
 }
@@ -65,12 +63,8 @@ void GitHubClient::verifyToken() {
     }
 
     QUrl url(m_apiUrl + "/user");
-    QNetworkRequest request(url);
-
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("Accept", "application/vnd.github.v3+json");
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkRequest request = m_baseRequest;
+    request.setUrl(url);
 
     manager->get(request);
 }
@@ -79,12 +73,8 @@ void GitHubClient::markAsRead(const QString &id) {
     if (m_token.isEmpty()) return;
 
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
-    QNetworkRequest request(url);
-
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("Accept", "application/vnd.github.v3+json");
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkRequest request = m_baseRequest;
+    request.setUrl(url);
 
     manager->sendCustomRequest(request, "PATCH");
 }

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
+#include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -43,6 +44,7 @@ private:
     QNetworkAccessManager *manager;
     QString m_token;
     QString m_apiUrl;
+    QNetworkRequest m_baseRequest;
 };
 
 #endif // GITHUBCLIENT_H
