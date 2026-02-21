@@ -23,3 +23,16 @@ TestMain_autogen/
 Testing/
 CTestTestfile.cmake
 DartConfiguration.tcl
+TestAuth
+TestAuth_autogen/
+TestJsonError
+TestJsonError_autogen/
+TestVerifyToken
+TestVerifyToken_autogen/
+TestNotificationWidget
+TestNotificationWidget_autogen/
+TestNotifications
+TestNotifications_autogen/
+server.py
+verify_server.py
+mock_notifications_server.py
