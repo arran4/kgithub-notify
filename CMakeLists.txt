@@ -11,6 +11,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 COMPONENTS Widgets Network Test REQUIRED)
+find_package(KF5Wallet REQUIRED)
 
 add_executable(Kgithub-notify
     src/main.cpp
@@ -30,6 +31,7 @@ add_executable(Kgithub-notify
 target_link_libraries(Kgithub-notify
     Qt5::Widgets
     Qt5::Network
+    KF5::Wallet
 )
 
 enable_testing()
@@ -47,6 +49,7 @@ target_link_libraries(TestMain
     Qt5::Widgets
     Qt5::Network
     Qt5::Test
+    KF5::Wallet
 )
 
 add_test(NAME TestMain COMMAND TestMain)
@@ -61,6 +64,7 @@ target_link_libraries(TestAuth
     Qt5::Widgets
     Qt5::Network
     Qt5::Test
+    KF5::Wallet
 )
 
 add_test(NAME TestAuth COMMAND TestAuth)

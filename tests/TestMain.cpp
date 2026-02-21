@@ -1,4 +1,3 @@
-#include <QSettings>
 #include <QSignalSpy>
 #include <QTest>
 
@@ -20,19 +19,6 @@ class TestGitHubClient : public QObject {
         QVERIFY(true);  // Just verifying it constructs without crash
     }
 
-    void testTokenHandling() {
-        // Since setToken is a setter without getter, we can't easily verify state without modifying class.
-        // However, we can verify SettingsDialog persistence.
-
-        QSettings settings("Kgithub-notify-test", "Kgithub-notify-test");
-        settings.clear();
-
-        QString testToken = "ghp_test12345";
-        settings.setValue("token", testToken);
-
-        // Check if SettingsDialog reads it correctly
-        QCOMPARE(SettingsDialog::getToken(), testToken);
-    }
 
     void testUrlConversion() {
         // Issue
