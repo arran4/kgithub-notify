@@ -733,7 +733,7 @@ void MainWindow::sendNotification(const Notification &n) {
         QDesktopServices::openUrl(QUrl(htmlUrl));
     });
 
-    connect(notification, QOverload<>::of(&KNotification::activated), this, [this]() {
+    connect(notification, &KNotification::defaultActivated, this, [this](){
         this->showNormal();
         this->activateWindow();
     });
@@ -766,7 +766,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
         this->activateWindow();
     });
 
-    connect(notification, QOverload<>::of(&KNotification::activated), this, [this]() {
+    connect(notification, &KNotification::defaultActivated, this, [this](){
         this->showNormal();
         this->activateWindow();
     });
