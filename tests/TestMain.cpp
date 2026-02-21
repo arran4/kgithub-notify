@@ -1,13 +1,14 @@
-#include <QTest>
-#include <QSignalSpy>
 #include <QSettings>
+#include <QSignalSpy>
+#include <QTest>
+
 #include "../src/GitHubClient.h"
 #include "../src/SettingsDialog.h"
 
 class TestGitHubClient : public QObject {
     Q_OBJECT
 
-private slots:
+   private slots:
     void initTestCase() {
         // Setup settings for testing
         QCoreApplication::setOrganizationName("Kgithub-notify-test");
@@ -16,7 +17,7 @@ private slots:
 
     void testConstruction() {
         GitHubClient client;
-        QVERIFY(true); // Just verifying it constructs without crash
+        QVERIFY(true);  // Just verifying it constructs without crash
     }
 
     void testTokenHandling() {
