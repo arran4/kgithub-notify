@@ -39,6 +39,7 @@ private slots:
     void openCurrentItem();
     void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
+    void dismissAllNotifications();
 
     // Toolbar slots
     void onRefreshClicked();
@@ -54,6 +55,7 @@ protected:
 
 private:
     void createTrayIcon();
+    void updateTrayMenu();
     void positionPopup(QWidget *popup);
     void createErrorPage();
     void createLoginPage();

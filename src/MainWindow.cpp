@@ -214,28 +214,7 @@ void MainWindow::setClient(GitHubClient *c) {
 
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
-
-    QAction *openAction = new QAction("Open", this);
-    connect(openAction, &QAction::triggered, this, &QWidget::showNormal);
-    trayIconMenu->addAction(openAction);
-
-    QAction *refreshAction = new QAction("Force Refresh", this);
-    connect(refreshAction, &QAction::triggered, [this]() {
-        if (client) {
-            client->checkNotifications();
-        }
-    });
-    trayIconMenu->addAction(refreshAction);
-
-    QAction *settingsAction = new QAction("Settings", this);
-    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    trayIconMenu->addAction(settingsAction);
-
-    trayIconMenu->addSeparator();
-
-    QAction *quitAction = new QAction("Quit", this);
-    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    trayIconMenu->addAction(quitAction);
+    updateTrayMenu();
 
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
@@ -250,6 +229,100 @@ void MainWindow::createTrayIcon() {
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
 
     trayIcon->show();
+}
+
+void MainWindow::updateTrayMenu() {
+    if (!trayIconMenu) return;
+    trayIconMenu->clear();
+
+    QAction *openAppAction = new QAction("Open Kgithub-notify", trayIconMenu);
+    QFont font = openAppAction->font();
+    font.setBold(true);
+    openAppAction->setFont(font);
+    connect(openAppAction, &QAction::triggered, this, &QWidget::showNormal);
+    trayIconMenu->addAction(openAppAction);
+
+    trayIconMenu->addSeparator();
+
+    int unreadCount = 0;
+    QList<QListWidgetItem*> unreadItems;
+    for(int i=0; i<notificationList->count(); ++i) {
+        QListWidgetItem* item = notificationList->item(i);
+        if(item->font().bold()) {
+            unreadCount++;
+            unreadItems.append(item);
+        }
+    }
+
+    if (unreadCount > 0) {
+        QAction *header = new QAction(QString("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
+        header->setEnabled(false);
+        trayIconMenu->addAction(header);
+
+        int limit = qMin(unreadCount, 5);
+        for(int i=0; i<limit; ++i) {
+            QListWidgetItem* item = unreadItems[i];
+            QString title = item->data(Qt::UserRole + 2).toString();
+            QString repo = item->data(Qt::UserRole + 3).toString();
+            QString apiUrl = item->data(Qt::UserRole).toString();
+            QString id = item->data(Qt::UserRole + 1).toString();
+
+            QString label = QString("%1: %2").arg(repo, title);
+
+            QAction *itemAction = new QAction(label, trayIconMenu);
+            connect(itemAction, &QAction::triggered, [this, apiUrl, id]() {
+                if (client) client->markAsRead(id);
+                QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+                QDesktopServices::openUrl(QUrl(htmlUrl));
+
+                // Update local state and refresh menu
+                for(int i=0; i<notificationList->count(); ++i) {
+                     QListWidgetItem* item = notificationList->item(i);
+                     if (item->data(Qt::UserRole + 1).toString() == id) {
+                         QFont font = item->font();
+                         font.setBold(false);
+                         item->setFont(font);
+                         QTimer::singleShot(0, this, &MainWindow::updateTrayMenu);
+                         break;
+                     }
+                }
+            });
+            trayIconMenu->addAction(itemAction);
+        }
+
+        trayIconMenu->addSeparator();
+
+        QAction *dismissAllAction = new QAction("Dismiss All", trayIconMenu);
+        connect(dismissAllAction, &QAction::triggered, this, &MainWindow::dismissAllNotifications);
+        trayIconMenu->addAction(dismissAllAction);
+    } else {
+        QAction *empty = new QAction("No new notifications", trayIconMenu);
+        empty->setEnabled(false);
+        trayIconMenu->addAction(empty);
+    }
+
+    trayIconMenu->addSeparator();
+
+    QAction *trayRefreshAction = new QAction("Force Refresh", trayIconMenu);
+    connect(trayRefreshAction, &QAction::triggered, [this]() {
+        if (client) {
+            client->checkNotifications();
+        }
+    });
+    trayIconMenu->addAction(trayRefreshAction);
+
+    QAction *settingsAction = new QAction("Settings", trayIconMenu);
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
+    trayIconMenu->addAction(settingsAction);
+
+    QAction *quitAction = new QAction("Quit", trayIconMenu);
+    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
+    trayIconMenu->addAction(quitAction);
+}
+
+void MainWindow::dismissAllNotifications() {
+    onSelectAllClicked();
+    onDismissSelectedClicked();
 }
 
 void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
@@ -297,6 +370,8 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
 
         item->setData(Qt::UserRole, n.url);
         item->setData(Qt::UserRole + 1, n.id);
+        item->setData(Qt::UserRole + 2, n.title);
+        item->setData(Qt::UserRole + 3, n.repository);
         item->setSizeHint(widget->sizeHint());
 
         if (n.unread) {
@@ -329,6 +404,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
         trayIcon->setIcon(icon);
     }
+    updateTrayMenu();
 }
 
 void MainWindow::onAuthNotificationSettingsClicked() {
@@ -350,6 +426,8 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QFont font = item->font();
     font.setBold(false);
     item->setFont(font);
+
+    updateTrayMenu();
 
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
     QDesktopServices::openUrl(QUrl(htmlUrl));
@@ -452,6 +530,7 @@ void MainWindow::dismissCurrentItem() {
         }
         trayIcon->setIcon(icon);
     }
+    updateTrayMenu();
 }
 
 void MainWindow::showError(const QString &error) {
@@ -529,6 +608,7 @@ void MainWindow::onDismissSelectedClicked() {
         }
         trayIcon->setIcon(icon);
     }
+    updateTrayMenu();
 }
 
 void MainWindow::onOpenSelectedClicked() {
