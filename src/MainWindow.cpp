@@ -24,7 +24,7 @@ static int calculateSafeInterval(int minutes) {
     return static_cast<int>(msec);
 }
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr), notificationPopup(nullptr) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
@@ -138,16 +138,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
     connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
     countdownTimer->start(1000);
 
-    // Notification Popup
-    notificationPopup = new NotificationPopup(nullptr);
-    connect(notificationPopup, &NotificationPopup::openUrlClicked, [](const QString &url){
-        QDesktopServices::openUrl(QUrl(url));
-    });
-    connect(notificationPopup, &NotificationPopup::openClientClicked, [this](){
-        this->showNormal();
-        this->activateWindow();
-    });
-
     // Initial State Check
     QString token = SettingsDialog::getToken();
     if (token.isEmpty()) {
@@ -158,7 +148,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), 
 }
 
 MainWindow::~MainWindow() {
-    delete notificationPopup;
 }
 
 void MainWindow::createErrorPage() {
@@ -328,26 +317,10 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
         if (newNotifications > 0) {
             if (newNotifications == 1) {
-                const Notification &n = newlyAddedNotifications.first();
-                notificationPopup->setTitle("New Notification");
-                notificationPopup->setMessage(QString("%1: %2").arg(n.repository, n.title));
-                notificationPopup->setOpenUrl(GitHubClient::apiToHtmlUrl(n.url, n.id));
-                notificationPopup->showOpenButton(true);
+                sendNotification(newlyAddedNotifications.first());
             } else {
-                notificationPopup->setTitle(QString("%1 New Notifications").arg(newNotifications));
-                QString summary;
-                int limit = qMin(newNotifications, 5);
-                for(int i=0; i<limit; ++i) {
-                    summary += "- " + newlyAddedNotifications[i].title + "\n";
-                }
-                if (newNotifications > limit) {
-                    summary += QString("... and %1 more").arg(newNotifications - limit);
-                }
-                notificationPopup->setMessage(summary.trimmed());
-                notificationPopup->showOpenButton(false);
+                sendSummaryNotification(newNotifications, newlyAddedNotifications);
             }
-            positionPopup(notificationPopup);
-            notificationPopup->show();
         }
     } else {
         QIcon icon(":/assets/icon.png");
@@ -620,4 +593,61 @@ void MainWindow::positionPopup(QWidget *popup) {
         // Fallback: Bottom right
         popup->move(screenGeom.bottomRight() - QPoint(popup->width() + 10, popup->height() + 10));
     }
+}
+
+void MainWindow::sendNotification(const Notification &n) {
+    KNotification *notification = new KNotification("NewNotification");
+    notification->setTitle(n.repository);
+    notification->setText(n.title);
+
+    // Actions
+    QStringList actions;
+    actions << "Open";
+    notification->setActions(actions);
+
+    connect(notification, &KNotification::action1Activated, this, [this, n](){
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
+        QDesktopServices::openUrl(QUrl(htmlUrl));
+    });
+
+    connect(notification, &KNotification::activated, this, [this](){
+        this->showNormal();
+        this->activateWindow();
+    });
+    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
+
+    notification->sendEvent();
+}
+
+void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
+    KNotification *notification = new KNotification("NewNotification");
+    notification->setTitle(QString("%1 New Notifications").arg(count));
+
+    QString summary;
+    int limit = qMin(count, 5);
+    for(int i=0; i<limit; ++i) {
+        summary += "- " + notifications[i].title + "\n";
+    }
+    if (count > limit) {
+        summary += QString("... and %1 more").arg(count - limit);
+    }
+    notification->setText(summary.trimmed());
+
+    // Actions
+    QStringList actions;
+    actions << "Open Client";
+    notification->setActions(actions);
+
+    connect(notification, &KNotification::action1Activated, this, [this](){
+        this->showNormal();
+        this->activateWindow();
+    });
+
+    connect(notification, &KNotification::activated, this, [this](){
+        this->showNormal();
+        this->activateWindow();
+    });
+    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
+
+    notification->sendEvent();
 }
