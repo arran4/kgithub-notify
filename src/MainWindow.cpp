@@ -209,6 +209,8 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
+    connect(client, &GitHubClient::subjectDetailsReceived, this, &MainWindow::onSubjectDetailsReceived);
+    connect(client, &GitHubClient::imageReceived, this, &MainWindow::onImageReceived);
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
@@ -286,7 +288,6 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         authNotification->close();
     }
 
-    // Switch to list view on successful update
     if (notifications.isEmpty()) {
         if (stackWidget->currentWidget() != emptyStatePage) {
             stackWidget->setCurrentWidget(emptyStatePage);
@@ -297,31 +298,68 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
     }
 
-    notificationList->clear();
+    // Smart update: reuse existing items
+    QMap<QString, QListWidgetItem*> existingItems;
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        QString id = item->data(Qt::UserRole + 1).toString();
+        existingItems.insert(id, item);
+    }
+
     int unreadCount = 0;
     int newNotifications = 0;
     QList<Notification> newlyAddedNotifications;
+    QSet<QString> processedIds;
 
     for (const Notification &n : notifications) {
-        QListWidgetItem *item = new QListWidgetItem();
-        NotificationItemWidget *widget = new NotificationItemWidget(n);
+        processedIds.insert(n.id);
 
-        item->setData(Qt::UserRole, n.url);
-        item->setData(Qt::UserRole + 1, n.id);
-        item->setSizeHint(widget->sizeHint());
+        if (existingItems.contains(n.id)) {
+            // Update existing
+            QListWidgetItem *item = existingItems[n.id];
+            NotificationItemWidget *widget = qobject_cast<NotificationItemWidget*>(notificationList->itemWidget(item));
+            if (widget) {
+                widget->updateFromNotification(n);
+            }
+        } else {
+            // Create new
+            QListWidgetItem *item = new QListWidgetItem();
+            NotificationItemWidget *widget = new NotificationItemWidget(n);
+
+            item->setData(Qt::UserRole, n.url);
+            item->setData(Qt::UserRole + 1, n.id);
+            item->setSizeHint(widget->sizeHint());
+
+            if (n.unread) {
+                // If unread, mark for new notification logic
+                // But wait, the loop continues below
+            }
+
+            notificationList->addItem(item);
+            notificationList->setItemWidget(item, widget);
+
+            if (client) {
+                client->fetchSubjectDetails(n.url, n.id);
+            }
+        }
 
         if (n.unread) {
             unreadCount++;
-
             if (!knownNotificationIds.contains(n.id)) {
                 newNotifications++;
                 knownNotificationIds.insert(n.id);
                 newlyAddedNotifications.append(n);
             }
         }
+    }
 
-        notificationList->addItem(item);
-        notificationList->setItemWidget(item, widget);
+    // Remove items that are no longer present
+    for (auto it = existingItems.begin(); it != existingItems.end(); ++it) {
+        if (!processedIds.contains(it.key())) {
+            QListWidgetItem *item = it.value();
+            knownNotificationIds.remove(it.key());
+            delete notificationList->takeItem(notificationList->row(item));
+        }
     }
 
     if (unreadCount > 0) {
@@ -584,6 +622,35 @@ void MainWindow::updateStatusBar() {
     }
     if (timerLabel) {
         timerLabel->setText("Next refresh: --:--");
+    }
+}
+
+void MainWindow::onSubjectDetailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl) {
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == notificationId) {
+            NotificationItemWidget *widget = qobject_cast<NotificationItemWidget*>(notificationList->itemWidget(item));
+            if (widget) {
+                widget->setAuthor(authorName, QPixmap());
+            }
+            if (!avatarUrl.isEmpty() && client) {
+                client->fetchImage(avatarUrl, notificationId);
+            }
+            break;
+        }
+    }
+}
+
+void MainWindow::onImageReceived(const QString &id, const QPixmap &pixmap) {
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == id) {
+             NotificationItemWidget *widget = qobject_cast<NotificationItemWidget*>(notificationList->itemWidget(item));
+             if (widget) {
+                 widget->setAuthor("", pixmap);
+             }
+             break;
+        }
     }
 }
 

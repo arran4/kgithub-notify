@@ -48,6 +48,8 @@ private slots:
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
+    void onSubjectDetailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl);
+    void onImageReceived(const QString &id, const QPixmap &pixmap);
 
 protected:
     void closeEvent(QCloseEvent *event) override;

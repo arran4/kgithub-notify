@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
+#include <QPixmap>
 
 struct Notification {
     QString id;
@@ -29,12 +30,16 @@ public:
     void checkNotifications();
     void verifyToken();
     void markAsRead(const QString &id);
+    void fetchSubjectDetails(const QString &url, const QString &notificationId);
+    void fetchImage(const QString &url, const QString &id);
 
 signals:
     void notificationsReceived(const QList<Notification> &notifications);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
     void tokenVerified(bool valid, const QString &message);
+    void subjectDetailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl);
+    void imageReceived(const QString &id, const QPixmap &pixmap);
 
 private slots:
     void onReplyFinished(QNetworkReply *reply);

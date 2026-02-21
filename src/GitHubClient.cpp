@@ -71,6 +71,21 @@ void GitHubClient::markAsRead(const QString &id) {
     manager->sendCustomRequest(request, "PATCH");
 }
 
+void GitHubClient::fetchSubjectDetails(const QString &url, const QString &notificationId) {
+    QNetworkRequest request = createRequest(QUrl(url));
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "details");
+    reply->setProperty("notificationId", notificationId);
+}
+
+void GitHubClient::fetchImage(const QString &url, const QString &id) {
+    QNetworkRequest request(QUrl(url));
+    request.setRawHeader("User-Agent", "Kgithub-notify");
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "image");
+    reply->setProperty("id", id);
+}
+
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
@@ -86,6 +101,54 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    QString type = reply->property("type").toString();
+    if (type == "details") {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                QString authorName;
+                QString avatarUrl;
+
+                if (obj.contains("user")) { // Issue or PR
+                    QJsonObject user = obj["user"].toObject();
+                    authorName = user["login"].toString();
+                    avatarUrl = user["avatar_url"].toString();
+                } else if (obj.contains("author")) { // Commit
+                    QJsonValue authorVal = obj["author"];
+                    if (authorVal.isObject()) {
+                         QJsonObject author = authorVal.toObject();
+                         authorName = author["login"].toString();
+                         avatarUrl = author["avatar_url"].toString();
+                    } else {
+                        // Fallback for commit author if not a GitHub user
+                        QJsonObject commit = obj["commit"].toObject();
+                        QJsonObject author = commit["author"].toObject();
+                        authorName = author["name"].toString();
+                    }
+                }
+                QString notificationId = reply->property("notificationId").toString();
+                emit subjectDetailsReceived(notificationId, authorName, avatarUrl);
+            }
+        }
+        reply->deleteLater();
+        return;
+    }
+
+    if (type == "image") {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+            QPixmap pixmap;
+            if (pixmap.loadFromData(data)) {
+                 QString id = reply->property("id").toString();
+                 emit imageReceived(id, pixmap);
+            }
+        }
+        reply->deleteLater();
+        return;
+    }
+
     // Check for verification request
     if (reply->url().toString().endsWith("/user")) {
         if (reply->error() == QNetworkReply::NoError) {
