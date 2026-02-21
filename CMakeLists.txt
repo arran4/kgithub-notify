@@ -71,6 +71,21 @@ target_link_libraries(TestAuth
 
 add_test(NAME TestAuth COMMAND TestAuth)
 
+add_executable(TestSettings
+    tests/TestSettings.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+)
+
+target_link_libraries(TestSettings
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+    KF5::Wallet
+)
+
+add_test(NAME TestSettings COMMAND TestSettings)
+
 add_executable(TestVerifyToken
     tests/TestVerifyToken.cpp
     src/GitHubClient.cpp
