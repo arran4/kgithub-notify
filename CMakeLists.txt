@@ -85,6 +85,22 @@ target_link_libraries(TestVerifyToken
 
 add_test(NAME TestVerifyToken COMMAND TestVerifyToken)
 
+add_executable(TestNotificationWidget
+    tests/TestNotificationWidget.cpp
+    src/NotificationItemWidget.cpp
+    src/GitHubClient.cpp
+    src/SettingsDialog.cpp
+)
+
+target_link_libraries(TestNotificationWidget
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+    KF5::Wallet
+)
+
+add_test(NAME TestNotificationWidget COMMAND TestNotificationWidget)
+
 # Installation
 install(TARGETS Kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
