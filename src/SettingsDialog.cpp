@@ -2,9 +2,9 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QSettings>
 #include <QHBoxLayout>
 #include <QCoreApplication>
+#include <KWallet>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Settings");
@@ -35,12 +35,29 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 }
 
 void SettingsDialog::saveSettings() {
-    QSettings settings;
-    settings.setValue("token", tokenEdit->text());
+    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
+    if (wallet) {
+        if (!wallet->hasFolder("Kgithub-notify")) {
+             wallet->createFolder("Kgithub-notify");
+        }
+        wallet->setFolder("Kgithub-notify");
+        wallet->writePassword("token", tokenEdit->text());
+        delete wallet;
+    }
     accept();
 }
 
 QString SettingsDialog::getToken() {
-    QSettings settings;
-    return settings.value("token").toString();
+    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
+    if (wallet) {
+        if (!wallet->hasFolder("Kgithub-notify")) {
+             wallet->createFolder("Kgithub-notify");
+        }
+        wallet->setFolder("Kgithub-notify");
+        QString token;
+        wallet->readPassword("token", token);
+        delete wallet;
+        return token;
+    }
+    return QString();
 }
