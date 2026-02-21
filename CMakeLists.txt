@@ -12,6 +12,7 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 COMPONENTS Widgets Network Test REQUIRED)
 find_package(KF5Wallet REQUIRED)
+find_package(KF5Notifications REQUIRED)
 
 add_executable(Kgithub-notify
     src/main.cpp
@@ -23,8 +24,6 @@ add_executable(Kgithub-notify
     src/MainWindow.h
     src/AuthErrorNotification.cpp
     src/AuthErrorNotification.h
-    src/NotificationPopup.cpp
-    src/NotificationPopup.h
     src/NotificationItemWidget.cpp
     src/NotificationItemWidget.h
     src/resources.qrc
@@ -34,6 +33,7 @@ target_link_libraries(Kgithub-notify
     Qt5::Widgets
     Qt5::Network
     KF5::Wallet
+    KF5::Notifications
 )
 
 enable_testing()
