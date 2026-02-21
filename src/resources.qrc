@@ -3,5 +3,7 @@
     <qresource prefix="/">
         <file>assets/icon.png</file>
         <file>assets/icon-dotted.png</file>
+        <file>assets/icon.svg</file>
+        <file>assets/icon-dotted.svg</file>
     </qresource>
 </RCC>

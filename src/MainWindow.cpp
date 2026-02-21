@@ -16,7 +16,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle("Kgithub-notify");
-    setWindowIcon(QIcon(":/assets/icon.png"));
+    setWindowIcon(QIcon(":/assets/icon.svg"));
     resize(400, 600);
 
     // Initialize Stacked Widget
@@ -227,7 +227,7 @@ void MainWindow::createTrayIcon() {
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
 
-    QIcon icon(":/assets/icon.png");
+    QIcon icon(":/assets/icon.svg");
     if (icon.isNull()) {
         icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
     }
@@ -299,12 +299,12 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 
     if (unreadCount > 0) {
-        trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
+        trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
         if (newNotifications > 0) {
             showTrayMessage("GitHub Notifications", QString("You have %1 new notification(s)").arg(newNotifications));
         }
     } else {
-        QIcon icon(":/assets/icon.png");
+        QIcon icon(":/assets/icon.svg");
         if (icon.isNull()) {
             icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
         }
@@ -458,7 +458,7 @@ void MainWindow::dismissCurrentItem() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        QIcon icon(":/assets/icon.png");
+        QIcon icon(":/assets/icon.svg");
         if (icon.isNull()) {
             icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
         }
@@ -535,7 +535,7 @@ void MainWindow::onDismissSelectedClicked() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        QIcon icon(":/assets/icon.png");
+        QIcon icon(":/assets/icon.svg");
         if (icon.isNull()) {
             icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
         }
