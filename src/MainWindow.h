@@ -14,11 +14,13 @@
 #include <QTimer>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
+#include "NotificationPopup.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
     void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
 
@@ -52,6 +54,7 @@ protected:
 
 private:
     void createTrayIcon();
+    void positionPopup(QWidget *popup);
     void createErrorPage();
     void createLoginPage();
     void createEmptyStatePage();
@@ -94,6 +97,7 @@ private:
 
     // Custom notification
     AuthErrorNotification *authNotification;
+    NotificationPopup *notificationPopup;
 
     // Status Bar
     QStatusBar *statusBar;
