@@ -1,7 +1,8 @@
 #include <QApplication>
 #include <QTimer>
-#include "MainWindow.h"
+
 #include "GitHubClient.h"
+#include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);

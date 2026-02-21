@@ -1,12 +1,13 @@
 #include "AuthErrorNotification.h"
-#include <QStyle>
+
 #include <QApplication>
+#include <QStyle>
 
 AuthErrorNotification::AuthErrorNotification(QWidget *parent) : QWidget(parent) {
     // Set window flags for a tooltip-like, topmost, frameless window
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_ShowWithoutActivating);
-    setAttribute(Qt::WA_DeleteOnClose, false); // We manage showing/hiding
+    setAttribute(Qt::WA_DeleteOnClose, false);  // We manage showing/hiding
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(10, 10, 10, 10);
@@ -24,12 +25,14 @@ AuthErrorNotification::AuthErrorNotification(QWidget *parent) : QWidget(parent) 
     buttonLayout->addStretch();
 
     settingsButton = new QPushButton("Settings", this);
-    settingsButton->setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
+    settingsButton->setStyleSheet(
+        "background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
     connect(settingsButton, &QPushButton::clicked, this, &AuthErrorNotification::onSettingsClicked);
     buttonLayout->addWidget(settingsButton);
 
     dismissButton = new QPushButton("Dismiss", this);
-    dismissButton->setStyleSheet("background-color: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
+    dismissButton->setStyleSheet(
+        "background-color: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
     connect(dismissButton, &QPushButton::clicked, this, &AuthErrorNotification::onDismissClicked);
     buttonLayout->addWidget(dismissButton);
 

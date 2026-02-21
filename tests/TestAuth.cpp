@@ -1,12 +1,13 @@
-#include <QTest>
-#include <QSignalSpy>
 #include <QProcess>
+#include <QSignalSpy>
+#include <QTest>
+
 #include "../src/GitHubClient.h"
 
 class TestAuth : public QObject {
     Q_OBJECT
 
-private slots:
+   private slots:
     void initTestCase() {
         // Write python script
         QFile scriptFile("server.py");
@@ -46,7 +47,7 @@ private slots:
 
     void testAuthError401() {
         GitHubClient client;
-        client.setToken("invalid_token"); // Must set token so it doesn't fail with "No token provided"
+        client.setToken("invalid_token");  // Must set token so it doesn't fail with "No token provided"
         client.setApiUrl(QString("http://localhost:%1").arg(serverPort));
 
         QSignalSpy spy(&client, &GitHubClient::authError);
@@ -78,7 +79,7 @@ private slots:
         QCOMPARE(spy.takeFirst().at(0).toString(), QString("No token provided"));
     }
 
-private:
+   private:
     QProcess *serverProcess;
     int serverPort;
 };
