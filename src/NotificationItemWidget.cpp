@@ -71,6 +71,8 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     urlLabel = new QLabel(QString("<a href=\"%1\">Open on GitHub</a>").arg(htmlUrl.toHtmlEscaped()), this);
     urlLabel->setTextFormat(Qt::RichText);
     urlLabel->setOpenExternalLinks(true);
+    urlLabel->setTextInteractionFlags(
+        Qt::TextSelectableByMouse);  // Allow selection
 
     dateUrlLayout->addWidget(dateLabel);
     dateUrlLayout->addSpacing(10);

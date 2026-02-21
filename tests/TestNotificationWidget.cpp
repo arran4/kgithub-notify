@@ -16,6 +16,7 @@ private slots:
         n.type = "<b>Type</b>";
         n.repository = "<b>Repo</b>";
         n.url = "http://example.com";
+        n.htmlUrl = "http://example.com";
         n.updatedAt = "2023-01-01T00:00:00Z";
         n.unread = true;
 

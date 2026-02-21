@@ -15,6 +15,7 @@ struct Notification {
     QString type;
     QString repository;
     QString url; // API URL
+    QString htmlUrl; // HTML URL (cached)
     QString updatedAt;
     bool unread;
 };
