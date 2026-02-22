@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QPixmap>
+#include <QDateTime>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -244,6 +245,13 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
 
         n.updatedAt = obj["updated_at"].toString();
         n.unread = obj["unread"].toBool();
+
+        if (m_showAll && !n.unread) {
+             QDateTime updated = QDateTime::fromString(n.updatedAt, Qt::ISODate);
+             if (updated < QDateTime::currentDateTime().addDays(-7)) {
+                 continue;
+             }
+        }
 
         notifications.append(n);
     }
