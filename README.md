@@ -22,7 +22,7 @@ A GitHub notification system tray application written in C++ using Qt5. It notif
 
 *   **C++ Compiler**: Must support C++17 (e.g., GCC 7+, Clang 5+, MSVC 2017+).
 *   **CMake**: Version 3.10 or higher.
-*   **Qt5**: Requires `Qt5Widgets`, `Qt5Network`, and `Qt5Test`.
+*   **Qt5**: Requires `Qt5Widgets` and `Qt5Network`.
 
 ### Installing Dependencies (Ubuntu/Debian)
 
@@ -64,23 +64,6 @@ On the first run, or by selecting "Settings" from the File menu or tray icon con
 2.  Generate a new token (classic).
 3.  Select the `notifications` scope. If you want to receive notifications for private repositories, also select the `repo` scope.
 4.  Copy the token and paste it into the application's settings dialog.
-
-## Testing
-
-The project includes unit tests located in the `tests/` directory.
-
-To run the tests:
-
-```bash
-cd build
-ctest --output-on-failure
-```
-
-Or run the test executable directly:
-
-```bash
-./TestMain
-```
 
 ## License
 

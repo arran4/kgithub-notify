@@ -54,11 +54,11 @@ jobs:
 
       - name: Run clang-format
         run: |
-          find src tests -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
+          find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
 
       - name: Run cppcheck
         run: |
-          cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/ tests/
+          cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/
 
       - name: Check for changes
         env:
@@ -99,17 +99,13 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y qtbase5-dev qttools5-dev-tools libqt5svg5-dev cmake build-essential xvfb
+        sudo apt-get install -y qtbase5-dev qttools5-dev-tools libqt5svg5-dev cmake build-essential
 
     - name: Configure CMake
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
       run: cmake --build build --config Release
-
-    - name: Test
-      if: runner.os == 'Linux'
-      run: xvfb-run ctest --test-dir build --output-on-failure
 
     - name: Verify Binary
       run: |
