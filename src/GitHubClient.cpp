@@ -1,4 +1,5 @@
 #include "GitHubClient.h"
+#include "GitHubResponseParser.h"
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QUrlQuery>
@@ -110,38 +111,24 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     QString type = reply->property("type").toString();
     QString notificationId = reply->property("notificationId").toString();
+    QByteArray data = reply->readAll();
+    int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    QString errorString = reply->errorString();
 
     if (!type.isEmpty()) {
         if (reply->error() != QNetworkReply::NoError) {
-            qDebug() << "Error fetching" << type << ":" << reply->errorString();
+            qDebug() << "Error fetching" << type << ":" << errorString;
             reply->deleteLater();
             return;
         }
 
         if (type == "details") {
-            QByteArray data = reply->readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isObject()) {
-                QJsonObject obj = doc.object();
-                QString authorName;
-                QString avatarUrl;
-
-                if (obj.contains("user")) {
-                    QJsonObject user = obj["user"].toObject();
-                    authorName = user["login"].toString();
-                    avatarUrl = user["avatar_url"].toString();
-                } else if (obj.contains("author")) {
-                    QJsonObject author = obj["author"].toObject();
-                    authorName = author["login"].toString();
-                    avatarUrl = author["avatar_url"].toString();
-                }
-
-                QString htmlUrl = obj["html_url"].toString();
-
-                emit detailsReceived(notificationId, authorName, avatarUrl, htmlUrl);
+            QString parseError;
+            ParsedNotificationDetails details = GitHubResponseParser::parseDetails(data, parseError);
+            if (parseError.isEmpty()) {
+                emit detailsReceived(notificationId, details.authorName, details.avatarUrl, details.htmlUrl);
             }
         } else if (type == "image") {
-            QByteArray data = reply->readAll();
             QPixmap pixmap;
             if (pixmap.loadFromData(data)) {
                 emit imageReceived(notificationId, pixmap);
@@ -153,31 +140,21 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     }
 
     // Check for verification request
+    // This logic needs to be careful because "checkNotifications" doesn't have a distinct "type".
+    // We infer it from the URL or lack of "type".
+    // However, verifyToken calls /user, which we can distinguish.
     if (reply->url().toString().endsWith("/user")) {
-        if (reply->error() == QNetworkReply::NoError) {
-             QByteArray data = reply->readAll();
-             QJsonDocument doc = QJsonDocument::fromJson(data);
-             if (doc.isObject()) {
-                 QJsonObject obj = doc.object();
-                 QString login = obj["login"].toString();
-                 emit tokenVerified(true, "Token valid for user: " + login);
-             } else {
-                 emit tokenVerified(true, "Token valid");
-             }
-        } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            emit tokenVerified(false, "Invalid Token");
-        } else {
-            emit tokenVerified(false, reply->errorString());
-        }
+        ParsedVerification result = GitHubResponseParser::parseUserVerification(data, statusCode, errorString);
+        emit tokenVerified(result.valid, result.message);
         reply->deleteLater();
         return;
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+        if (statusCode == 401) {
             emit authError("Invalid Token");
         } else {
-            emit errorOccurred(reply->errorString());
+            emit errorOccurred(errorString);
         }
         reply->deleteLater();
         return;
@@ -190,40 +167,14 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         return;
     }
 
-    QByteArray data = reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-
-    if (!doc.isArray()) {
-        emit errorOccurred("Invalid JSON response (expected array)");
-        reply->deleteLater();
-        return;
+    // Parse notifications
+    QString parseError;
+    QList<Notification> notifications = GitHubResponseParser::parseNotifications(data, parseError);
+    if (!parseError.isEmpty()) {
+        emit errorOccurred(parseError);
+    } else {
+        emit notificationsReceived(notifications);
     }
 
-    QJsonArray array = doc.array();
-
-    QList<Notification> notifications;
-    for (const QJsonValue &value : array) {
-        if (!value.isObject()) continue;
-
-        QJsonObject obj = value.toObject();
-        Notification n;
-        n.id = obj["id"].toString();
-
-        QJsonObject subject = obj["subject"].toObject();
-        n.title = subject["title"].toString();
-        n.type = subject["type"].toString();
-        n.url = subject["url"].toString(); // API URL
-        n.htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
-
-        QJsonObject repo = obj["repository"].toObject();
-        n.repository = repo["full_name"].toString();
-
-        n.updatedAt = obj["updated_at"].toString();
-        n.unread = obj["unread"].toBool();
-
-        notifications.append(n);
-    }
-
-    emit notificationsReceived(notifications);
     reply->deleteLater();
 }

@@ -30,6 +30,8 @@ add_executable(Kgithub-notify
     src/NotificationItemWidget.h
     src/NotificationTextFormatter.cpp
     src/NotificationTextFormatter.h
+    src/GitHubResponseParser.cpp
+    src/GitHubResponseParser.h
     src/resources.qrc
 )
 
@@ -45,11 +47,9 @@ enable_testing()
 add_executable(TestMain
     tests/TestMain.cpp
     src/GitHubClient.cpp
+    src/GitHubResponseParser.cpp
     src/SettingsDialog.cpp
     src/WalletManager.cpp
-    # MainWindow depends on widgets and might be hard to test headless if we included it, but we only test Client/Settings.
-    # However SettingsDialog depends on QDialog which is widgets.
-    # So we need widgets linked.
 )
 
 target_link_libraries(TestMain
@@ -61,52 +61,11 @@ target_link_libraries(TestMain
 
 add_test(NAME TestMain COMMAND TestMain)
 
-add_executable(TestAuth
-    tests/TestAuth.cpp
-    src/GitHubClient.cpp
-    src/SettingsDialog.cpp
-    src/WalletManager.cpp
-)
-
-target_link_libraries(TestAuth
-    Qt5::Widgets
-    Qt5::Network
-    Qt5::Test
-    KF5::Wallet
-)
-
-add_test(NAME TestAuth COMMAND TestAuth)
-
-add_executable(TestVerifyToken
-    tests/TestVerifyToken.cpp
-    src/GitHubClient.cpp
-)
-
-target_link_libraries(TestVerifyToken
-    Qt5::Widgets
-    Qt5::Network
-    Qt5::Test
-    KF5::Wallet
-)
-
-add_test(NAME TestVerifyToken COMMAND TestVerifyToken)
-
-add_executable(TestJsonError
-    tests/TestJsonError.cpp
-    src/GitHubClient.cpp
-)
-
-target_link_libraries(TestJsonError
-    Qt5::Widgets
-    Qt5::Network
-    Qt5::Test
-    KF5::Wallet
-)
-
 add_executable(TestNotificationTextFormatter
     tests/TestNotificationTextFormatter.cpp
     src/NotificationTextFormatter.cpp
     src/GitHubClient.cpp
+    src/GitHubResponseParser.cpp
 )
 
 target_link_libraries(TestNotificationTextFormatter
@@ -116,14 +75,30 @@ target_link_libraries(TestNotificationTextFormatter
     KF5::Wallet
 )
 
-add_test(NAME TestJsonError COMMAND TestJsonError)
 add_test(NAME TestNotificationTextFormatter COMMAND TestNotificationTextFormatter)
+
+add_executable(TestGitHubResponseParser
+    tests/TestGitHubResponseParser.cpp
+    src/GitHubResponseParser.cpp
+    src/GitHubClient.cpp
+)
+
+target_link_libraries(TestGitHubResponseParser
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Test
+    KF5::Wallet
+)
+
+add_test(NAME TestGitHubResponseParser COMMAND TestGitHubResponseParser)
+
 
 add_executable(BenchmarkListUpdate
     tests/BenchmarkListUpdate.cpp
     src/NotificationItemWidget.cpp
     src/NotificationTextFormatter.cpp
     src/GitHubClient.cpp
+    src/GitHubResponseParser.cpp
 )
 
 target_link_libraries(BenchmarkListUpdate
