@@ -28,7 +28,7 @@ static int calculateSafeInterval(int minutes) {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
-    setWindowTitle("Kgithub-notify");
+    setWindowTitle(tr("Kgithub-notify"));
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(400, 600);
 
@@ -47,15 +47,15 @@ MainWindow::MainWindow(QWidget *parent)
 
     contextMenu = new QMenu(this);
 
-    openAction = new QAction("Open", this);
+    openAction = new QAction(tr("Open"), this);
     connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
     contextMenu->addAction(openAction);
 
-    copyLinkAction = new QAction("Copy Link", this);
+    copyLinkAction = new QAction(tr("Copy Link"), this);
     connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
     contextMenu->addAction(copyLinkAction);
 
-    dismissAction = new QAction("Dismiss", this);
+    dismissAction = new QAction(tr("Dismiss"), this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
 
@@ -66,24 +66,24 @@ MainWindow::MainWindow(QWidget *parent)
     toolbar->setMovable(false);
     addToolBar(Qt::TopToolBarArea, toolbar);
 
-    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this);
+    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), tr("Refresh"), this);
     refreshAction->setShortcut(QKeySequence::Refresh);
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
 
     toolbar->addSeparator();
 
-    selectAllAction = new QAction("Select All", this);
+    selectAllAction = new QAction(tr("Select All"), this);
     selectAllAction->setShortcut(QKeySequence::SelectAll);
     connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
     toolbar->addAction(selectAllAction);
 
-    selectNoneAction = new QAction("Select None", this);
+    selectNoneAction = new QAction(tr("Select None"), this);
     selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
     toolbar->addAction(selectNoneAction);
 
-    selectTop10Action = new QAction("Top 10", this);
+    selectTop10Action = new QAction(tr("Top 10"), this);
     selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
     connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
     toolbar->addAction(selectTop10Action);
@@ -91,13 +91,13 @@ MainWindow::MainWindow(QWidget *parent)
     toolbar->addSeparator();
 
     dismissSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), "Dismiss Selected", this);
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), tr("Dismiss Selected"), this);
     dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
 
     openSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), "Open Selected", this);
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), tr("Open Selected"), this);
     openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
@@ -118,11 +118,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Menu
     QMenu *fileMenu = menuBar()->addMenu("&File");
-    QAction *settingsAction = new QAction("&Settings", this);
+    QAction *settingsAction = new QAction(tr("&Settings"), this);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     fileMenu->addAction(settingsAction);
 
-    QAction *quitAction = new QAction("&Quit", this);
+    QAction *quitAction = new QAction(tr("&Quit"), this);
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
@@ -131,8 +131,8 @@ MainWindow::MainWindow(QWidget *parent)
     statusBar = new QStatusBar(this);
     setStatusBar(statusBar);
 
-    countLabel = new QLabel("Items: 0", this);
-    timerLabel = new QLabel("Next refresh: --:--", this);
+    countLabel = new QLabel(tr("Items: 0"), this);
+    timerLabel = new QLabel(tr("Next refresh: --:--"), this);
 
     statusBar->addWidget(countLabel);
     statusBar->addPermanentWidget(timerLabel);
@@ -159,11 +159,11 @@ void MainWindow::createErrorPage() {
     QVBoxLayout *layout = new QVBoxLayout(errorPage);
     layout->setAlignment(Qt::AlignCenter);
 
-    errorLabel = new QLabel("Authentication Error", errorPage);
+    errorLabel = new QLabel(tr("Authentication Error"), errorPage);
     errorLabel->setWordWrap(true);
     errorLabel->setAlignment(Qt::AlignCenter);
 
-    settingsButton = new QPushButton("Open Settings", errorPage);
+    settingsButton = new QPushButton(tr("Open Settings"), errorPage);
     connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
 
     layout->addWidget(errorLabel);
@@ -176,11 +176,11 @@ void MainWindow::createLoginPage() {
     layout->setAlignment(Qt::AlignCenter);
 
     loginLabel = new QLabel(
-        "Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started.", loginPage);
+        tr("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started."), loginPage);
     loginLabel->setWordWrap(true);
     loginLabel->setAlignment(Qt::AlignCenter);
 
-    loginButton = new QPushButton("Open Settings", loginPage);
+    loginButton = new QPushButton(tr("Open Settings"), loginPage);
     connect(loginButton, &QPushButton::clicked, this, &MainWindow::showSettings);
 
     layout->addWidget(loginLabel);
@@ -192,7 +192,7 @@ void MainWindow::createEmptyStatePage() {
     QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
     layout->setAlignment(Qt::AlignCenter);
 
-    emptyStateLabel = new QLabel("No new notifications", emptyStatePage);
+    emptyStateLabel = new QLabel(tr("No new notifications"), emptyStatePage);
     emptyStateLabel->setAlignment(Qt::AlignCenter);
 
     layout->addWidget(emptyStateLabel);
@@ -269,7 +269,7 @@ void MainWindow::updateTrayMenu() {
     if (!trayIconMenu) return;
     trayIconMenu->clear();
 
-    QAction *openAppAction = new QAction("Open Kgithub-notify", trayIconMenu);
+    QAction *openAppAction = new QAction(tr("Open Kgithub-notify"), trayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
     openAppAction->setFont(font);
@@ -289,7 +289,7 @@ void MainWindow::updateTrayMenu() {
     }
 
     if (unreadCount > 0) {
-        QAction *header = new QAction(QString("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
+        QAction *header = new QAction(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
         header->setEnabled(false);
         trayIconMenu->addAction(header);
 
@@ -326,18 +326,18 @@ void MainWindow::updateTrayMenu() {
 
         trayIconMenu->addSeparator();
 
-        QAction *dismissAllAction = new QAction("Dismiss All", trayIconMenu);
+        QAction *dismissAllAction = new QAction(tr("Dismiss All"), trayIconMenu);
         connect(dismissAllAction, &QAction::triggered, this, &MainWindow::dismissAllNotifications);
         trayIconMenu->addAction(dismissAllAction);
     } else {
-        QAction *empty = new QAction("No new notifications", trayIconMenu);
+        QAction *empty = new QAction(tr("No new notifications"), trayIconMenu);
         empty->setEnabled(false);
         trayIconMenu->addAction(empty);
     }
 
     trayIconMenu->addSeparator();
 
-    QAction *trayRefreshAction = new QAction("Force Refresh", trayIconMenu);
+    QAction *trayRefreshAction = new QAction(tr("Force Refresh"), trayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, [this]() {
         if (client) {
             client->checkNotifications();
@@ -345,11 +345,11 @@ void MainWindow::updateTrayMenu() {
     });
     trayIconMenu->addAction(trayRefreshAction);
 
-    QAction *settingsAction = new QAction("Settings", trayIconMenu);
+    QAction *settingsAction = new QAction(tr("Settings"), trayIconMenu);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
 
-    QAction *quitAction = new QAction("Quit", trayIconMenu);
+    QAction *quitAction = new QAction(tr("Quit"), trayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
 }
@@ -375,7 +375,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     lastError.clear();
 
     if (countLabel) {
-        countLabel->setText(QString("Items: %1").arg(notifications.count()));
+        countLabel->setText(tr("Items: %1").arg(notifications.count()));
     }
 
     if (authNotification && authNotification->isVisible()) {
@@ -521,7 +521,7 @@ void MainWindow::onAuthError(const QString &message) {
     pendingAuthError = true;
 
     // Update error page
-    errorLabel->setText("Authentication Error: " + message + "\n\nPlease update your token in Settings.");
+    errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
     stackWidget->setCurrentWidget(errorPage);
 
     if (!authNotification) {
@@ -586,12 +586,12 @@ void MainWindow::showError(const QString &error) {
 
     // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
     if (trayIcon && trayIcon->isVisible()) {
-        trayIcon->showMessage("GitHub Error", error, QSystemTrayIcon::Warning, 5000);
+        trayIcon->showMessage(tr("GitHub Error"), error, QSystemTrayIcon::Warning, 5000);
     } else {
         // Maybe don't show message box on every polling error if window is hidden?
         // But if window is visible, we should show it.
         if (isVisible()) {
-            QMessageBox::warning(this, "GitHub Error", error);
+            QMessageBox::warning(this, tr("GitHub Error"), error);
         }
     }
 }
@@ -676,12 +676,12 @@ void MainWindow::updateStatusBar() {
         if (remaining >= 0) {
             int seconds = (remaining / 1000) % 60;
             int minutes = (remaining / 60000);
-            timerLabel->setText(QString::asprintf("Next refresh: %02d:%02d", minutes, seconds));
+            timerLabel->setText(tr("Next refresh: %1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0')));
             return;
         }
     }
     if (timerLabel) {
-        timerLabel->setText("Next refresh: --:--");
+        timerLabel->setText(tr("Next refresh: --:--"));
     }
 }
 
@@ -727,7 +727,7 @@ void MainWindow::sendNotification(const Notification &n) {
 
     // Actions
     QStringList actions;
-    actions << "Open";
+    actions << tr("Open");
     notification->setActions(actions);
 
     connect(notification, &KNotification::action1Activated, this, [this, n]() {
@@ -746,7 +746,7 @@ void MainWindow::sendNotification(const Notification &n) {
 
 void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
     KNotification *notification = new KNotification("NewNotification");
-    notification->setTitle(QString("%1 New Notifications").arg(count));
+    notification->setTitle(tr("%1 New Notifications").arg(count));
 
     QString summary;
     int limit = qMin(count, 5);
@@ -754,13 +754,13 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
         summary += "- " + notifications[i].title + "\n";
     }
     if (count > limit) {
-        summary += QString("... and %1 more").arg(count - limit);
+        summary += tr("... and %1 more").arg(count - limit);
     }
     notification->setText(summary.trimmed());
 
     // Actions
     QStringList actions;
-    actions << "Open Client";
+    actions << tr("Open Client");
     notification->setActions(actions);
 
     connect(notification, &KNotification::action1Activated, this, [this]() {
