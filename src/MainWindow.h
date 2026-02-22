@@ -58,6 +58,14 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    void setupWindow();
+    void setupCentralWidget();
+    void setupNotificationList();
+    void setupToolbar();
+    void setupPages();
+    void setupMenus();
+    void setupStatusBar();
+
     void createTrayIcon();
     void updateTrayMenu();
     void positionPopup(QWidget *popup);

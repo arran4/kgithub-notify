@@ -29,6 +29,31 @@ static int calculateSafeInterval(int minutes) {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), client(nullptr), m_isManualRefresh(false), pendingAuthError(false), authNotification(nullptr) {
+    setupWindow();
+    setupCentralWidget();
+    setupNotificationList();
+    setupToolbar();
+    setupPages();
+    createTrayIcon();
+    setupMenus();
+    setupStatusBar();
+
+    // Initial State Check
+    QString token = SettingsDialog::getToken();
+    if (token.isEmpty()) {
+        stackWidget->setCurrentWidget(loginPage);
+    } else {
+        stackWidget->setCurrentWidget(notificationList);
+    }
+}
+
+MainWindow::~MainWindow() {
+    QSettings settings;
+    settings.setValue("geometry", saveGeometry());
+    settings.setValue("windowState", saveState());
+}
+
+void MainWindow::setupWindow() {
     setWindowTitle(tr("Kgithub-notify"));
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(800, 600);
@@ -40,11 +65,15 @@ MainWindow::MainWindow(QWidget *parent)
     if (settings.contains("windowState")) {
         restoreState(settings.value("windowState").toByteArray());
     }
+}
 
+void MainWindow::setupCentralWidget() {
     // Initialize Stacked Widget
     stackWidget = new QStackedWidget(this);
     setCentralWidget(stackWidget);
+}
 
+void MainWindow::setupNotificationList() {
     // Notification List
     notificationList = new QListWidget(this);
     notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -69,7 +98,9 @@ MainWindow::MainWindow(QWidget *parent)
     contextMenu->addAction(dismissAction);
 
     stackWidget->addWidget(notificationList);
+}
 
+void MainWindow::setupToolbar() {
     // Toolbar
     toolbar = new QToolBar(this);
     toolbar->setMovable(false);
@@ -115,7 +146,9 @@ MainWindow::MainWindow(QWidget *parent)
     openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
+}
 
+void MainWindow::setupPages() {
     // Error Page
     createErrorPage();
     stackWidget->addWidget(errorPage);
@@ -131,9 +164,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Loading Page
     createLoadingPage();
     stackWidget->addWidget(loadingPage);
+}
 
-    createTrayIcon();
-
+void MainWindow::setupMenus() {
     // Menu
     QMenu *fileMenu = menuBar()->addMenu("&File");
     QAction *settingsAction = new QAction(tr("&Settings"), this);
@@ -144,7 +177,9 @@ MainWindow::MainWindow(QWidget *parent)
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
+}
 
+void MainWindow::setupStatusBar() {
     // Status Bar
     statusBar = new QStatusBar(this);
     setStatusBar(statusBar);
@@ -160,20 +195,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
     countdownTimer->start(1000);
-
-    // Initial State Check
-    QString token = SettingsDialog::getToken();
-    if (token.isEmpty()) {
-        stackWidget->setCurrentWidget(loginPage);
-    } else {
-        stackWidget->setCurrentWidget(notificationList);
-    }
-}
-
-MainWindow::~MainWindow() {
-    QSettings settings;
-    settings.setValue("geometry", saveGeometry());
-    settings.setValue("windowState", saveState());
 }
 
 void MainWindow::createErrorPage() {
