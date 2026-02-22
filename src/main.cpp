@@ -34,8 +34,5 @@ int main(int argc, char *argv[]) {
         window.show();
     }
 
-    // Initial check
-    client.checkNotifications();
-
     return app.exec();
 }

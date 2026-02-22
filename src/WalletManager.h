@@ -2,15 +2,13 @@
 #define WALLETMANAGER_H
 
 #include <QString>
+#include <QFuture>
 
 class WalletManager {
 public:
     static QString loadToken();
+    static QFuture<QString> loadTokenAsync();
     static void saveToken(const QString &token);
-
-private:
-    static const QString FOLDER_NAME;
-    static const QString KEY_NAME;
 };
 
 #endif // WALLETMANAGER_H

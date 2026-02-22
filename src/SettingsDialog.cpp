@@ -12,6 +12,7 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QVBoxLayout>
+#include <QFutureWatcher>
 
 #include "GitHubClient.h"
 #include "WalletManager.h"
@@ -27,8 +28,20 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     QHBoxLayout *tokenLayout = new QHBoxLayout();
     tokenEdit = new QLineEdit(this);
     tokenEdit->setEchoMode(QLineEdit::Password);
-    // Load existing token
-    tokenEdit->setText(getToken());
+
+    // Load existing token asynchronously
+    tokenEdit->setEnabled(false);
+    tokenEdit->setPlaceholderText("Loading...");
+
+    QFutureWatcher<QString> *watcher = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
+        tokenEdit->setText(watcher->result());
+        tokenEdit->setEnabled(true);
+        tokenEdit->setPlaceholderText("");
+        watcher->deleteLater();
+    });
+    watcher->setFuture(getTokenAsync());
+
     tokenLayout->addWidget(tokenEdit);
 
     testButton = new QPushButton("Test Key", this);
@@ -146,6 +159,8 @@ bool SettingsDialog::isAutostartEnabled() {
 }
 
 QString SettingsDialog::getToken() { return WalletManager::loadToken(); }
+
+QFuture<QString> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
 int SettingsDialog::getInterval() {
     QSettings settings;
