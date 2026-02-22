@@ -48,6 +48,7 @@ private:
     QNetworkAccessManager *manager;
     QString m_token;
     QString m_apiUrl;
+    int m_pendingPatchRequests;
 
     QNetworkRequest createRequest(const QUrl &url) const;
 };
