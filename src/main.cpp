@@ -9,7 +9,8 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setOrganizationName("Kgithub-notify");
-    QApplication::setApplicationName("Kgithub-notify");
+    QApplication::setApplicationName("kgithub-notify");
+    QApplication::setDesktopFileName("kgithub-notify");
     QApplication::setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
