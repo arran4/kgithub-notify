@@ -1,13 +1,20 @@
 #include "SettingsDialog.h"
-#include "GitHubClient.h"
-#include "WalletManager.h"
-#include <QVBoxLayout>
+
+#include <QCheckBox>
+#include <QComboBox>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QHBoxLayout>
-#include <QCoreApplication>
-#include <QComboBox>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QTextStream>
+#include <QVBoxLayout>
+
+#include "GitHubClient.h"
+#include "WalletManager.h"
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nullptr) {
     setWindowTitle("Settings");
@@ -49,6 +56,34 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     }
     layout->addWidget(intervalCombo);
 
+    // Startup
+    autostartCheckBox = new QCheckBox("Run on startup", this);
+    startMinimizedCheckBox = new QCheckBox("Start minimized (tray only)", this);
+
+    layout->addWidget(autostartCheckBox);
+    layout->addWidget(startMinimizedCheckBox);
+
+    if (isAutostartEnabled()) {
+        autostartCheckBox->setChecked(true);
+        startMinimizedCheckBox->setEnabled(true);
+
+        QString path =
+            QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart/kgithub-notify.desktop";
+        QFile file(path);
+        if (file.open(QIODevice::ReadOnly)) {
+            QString content = file.readAll();
+            if (content.contains("--background")) {
+                startMinimizedCheckBox->setChecked(true);
+            }
+        }
+    } else {
+        autostartCheckBox->setChecked(false);
+        startMinimizedCheckBox->setEnabled(false);
+        startMinimizedCheckBox->setChecked(true);  // Default preference
+    }
+
+    connect(autostartCheckBox, &QCheckBox::toggled, startMinimizedCheckBox, &QCheckBox::setEnabled);
+
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     QPushButton *saveButton = new QPushButton("Save", this);
     QPushButton *cancelButton = new QPushButton("Cancel", this);
@@ -67,12 +102,50 @@ void SettingsDialog::saveSettings() {
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
 
+    updateAutostartEntry();
+
     accept();
 }
 
-QString SettingsDialog::getToken() {
-    return WalletManager::loadToken();
+void SettingsDialog::updateAutostartEntry() {
+    QString configPath = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
+    QDir dir(configPath);
+    if (!dir.exists("autostart")) {
+        dir.mkdir("autostart");
+    }
+    QString path = configPath + "/autostart/kgithub-notify.desktop";
+
+    if (autostartCheckBox->isChecked()) {
+        QFile file(path);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=KGitHub Notify\n";
+            out << "Comment=GitHub Notification System Tray\n";
+            QString exec = QCoreApplication::applicationFilePath();
+            if (startMinimizedCheckBox->isChecked()) {
+                exec += " --background";
+            }
+            out << "Exec=" << exec << "\n";
+            out << "Icon=kgithub-notify\n";
+            out << "Categories=Development;Utility;Qt;KDE;\n";
+            out << "StartupWMClass=Kgithub-notify\n";
+            out << "Terminal=false\n";
+            out << "X-KDE-autostart-after=panel\n";
+        }
+    } else {
+        QFile::remove(path);
+    }
 }
+
+bool SettingsDialog::isAutostartEnabled() {
+    QString path =
+        QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart/kgithub-notify.desktop";
+    return QFile::exists(path);
+}
+
+QString SettingsDialog::getToken() { return WalletManager::loadToken(); }
 
 int SettingsDialog::getInterval() {
     QSettings settings;

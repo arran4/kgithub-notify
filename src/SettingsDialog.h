@@ -8,25 +8,31 @@ class QComboBox;
 class QPushButton;
 class QLabel;
 class GitHubClient;
+class QCheckBox;
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
-public:
+   public:
     explicit SettingsDialog(QWidget *parent = nullptr);
     static QString getToken();
     static int getInterval();
 
-private slots:
+   private slots:
     void saveSettings();
     void onTestClicked();
     void onVerificationResult(bool valid, const QString &message);
 
-private:
+   private:
+    void updateAutostartEntry();
+    bool isAutostartEnabled();
+
     QLineEdit *tokenEdit;
     QComboBox *intervalCombo;
+    QCheckBox *autostartCheckBox;
+    QCheckBox *startMinimizedCheckBox;
     QPushButton *testButton;
     QLabel *statusLabel;
     GitHubClient *testClient;
 };
 
-#endif // SETTINGSDIALOG_H
+#endif  // SETTINGSDIALOG_H
