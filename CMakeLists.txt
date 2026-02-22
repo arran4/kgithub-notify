@@ -10,7 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Widgets Network REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Svg REQUIRED)
 find_package(KF5Wallet REQUIRED)
 find_package(KF5Notifications REQUIRED)
 
@@ -34,6 +34,7 @@ add_executable(Kgithub-notify
 target_link_libraries(Kgithub-notify
     Qt5::Widgets
     Qt5::Network
+    Qt5::Svg
     KF5::Wallet
     KF5::Notifications
 )
@@ -51,4 +52,8 @@ install(FILES kgithub-notify.desktop
 install(FILES src/assets/icon.png
     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/1024x1024/apps
     RENAME kgithub-notify.png
+)
+
+install(FILES src/kgithub-notify.notifyrc
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/knotifications5
 )

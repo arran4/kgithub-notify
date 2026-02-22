@@ -1,0 +1,10 @@
+[Global]
+IconName=kgithub-notify
+Name=KGithubNotify
+Comment=GitHub Notifications
+
+[Event/NewNotification]
+Name=New Notification
+Comment=You have new GitHub notifications
+Action=Popup
+Urgency=Normal
