@@ -36,6 +36,7 @@ private slots:
     void onTrayMessageClicked();
     void onNotificationItemActivated(QListWidgetItem *item);
     void showSettings();
+    void onLoadingStarted();
     void showContextMenu(const QPoint &pos);
     void dismissCurrentItem();
     void openCurrentItem();
@@ -63,6 +64,7 @@ private:
     void createErrorPage();
     void createLoginPage();
     void createEmptyStatePage();
+    void createLoadingPage();
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -112,6 +114,11 @@ private:
     // Empty state components
     QWidget *emptyStatePage;
     QLabel *emptyStateLabel;
+
+    // Loading page components
+    QWidget *loadingPage;
+    QLabel *loadingLabel;
+    bool m_isManualRefresh;
 
     // Custom notification
     AuthErrorNotification *authNotification;

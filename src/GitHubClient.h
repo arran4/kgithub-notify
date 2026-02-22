@@ -35,6 +35,7 @@ public:
     void fetchImage(const QString &imageUrl, const QString &notificationId);
 
 signals:
+    void loadingStarted();
     void notificationsReceived(const QList<Notification> &notifications);
     void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl, const QString &htmlUrl);
     void imageReceived(const QString &notificationId, const QPixmap &avatar);
