@@ -13,6 +13,7 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
+    m_pendingPatchRequests = 0;
 }
 
 QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
@@ -65,6 +66,8 @@ void GitHubClient::verifyToken() {
 
 void GitHubClient::markAsRead(const QString &id) {
     if (m_token.isEmpty()) return;
+
+    m_pendingPatchRequests++;
 
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request = createRequest(url);
@@ -173,6 +176,15 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         return;
     }
 
+    bool isPatch = (reply->operation() == QNetworkAccessManager::CustomOperation && reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH");
+
+    if (isPatch) {
+        m_pendingPatchRequests--;
+        if (m_pendingPatchRequests < 0) {
+            m_pendingPatchRequests = 0;
+        }
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
             emit authError("Invalid Token");
@@ -184,8 +196,10 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     }
 
     // Check if this was a PATCH request (mark as read)
-    if (reply->operation() == QNetworkAccessManager::CustomOperation && reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH") {
-        checkNotifications();
+    if (isPatch) {
+        if (m_pendingPatchRequests == 0) {
+            checkNotifications();
+        }
         reply->deleteLater();
         return;
     }
