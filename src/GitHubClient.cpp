@@ -34,7 +34,7 @@ QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notific
 }
 
 void GitHubClient::setToken(const QString &token) {
-    m_token = token;
+    m_token.set(token);
 }
 
 void GitHubClient::setApiUrl(const QString &url) {
@@ -112,9 +112,24 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
     // Add Authorization header
-    QString authHeader = "token " + m_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
+    QByteArray authHeader = "token ";
+    QByteArray tokenBytes = m_token.toQByteArray();
+    authHeader.append(tokenBytes);
+
+    request.setRawHeader("Authorization", authHeader);
     request.setRawHeader("Accept", "application/vnd.github.v3+json");
+
+    // Explicitly zero out sensitive data
+    if (!tokenBytes.isEmpty()) {
+        volatile char *p = tokenBytes.data();
+        size_t s = tokenBytes.size();
+        while (s--) *p++ = 0;
+    }
+    if (!authHeader.isEmpty()) {
+        volatile char *p = authHeader.data();
+        size_t s = authHeader.size();
+        while (s--) *p++ = 0;
+    }
 
     // Add user-agent header as required by GitHub API
     request.setRawHeader("User-Agent", "Kgithub-notify");
