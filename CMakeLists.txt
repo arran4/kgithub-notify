@@ -10,7 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Widgets Network Svg REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Svg Test REQUIRED)
 find_package(KF5Wallet REQUIRED)
 find_package(KF5Notifications REQUIRED)
 
@@ -38,6 +38,9 @@ target_link_libraries(Kgithub-notify
     KF5::Wallet
     KF5::Notifications
 )
+
+enable_testing()
+add_subdirectory(tests)
 
 # Installation
 install(TARGETS Kgithub-notify

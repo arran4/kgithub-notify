@@ -22,6 +22,7 @@ struct Notification {
 
 class GitHubClient : public QObject {
     Q_OBJECT
+    friend class TestGitHubClient;
 public:
     explicit GitHubClient(QObject *parent = nullptr);
     static QString apiToHtmlUrl(const QString &apiUrl, const QString &notificationId = "");
