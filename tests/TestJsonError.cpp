@@ -1,57 +1,44 @@
 #include <QTest>
-#include <QProcess>
 #include <QSignalSpy>
 #include <QDebug>
-#include <QFile>
-#include <QTextStream>
+#include <QTcpServer>
+#include <QTcpSocket>
+
 #include "../src/GitHubClient.h"
 
 class TestJsonError : public QObject {
     Q_OBJECT
 
 public:
-    TestJsonError() : serverProcess(nullptr) {}
+    TestJsonError() : server(nullptr) {}
 
 private slots:
     void initTestCase() {
-        // Create a python script that returns a JSON object instead of an array
-        QFile scriptFile("server_json_error.py");
-        if (scriptFile.open(QIODevice::WriteOnly)) {
-            QTextStream out(&scriptFile);
-            out << "import http.server, socketserver, sys\n"
-                << "class Handler(http.server.SimpleHTTPRequestHandler):\n"
-                << "    def do_GET(self):\n"
-                << "        self.send_response(200)\n"
-                << "        self.send_header('Content-type', 'application/json')\n"
-                << "        self.end_headers()\n"
-                << "        self.wfile.write(b'{\"error\": \"not an array\"}')\n"
-                << "with socketserver.TCPServer(('', 0), Handler) as httpd:\n"
-                << "    print(httpd.server_address[1], flush=True)\n"
-                << "    httpd.serve_forever()\n";
-            scriptFile.close();
-        }
+        server = new QTcpServer(this);
+        QVERIFY(server->listen(QHostAddress::LocalHost));
+        serverPort = server->serverPort();
+        connect(server, &QTcpServer::newConnection, this, &TestJsonError::handleNewConnection);
+    }
 
-        serverProcess = new QProcess(this);
-        serverProcess->start("python3", QStringList() << "-u" << "server_json_error.py");
+    void handleNewConnection() {
+        QTcpSocket *socket = server->nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, [this, socket]() {
+            socket->readAll();
 
-        QVERIFY(serverProcess->waitForStarted());
-
-        // Wait for port number
-        if (!serverProcess->waitForReadyRead(5000)) {
-             qDebug() << "Server failed to start. Stderr:" << serverProcess->readAllStandardError();
-             QFAIL("Server failed to start");
-        }
-        QByteArray portData = serverProcess->readLine().trimmed();
-        serverPort = portData.toInt();
-        QVERIFY(serverPort > 0);
+            // Send JSON object instead of array
+            QByteArray response = "HTTP/1.1 200 OK\r\n"
+                                  "Content-Type: application/json\r\n"
+                                  "Content-Length: 25\r\n"
+                                  "\r\n"
+                                  "{\"error\": \"not an array\"}";
+            socket->write(response);
+            socket->disconnectFromHost();
+        });
+        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
     }
 
     void cleanupTestCase() {
-        if (serverProcess) {
-            serverProcess->terminate();
-            serverProcess->waitForFinished();
-        }
-        QFile::remove("server_json_error.py");
+        server->close();
     }
 
     void testInvalidJsonResponse() {
@@ -63,7 +50,7 @@ private slots:
         client.checkNotifications();
 
         if (!spy.wait(5000)) {
-             qDebug() << "Timeout waiting for signal. Server output:" << serverProcess->readAllStandardError();
+             qDebug() << "Timeout waiting for signal";
         }
 
         QVERIFY2(spy.count() == 1, "Expected errorOccurred signal");
@@ -71,7 +58,7 @@ private slots:
     }
 
 private:
-    QProcess *serverProcess;
+    QTcpServer *server;
     int serverPort;
 };
 

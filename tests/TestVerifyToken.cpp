@@ -1,9 +1,7 @@
-#include <QProcess>
 #include <QSignalSpy>
 #include <QTest>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QApplication>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "../src/GitHubClient.h"
 
@@ -12,45 +10,44 @@ class TestVerifyToken : public QObject {
 
    private slots:
     void initTestCase() {
-        // Setup simple HTTP server in Python
-        QFile scriptFile("verify_server.py");
-        if (scriptFile.open(QIODevice::WriteOnly)) {
-            QTextStream out(&scriptFile);
-            out << "import http.server, socketserver, json\n"
-                << "class Handler(http.server.BaseHTTPRequestHandler):\n"
-                << "    def do_GET(self):\n"
-                << "        if self.path == '/user':\n"
-                << "            self.send_response(200)\n"
-                << "            self.send_header('Content-type', 'application/json')\n"
-                << "            self.end_headers()\n"
-                << "            self.wfile.write(json.dumps({'login': 'testuser'}).encode())\n"
-                << "        else:\n"
-                << "            self.send_response(404)\n"
-                << "            self.end_headers()\n"
-                << "\n"
-                << "with socketserver.TCPServer(('', 0), Handler) as httpd:\n"
-                << "    print(httpd.server_address[1], flush=True)\n"
-                << "    httpd.serve_forever()\n";
-            scriptFile.close();
-        }
+        server = new QTcpServer(this);
+        QVERIFY(server->listen(QHostAddress::LocalHost));
+        serverPort = server->serverPort();
+        connect(server, &QTcpServer::newConnection, this, &TestVerifyToken::handleNewConnection);
+    }
 
-        serverProcess = new QProcess(this);
-        serverProcess->start("python3", QStringList() << "-u" << "verify_server.py");
+    void handleNewConnection() {
+        QTcpSocket *socket = server->nextPendingConnection();
+        if (!socket) return;
+        connect(socket, &QTcpSocket::readyRead, [this, socket]() {
+            // Read request to verify path
+            QByteArray request = socket->readAll();
+            QString requestStr(request);
 
-        QVERIFY(serverProcess->waitForStarted());
-        if (!serverProcess->waitForReadyRead(5000)) {
-            QFAIL("Server failed to start");
-        }
-        QByteArray portData = serverProcess->readLine().trimmed();
-        serverPort = portData.toInt();
-        QVERIFY(serverPort > 0);
+            // Minimal response with proper headers
+            // Connection: close is important for QNetworkAccessManager to finish the request quickly in tests
+            if (requestStr.contains("GET /user")) {
+                QByteArray response = "HTTP/1.1 200 OK\r\n"
+                                      "Content-Type: application/json\r\n"
+                                      "Connection: close\r\n"
+                                      "\r\n"
+                                      "{\"login\": \"testuser\"}";
+                socket->write(response);
+            } else {
+                QByteArray response = "HTTP/1.1 404 Not Found\r\n"
+                                      "Content-Length: 0\r\n"
+                                      "Connection: close\r\n"
+                                      "\r\n";
+                socket->write(response);
+            }
+            socket->flush();
+            socket->disconnectFromHost();
+        });
+        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
     }
 
     void cleanupTestCase() {
-        if (serverProcess) {
-            serverProcess->terminate();
-            serverProcess->waitForFinished();
-        }
+        server->close();
     }
 
     void testVerifyTokenSuccess() {
@@ -63,6 +60,7 @@ class TestVerifyToken : public QObject {
 
         client.verifyToken();
 
+        // Wait up to 5s, but it should be much faster
         QVERIFY2(spy.wait(5000), "Timeout waiting for tokenVerified signal");
         QCOMPARE(spy.count(), 1);
 
@@ -70,12 +68,16 @@ class TestVerifyToken : public QObject {
         bool valid = args.at(0).toBool();
         QString message = args.at(1).toString();
 
+        if (!valid) {
+             qDebug() << "Verification failed with message:" << message;
+        }
+
         QVERIFY2(valid, "Token should be verified as valid");
         QVERIFY2(message.contains("testuser"), "Message should contain username 'testuser'");
     }
 
    private:
-    QProcess *serverProcess;
+    QTcpServer *server;
     int serverPort;
 };
 

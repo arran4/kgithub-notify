@@ -1,6 +1,7 @@
-#include <QProcess>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "../src/GitHubClient.h"
 
@@ -9,45 +10,35 @@ class TestAuth : public QObject {
 
    private slots:
     void initTestCase() {
-        // Write python script
-        QFile scriptFile("server.py");
-        if (scriptFile.open(QIODevice::WriteOnly)) {
-            QTextStream out(&scriptFile);
-            out << "import http.server, socketserver, sys\n"
-                << "class Handler(http.server.SimpleHTTPRequestHandler):\n"
-                << "    def do_GET(self):\n"
-                << "        self.send_response(401)\n"
-                << "        self.end_headers()\n"
-                << "with socketserver.TCPServer(('', 0), Handler) as httpd:\n"
-                << "    print(httpd.server_address[1], flush=True)\n"
-                << "    httpd.serve_forever()\n";
-            scriptFile.close();
-        }
+        server = new QTcpServer(this);
+        QVERIFY(server->listen(QHostAddress::LocalHost));
+        serverPort = server->serverPort();
+        connect(server, &QTcpServer::newConnection, this, &TestAuth::handleNewConnection);
+    }
 
-        // Start python server
-        serverProcess = new QProcess(this);
-        serverProcess->start("python3", QStringList() << "-u" << "server.py");
+    void handleNewConnection() {
+        QTcpSocket *socket = server->nextPendingConnection();
+        connect(socket, &QTcpSocket::readyRead, [this, socket]() {
+            // Read request
+            socket->readAll();
 
-        QVERIFY(serverProcess->waitForStarted());
-        if (!serverProcess->waitForReadyRead(5000)) {
-            qDebug() << "Server failed to start. Stderr:" << serverProcess->readAllStandardError();
-            QFAIL("Server failed to start");
-        }
-        QByteArray portData = serverProcess->readLine().trimmed();
-        serverPort = portData.toInt();
-        QVERIFY(serverPort > 0);
+            // Send 401 response
+            QByteArray response = "HTTP/1.1 401 Unauthorized\r\n"
+                                  "Content-Length: 0\r\n"
+                                  "\r\n";
+            socket->write(response);
+            socket->disconnectFromHost();
+        });
+        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
     }
 
     void cleanupTestCase() {
-        if (serverProcess) {
-            serverProcess->terminate();
-            serverProcess->waitForFinished();
-        }
+        server->close();
     }
 
     void testAuthError401() {
         GitHubClient client;
-        client.setToken("invalid_token");  // Must set token so it doesn't fail with "No token provided"
+        client.setToken("invalid_token");
         client.setApiUrl(QString("http://localhost:%1").arg(serverPort));
 
         QSignalSpy spy(&client, &GitHubClient::authError);
@@ -59,7 +50,7 @@ class TestAuth : public QObject {
             if (errorSpy.count() > 0) {
                 qDebug() << "Error occurred:" << errorSpy.takeFirst().at(0).toString();
             } else {
-                qDebug() << "Timeout waiting for signal. Server output:" << serverProcess->readAllStandardError();
+                qDebug() << "Timeout waiting for signal";
             }
         }
 
@@ -80,7 +71,7 @@ class TestAuth : public QObject {
     }
 
    private:
-    QProcess *serverProcess;
+    QTcpServer *server;
     int serverPort;
 };
 

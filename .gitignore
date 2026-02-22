@@ -35,8 +35,3 @@ TestNotificationTextFormatter
 TestNotificationTextFormatter_autogen/
 BenchmarkListUpdate
 BenchmarkListUpdate_autogen/
-
-# Temporary test files
-server.py
-verify_server.py
-server_json_error.py
