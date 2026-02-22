@@ -28,7 +28,7 @@ static int calculateSafeInterval(int minutes) {
 }
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
+    : QMainWindow(parent), client(nullptr), m_isManualRefresh(false), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle(tr("Kgithub-notify"));
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(800, 600);
@@ -128,6 +128,10 @@ MainWindow::MainWindow(QWidget *parent)
     createEmptyStatePage();
     stackWidget->addWidget(emptyStatePage);
 
+    // Loading Page
+    createLoadingPage();
+    stackWidget->addWidget(loadingPage);
+
     createTrayIcon();
 
     // Menu
@@ -216,8 +220,20 @@ void MainWindow::createEmptyStatePage() {
     layout->addWidget(emptyStateLabel);
 }
 
+void MainWindow::createLoadingPage() {
+    loadingPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(loadingPage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    loadingLabel = new QLabel(tr("Loading..."), loadingPage);
+    loadingLabel->setAlignment(Qt::AlignCenter);
+
+    layout->addWidget(loadingLabel);
+}
+
 void MainWindow::setClient(GitHubClient *c) {
     client = c;
+    connect(client, &GitHubClient::loadingStarted, this, &MainWindow::onLoadingStarted);
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
@@ -356,11 +372,7 @@ void MainWindow::updateTrayMenu() {
     trayIconMenu->addSeparator();
 
     QAction *trayRefreshAction = new QAction(tr("Force Refresh"), trayIconMenu);
-    connect(trayRefreshAction, &QAction::triggered, [this]() {
-        if (client) {
-            client->checkNotifications();
-        }
-    });
+    connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     trayIconMenu->addAction(trayRefreshAction);
 
     QAction *settingsAction = new QAction(tr("Settings"), trayIconMenu);
@@ -525,12 +537,26 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
+            m_isManualRefresh = true;
             client->checkNotifications();  // Force check immediately
+            m_isManualRefresh = false;
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
             refreshTimer->start();
             updateStatusBar();
+        }
+    }
+}
+
+void MainWindow::onLoadingStarted() {
+    if (!notificationList) return;
+    if (notificationList->count() == 0 || m_isManualRefresh) {
+        if (stackWidget->currentWidget() != loadingPage) {
+            stackWidget->setCurrentWidget(loadingPage);
+        }
+        if (loadingLabel) {
+            loadingLabel->setText(tr("Loading..."));
         }
     }
 }
@@ -612,6 +638,16 @@ void MainWindow::showError(const QString &error) {
             QMessageBox::warning(this, tr("GitHub Error"), error);
         }
     }
+
+    if (stackWidget->currentWidget() == loadingPage) {
+        if (notificationList->count() > 0) {
+            stackWidget->setCurrentWidget(notificationList);
+        } else {
+            if (loadingLabel) {
+                loadingLabel->setText(tr("Error: %1").arg(error));
+            }
+        }
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -623,7 +659,9 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 
 void MainWindow::onRefreshClicked() {
     if (client) {
+        m_isManualRefresh = true;
         client->checkNotifications();
+        m_isManualRefresh = false;
         if (refreshTimer) {
             refreshTimer->start();  // Restart timer
             updateStatusBar();      // Force update
@@ -633,8 +671,10 @@ void MainWindow::onRefreshClicked() {
 
 void MainWindow::onToggleShowAll() {
     if (client) {
+        m_isManualRefresh = true;
         client->setShowAll(showAllAction->isChecked());
         client->checkNotifications();
+        m_isManualRefresh = false;
         if (refreshTimer) {
             refreshTimer->start();
             updateStatusBar();

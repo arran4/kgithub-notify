@@ -46,6 +46,8 @@ void GitHubClient::setShowAll(bool all) {
 }
 
 void GitHubClient::checkNotifications() {
+    emit loadingStarted();
+
     if (m_token.isEmpty()) {
         emit authError("No token provided");
         return;
