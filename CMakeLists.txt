@@ -39,6 +39,7 @@ target_link_libraries(Kgithub-notify
     KF5::Notifications
 )
 
+
 # Installation
 install(TARGETS Kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

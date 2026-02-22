@@ -12,6 +12,7 @@
 #include <QToolBar>
 #include <QStatusBar>
 #include <QTimer>
+#include <QFutureWatcher>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
 #include <KNotification>
@@ -43,6 +44,7 @@ private slots:
     void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
     void dismissAllNotifications();
+    void onTokenLoaded();
 
     // Toolbar slots
     void onRefreshClicked();
@@ -132,6 +134,9 @@ private:
     QLabel *timerLabel;
     QTimer *refreshTimer;
     QTimer *countdownTimer;
+
+    QFutureWatcher<QString> *tokenWatcher;
+    QString m_loadedToken;
 };
 
 #endif // MAINWINDOW_H

@@ -162,11 +162,24 @@ MainWindow::MainWindow(QWidget *parent)
     countdownTimer->start(1000);
 
     // Initial State Check
-    QString token = SettingsDialog::getToken();
-    if (token.isEmpty()) {
+    stackWidget->setCurrentWidget(loadingPage);
+
+    tokenWatcher = new QFutureWatcher<QString>(this);
+    connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
+    tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
+}
+
+void MainWindow::onTokenLoaded() {
+    m_loadedToken = tokenWatcher->result();
+
+    if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
     } else {
         stackWidget->setCurrentWidget(notificationList);
+        if (client) {
+            client->setToken(m_loadedToken);
+            client->checkNotifications();
+        }
     }
 }
 
@@ -274,9 +287,9 @@ void MainWindow::setClient(GitHubClient *c) {
         refreshTimer->start();
     }
 
-    QString token = SettingsDialog::getToken();
-    if (!token.isEmpty()) {
-        client->setToken(token);
+    if (!m_loadedToken.isEmpty()) {
+        client->setToken(m_loadedToken);
+        client->checkNotifications();
     }
 }
 

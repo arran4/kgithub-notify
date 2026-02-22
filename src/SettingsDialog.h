@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QLineEdit>
+#include <QFuture>
 
 class QComboBox;
 class QPushButton;
@@ -15,6 +16,7 @@ class SettingsDialog : public QDialog {
    public:
     explicit SettingsDialog(QWidget *parent = nullptr);
     static QString getToken();
+    static QFuture<QString> getTokenAsync();
     static int getInterval();
 
    private slots:
