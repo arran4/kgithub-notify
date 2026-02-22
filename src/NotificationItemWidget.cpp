@@ -56,9 +56,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
 
     contentLayout->addLayout(repoTypeLayout);
 
-    // Date and URL
-    QHBoxLayout *dateUrlLayout = new QHBoxLayout();
-
+    // Date
     // Parse date
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
     QString dateStr = dt.isValid()
@@ -66,19 +64,16 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
                           : n.updatedAt;
 
     dateLabel = new QLabel("Date: " + dateStr, this);
+    contentLayout->addWidget(dateLabel);
 
+    // URL
     QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
     urlLabel = new QLabel(QString("<a href=\"%1\">Open on GitHub</a>").arg(htmlUrl.toHtmlEscaped()), this);
     urlLabel->setTextFormat(Qt::RichText);
     urlLabel->setOpenExternalLinks(true);
     urlLabel->setTextInteractionFlags(
         Qt::TextSelectableByMouse);  // Allow selection
-
-    dateUrlLayout->addWidget(dateLabel);
-    dateUrlLayout->addSpacing(10);
-    dateUrlLayout->addWidget(urlLabel);
-
-    contentLayout->addLayout(dateUrlLayout);
+    contentLayout->addWidget(urlLabel);
 
     mainLayout->addLayout(contentLayout);
 
