@@ -71,6 +71,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
 
+    showAllAction = new QAction(tr("Show All"), this);
+    showAllAction->setCheckable(true);
+    connect(showAllAction, &QAction::triggered, this, &MainWindow::onToggleShowAll);
+    toolbar->addAction(showAllAction);
+
     toolbar->addSeparator();
 
     selectAllAction = new QAction(tr("Select All"), this);
@@ -609,6 +614,17 @@ void MainWindow::onRefreshClicked() {
         if (refreshTimer) {
             refreshTimer->start();  // Restart timer
             updateStatusBar();      // Force update
+        }
+    }
+}
+
+void MainWindow::onToggleShowAll() {
+    if (client) {
+        client->setShowAll(showAllAction->isChecked());
+        client->checkNotifications();
+        if (refreshTimer) {
+            refreshTimer->start();
+            updateStatusBar();
         }
     }
 }

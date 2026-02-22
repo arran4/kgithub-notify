@@ -27,6 +27,7 @@ public:
     static QString apiToHtmlUrl(const QString &apiUrl, const QString &notificationId = "");
     void setToken(const QString &token);
     void setApiUrl(const QString &url);
+    void setShowAll(bool all);
     void checkNotifications();
     void verifyToken();
     void markAsRead(const QString &id);
@@ -48,6 +49,7 @@ private:
     QNetworkAccessManager *manager;
     QString m_token;
     QString m_apiUrl;
+    bool m_showAll;
     int m_pendingPatchRequests;
 
     QNetworkRequest createRequest(const QUrl &url) const;
