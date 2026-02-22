@@ -8,6 +8,7 @@
 #include <QDesktopServices>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QSettings>
 #include <QScreen>
 #include <QStyle>
 #include <QUrl>
@@ -30,7 +31,15 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), client(nullptr), pendingAuthError(false), authNotification(nullptr) {
     setWindowTitle(tr("Kgithub-notify"));
     setWindowIcon(QIcon(":/assets/icon.png"));
-    resize(400, 600);
+    resize(800, 600);
+
+    QSettings settings;
+    if (settings.contains("geometry")) {
+        restoreGeometry(settings.value("geometry").toByteArray());
+    }
+    if (settings.contains("windowState")) {
+        restoreState(settings.value("windowState").toByteArray());
+    }
 
     // Initialize Stacked Widget
     stackWidget = new QStackedWidget(this);
@@ -157,7 +166,11 @@ MainWindow::MainWindow(QWidget *parent)
     }
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() {
+    QSettings settings;
+    settings.setValue("geometry", saveGeometry());
+    settings.setValue("windowState", saveState());
+}
 
 void MainWindow::createErrorPage() {
     errorPage = new QWidget(this);
