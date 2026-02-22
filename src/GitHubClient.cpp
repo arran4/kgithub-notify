@@ -14,6 +14,7 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
     m_pendingPatchRequests = 0;
+    m_showAll = false;
 }
 
 QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
@@ -40,6 +41,10 @@ void GitHubClient::setApiUrl(const QString &url) {
     m_apiUrl = url;
 }
 
+void GitHubClient::setShowAll(bool all) {
+    m_showAll = all;
+}
+
 void GitHubClient::checkNotifications() {
     if (m_token.isEmpty()) {
         emit authError("No token provided");
@@ -47,6 +52,11 @@ void GitHubClient::checkNotifications() {
     }
 
     QUrl url(m_apiUrl + "/notifications");
+    if (m_showAll) {
+        QUrlQuery query;
+        query.addQueryItem("all", "true");
+        url.setQuery(query);
+    }
     QNetworkRequest request = createRequest(url);
 
     manager->get(request);

@@ -51,6 +51,7 @@ private slots:
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
+    void onToggleShowAll();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -90,6 +91,7 @@ private:
     // Toolbar
     QToolBar *toolbar;
     QAction *refreshAction;
+    QAction *showAllAction;
     QAction *selectAllAction;
     QAction *selectNoneAction;
     QAction *selectTop10Action;
