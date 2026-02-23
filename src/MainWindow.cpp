@@ -29,144 +29,19 @@ static int calculateSafeInterval(int minutes) {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), client(nullptr), m_isManualRefresh(false), pendingAuthError(false), authNotification(nullptr) {
-    setWindowTitle(tr("Kgithub-notify"));
-    setWindowIcon(QIcon(":/assets/icon.png"));
-    resize(800, 600);
-
-    QSettings settings;
-    if (settings.contains("geometry")) {
-        restoreGeometry(settings.value("geometry").toByteArray());
-    }
-    if (settings.contains("windowState")) {
-        restoreState(settings.value("windowState").toByteArray());
-    }
-
-    // Initialize Stacked Widget
-    stackWidget = new QStackedWidget(this);
-    setCentralWidget(stackWidget);
-
-    // Notification List
-    notificationList = new QListWidget(this);
-    notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
-
-    // Context menu for list
-    notificationList->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
-
-    contextMenu = new QMenu(this);
-
-    openAction = new QAction(tr("Open"), this);
-    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
-    contextMenu->addAction(openAction);
-
-    copyLinkAction = new QAction(tr("Copy Link"), this);
-    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
-    contextMenu->addAction(copyLinkAction);
-
-    dismissAction = new QAction(tr("Dismiss"), this);
-    connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
-    contextMenu->addAction(dismissAction);
-
-    stackWidget->addWidget(notificationList);
-
-    // Toolbar
-    toolbar = new QToolBar(this);
-    toolbar->setMovable(false);
-    addToolBar(Qt::TopToolBarArea, toolbar);
-
-    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), tr("Refresh"), this);
-    refreshAction->setShortcut(QKeySequence::Refresh);
-    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    toolbar->addAction(refreshAction);
-
-    showAllAction = new QAction(tr("Show All"), this);
-    showAllAction->setCheckable(true);
-    connect(showAllAction, &QAction::triggered, this, &MainWindow::onToggleShowAll);
-    toolbar->addAction(showAllAction);
-
-    toolbar->addSeparator();
-
-    selectAllAction = new QAction(tr("Select All"), this);
-    selectAllAction->setShortcut(QKeySequence::SelectAll);
-    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
-    toolbar->addAction(selectAllAction);
-
-    selectNoneAction = new QAction(tr("Select None"), this);
-    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
-    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
-    toolbar->addAction(selectNoneAction);
-
-    selectTop10Action = new QAction(tr("Top 10"), this);
-    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
-    connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
-    toolbar->addAction(selectTop10Action);
-
-    toolbar->addSeparator();
-
-    dismissSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), tr("Dismiss Selected"), this);
-    dismissSelectedAction->setShortcut(QKeySequence::Delete);
-    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
-    toolbar->addAction(dismissSelectedAction);
-
-    openSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), tr("Open Selected"), this);
-    openSelectedAction->setShortcut(Qt::Key_Return);
-    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
-    toolbar->addAction(openSelectedAction);
-
-    // Error Page
-    createErrorPage();
-    stackWidget->addWidget(errorPage);
-
-    // Login Page
-    createLoginPage();
-    stackWidget->addWidget(loginPage);
-
-    // Empty State Page
-    createEmptyStatePage();
-    stackWidget->addWidget(emptyStatePage);
-
-    // Loading Page
-    createLoadingPage();
-    stackWidget->addWidget(loadingPage);
-
+    setupWindow();
+    setupCentralWidget();
+    setupNotificationList();
+    setupToolbar();
+    setupPages();
     createTrayIcon();
-
-    // Menu
-    QMenu *fileMenu = menuBar()->addMenu("&File");
-    QAction *settingsAction = new QAction(tr("&Settings"), this);
-    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    fileMenu->addAction(settingsAction);
-
-    QAction *quitAction = new QAction(tr("&Quit"), this);
-    quitAction->setShortcut(QKeySequence::Quit);
-    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    fileMenu->addAction(quitAction);
-
-    // Status Bar
-    statusBar = new QStatusBar(this);
-    setStatusBar(statusBar);
-
-    countLabel = new QLabel(tr("Items: 0"), this);
-    timerLabel = new QLabel(tr("Next refresh: --:--"), this);
-
-    statusBar->addWidget(countLabel);
-    statusBar->addPermanentWidget(timerLabel);
-
-    refreshTimer = new QTimer(this);
-    countdownTimer = new QTimer(this);
-
-    connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
-    countdownTimer->start(1000);
+    setupMenus();
+    setupStatusBar();
 
     // Initial State Check
     stackWidget->setCurrentWidget(loadingPage);
 
-    tokenWatcher = new QFutureWatcher<QString>(this);
-    connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
-    tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
+    loadToken();
 }
 
 void MainWindow::onTokenLoaded() {
@@ -868,4 +743,145 @@ NotificationItemWidget* MainWindow::findNotificationWidget(const QString &id) {
         }
     }
     return nullptr;
+}
+
+void MainWindow::setupWindow() {
+    setWindowTitle(tr("Kgithub-notify"));
+    setWindowIcon(QIcon(":/assets/icon.png"));
+    resize(800, 600);
+
+    QSettings settings;
+    if (settings.contains("geometry")) {
+        restoreGeometry(settings.value("geometry").toByteArray());
+    }
+    if (settings.contains("windowState")) {
+        restoreState(settings.value("windowState").toByteArray());
+    }
+}
+
+void MainWindow::setupCentralWidget() {
+    stackWidget = new QStackedWidget(this);
+    setCentralWidget(stackWidget);
+}
+
+void MainWindow::setupNotificationList() {
+    notificationList = new QListWidget(this);
+    notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
+
+    // Context menu for list
+    notificationList->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
+
+    contextMenu = new QMenu(this);
+
+    openAction = new QAction(tr("Open"), this);
+    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
+    contextMenu->addAction(openAction);
+
+    copyLinkAction = new QAction(tr("Copy Link"), this);
+    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
+    contextMenu->addAction(copyLinkAction);
+
+    dismissAction = new QAction(tr("Dismiss"), this);
+    connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
+    contextMenu->addAction(dismissAction);
+
+    stackWidget->addWidget(notificationList);
+}
+
+void MainWindow::setupToolbar() {
+    toolbar = new QToolBar(this);
+    toolbar->setMovable(false);
+    addToolBar(Qt::TopToolBarArea, toolbar);
+
+    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), tr("Refresh"), this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
+    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    toolbar->addAction(refreshAction);
+
+    showAllAction = new QAction(tr("Show All"), this);
+    showAllAction->setCheckable(true);
+    connect(showAllAction, &QAction::triggered, this, &MainWindow::onToggleShowAll);
+    toolbar->addAction(showAllAction);
+
+    toolbar->addSeparator();
+
+    selectAllAction = new QAction(tr("Select All"), this);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    toolbar->addAction(selectAllAction);
+
+    selectNoneAction = new QAction(tr("Select None"), this);
+    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    toolbar->addAction(selectNoneAction);
+
+    selectTop10Action = new QAction(tr("Top 10"), this);
+    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
+    connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
+    toolbar->addAction(selectTop10Action);
+
+    toolbar->addSeparator();
+
+    dismissSelectedAction =
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), tr("Dismiss Selected"), this);
+    dismissSelectedAction->setShortcut(QKeySequence::Delete);
+    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
+    toolbar->addAction(dismissSelectedAction);
+
+    openSelectedAction =
+        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), tr("Open Selected"), this);
+    openSelectedAction->setShortcut(Qt::Key_Return);
+    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
+    toolbar->addAction(openSelectedAction);
+}
+
+void MainWindow::setupPages() {
+    createErrorPage();
+    stackWidget->addWidget(errorPage);
+
+    createLoginPage();
+    stackWidget->addWidget(loginPage);
+
+    createEmptyStatePage();
+    stackWidget->addWidget(emptyStatePage);
+
+    createLoadingPage();
+    stackWidget->addWidget(loadingPage);
+}
+
+void MainWindow::setupMenus() {
+    QMenu *fileMenu = menuBar()->addMenu("&File");
+    QAction *settingsAction = new QAction(tr("&Settings"), this);
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
+    fileMenu->addAction(settingsAction);
+
+    QAction *quitAction = new QAction(tr("&Quit"), this);
+    quitAction->setShortcut(QKeySequence::Quit);
+    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
+    fileMenu->addAction(quitAction);
+}
+
+void MainWindow::setupStatusBar() {
+    statusBar = new QStatusBar(this);
+    setStatusBar(statusBar);
+
+    countLabel = new QLabel(tr("Items: 0"), this);
+    timerLabel = new QLabel(tr("Next refresh: --:--"), this);
+
+    statusBar->addWidget(countLabel);
+    statusBar->addPermanentWidget(timerLabel);
+
+    refreshTimer = new QTimer(this);
+    countdownTimer = new QTimer(this);
+
+    connect(countdownTimer, &QTimer::timeout, this, &MainWindow::updateStatusBar);
+    countdownTimer->start(1000);
+}
+
+void MainWindow::loadToken() {
+    tokenWatcher = new QFutureWatcher<QString>(this);
+    connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
+    tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
 }
