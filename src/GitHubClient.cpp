@@ -56,7 +56,8 @@ void GitHubClient::checkNotifications() {
     }
     QNetworkRequest request = createRequest(url);
 
-    manager->get(request);
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "notifications");
 }
 
 void GitHubClient::verifyToken() {
@@ -68,7 +69,8 @@ void GitHubClient::verifyToken() {
     QUrl url(m_apiUrl + "/user");
     QNetworkRequest request = createRequest(url);
 
-    manager->get(request);
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "verification");
 }
 
 void GitHubClient::markAsRead(const QString &id) {
@@ -79,7 +81,8 @@ void GitHubClient::markAsRead(const QString &id) {
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request = createRequest(url);
 
-    manager->sendCustomRequest(request, "PATCH");
+    QNetworkReply *reply = manager->sendCustomRequest(request, "PATCH");
+    reply->setProperty("type", "patch");
 }
 
 void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
@@ -134,78 +137,90 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     QString type = reply->property("type").toString();
+
+    if (type == "details") {
+        handleDetailsReply(reply);
+    } else if (type == "image") {
+        handleImageReply(reply);
+    } else if (type == "verification") {
+        handleVerificationReply(reply);
+    } else if (type == "patch") {
+        handlePatchReply(reply);
+    } else if (type == "notifications") {
+        handleNotificationsReply(reply);
+    } else {
+        qDebug() << "Unknown reply type:" << type;
+    }
+
+    reply->deleteLater();
+}
+
+void GitHubClient::handleDetailsReply(QNetworkReply *reply) {
     QString notificationId = reply->property("notificationId").toString();
-
-    if (!type.isEmpty()) {
-        if (reply->error() != QNetworkReply::NoError) {
-            qDebug() << "Error fetching" << type << ":" << reply->errorString();
-            reply->deleteLater();
-            return;
-        }
-
-        if (type == "details") {
-            QByteArray data = reply->readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isObject()) {
-                QJsonObject obj = doc.object();
-                QString authorName;
-                QString avatarUrl;
-
-                if (obj.contains("user")) {
-                    QJsonObject user = obj["user"].toObject();
-                    authorName = user["login"].toString();
-                    avatarUrl = user["avatar_url"].toString();
-                } else if (obj.contains("author")) {
-                    QJsonObject author = obj["author"].toObject();
-                    authorName = author["login"].toString();
-                    avatarUrl = author["avatar_url"].toString();
-                }
-
-                QString htmlUrl = obj["html_url"].toString();
-
-                emit detailsReceived(notificationId, authorName, avatarUrl, htmlUrl);
-            }
-        } else if (type == "image") {
-            QByteArray data = reply->readAll();
-            QPixmap pixmap;
-            if (pixmap.loadFromData(data)) {
-                emit imageReceived(notificationId, pixmap);
-            }
-        }
-
-        reply->deleteLater();
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "Error fetching details:" << reply->errorString();
         return;
     }
 
-    // Check for verification request
-    if (reply->url().toString().endsWith("/user")) {
-        if (reply->error() == QNetworkReply::NoError) {
-            QByteArray data = reply->readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isObject()) {
-                QJsonObject obj = doc.object();
-                QString login = obj["login"].toString();
-                emit tokenVerified(true, "Token valid for user: " + login);
-            } else {
-                emit tokenVerified(true, "Token valid");
-            }
-        } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            emit tokenVerified(false, "Invalid Token");
+    QByteArray data = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (doc.isObject()) {
+        QJsonObject obj = doc.object();
+        QString authorName;
+        QString avatarUrl;
+
+        if (obj.contains("user")) {
+            QJsonObject user = obj["user"].toObject();
+            authorName = user["login"].toString();
+            avatarUrl = user["avatar_url"].toString();
+        } else if (obj.contains("author")) {
+            QJsonObject author = obj["author"].toObject();
+            authorName = author["login"].toString();
+            avatarUrl = author["avatar_url"].toString();
+        }
+
+        QString htmlUrl = obj["html_url"].toString();
+
+        emit detailsReceived(notificationId, authorName, avatarUrl, htmlUrl);
+    }
+}
+
+void GitHubClient::handleImageReply(QNetworkReply *reply) {
+    QString notificationId = reply->property("notificationId").toString();
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "Error fetching image:" << reply->errorString();
+        return;
+    }
+
+    QByteArray data = reply->readAll();
+    QPixmap pixmap;
+    if (pixmap.loadFromData(data)) {
+        emit imageReceived(notificationId, pixmap);
+    }
+}
+
+void GitHubClient::handleVerificationReply(QNetworkReply *reply) {
+    if (reply->error() == QNetworkReply::NoError) {
+        QByteArray data = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            QString login = obj["login"].toString();
+            emit tokenVerified(true, "Token valid for user: " + login);
         } else {
-            emit tokenVerified(false, reply->errorString());
+            emit tokenVerified(true, "Token valid");
         }
-        reply->deleteLater();
-        return;
+    } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+        emit tokenVerified(false, "Invalid Token");
+    } else {
+        emit tokenVerified(false, reply->errorString());
     }
+}
 
-    bool isPatch = (reply->operation() == QNetworkAccessManager::CustomOperation &&
-                    reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH");
-
-    if (isPatch) {
-        m_pendingPatchRequests--;
-        if (m_pendingPatchRequests < 0) {
-            m_pendingPatchRequests = 0;
-        }
+void GitHubClient::handlePatchReply(QNetworkReply *reply) {
+    m_pendingPatchRequests--;
+    if (m_pendingPatchRequests < 0) {
+        m_pendingPatchRequests = 0;
     }
 
     if (reply->error() != QNetworkReply::NoError) {
@@ -214,16 +229,21 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         } else {
             emit errorOccurred(reply->errorString());
         }
-        reply->deleteLater();
         return;
     }
 
-    // Check if this was a PATCH request (mark as read)
-    if (isPatch) {
-        if (m_pendingPatchRequests == 0) {
-            checkNotifications();
+    if (m_pendingPatchRequests == 0) {
+        checkNotifications();
+    }
+}
+
+void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
+    if (reply->error() != QNetworkReply::NoError) {
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            emit authError("Invalid Token");
+        } else {
+            emit errorOccurred(reply->errorString());
         }
-        reply->deleteLater();
         return;
     }
 
@@ -232,7 +252,6 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
 
     if (!doc.isArray()) {
         emit errorOccurred("Invalid JSON response (expected array)");
-        reply->deleteLater();
         return;
     }
 
@@ -262,5 +281,4 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     }
 
     emit notificationsReceived(notifications);
-    reply->deleteLater();
 }

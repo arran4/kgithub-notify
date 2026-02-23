@@ -10,9 +10,29 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Widgets Network Svg REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Svg Test REQUIRED)
 find_package(KF5Wallet REQUIRED)
 find_package(KF5Notifications REQUIRED)
+
+enable_testing()
+
+add_executable(TestGitHubClient
+    tests/TestGitHubClient.cpp
+    tests/MockNetworkReply.cpp
+    tests/MockNetworkReply.h
+    src/GitHubClient.cpp
+    src/GitHubClient.h
+    src/SecureString.h
+)
+
+target_link_libraries(TestGitHubClient
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Svg
+    Qt5::Test
+)
+
+add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
 
 add_executable(Kgithub-notify
     src/main.cpp
