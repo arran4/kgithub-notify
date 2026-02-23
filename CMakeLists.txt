@@ -18,6 +18,7 @@ add_executable(Kgithub-notify
     src/main.cpp
     src/GitHubClient.cpp
     src/GitHubClient.h
+    src/SecureString.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
     src/WalletManager.cpp

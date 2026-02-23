@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
+#include "SecureString.h"
 
 struct Notification {
     QString id;
@@ -48,7 +49,7 @@ private slots:
 
 private:
     QNetworkAccessManager *manager;
-    QString m_token;
+    SecureString m_token;
     QString m_apiUrl;
     bool m_showAll;
     int m_pendingPatchRequests;
