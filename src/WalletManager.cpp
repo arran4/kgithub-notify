@@ -1,19 +1,18 @@
 #include "WalletManager.h"
+
 #include <KWallet>
 #include <QFutureInterface>
 #include <QObject>
 
 namespace {
-    const QString FOLDER_NAME = "Kgithub-notify";
-    const QString KEY_NAME = "token";
-}
+const QString FOLDER_NAME = "Kgithub-notify";
+const QString KEY_NAME = "token";
+}  // namespace
 
 class WalletLoader : public QObject {
     Q_OBJECT
-public:
-    WalletLoader() {
-        interface.reportStarted();
-    }
+   public:
+    WalletLoader() { interface.reportStarted(); }
 
     QFuture<QString> start() {
         wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Asynchronous);
@@ -27,11 +26,11 @@ public:
         return interface.future();
     }
 
-private slots:
+   private slots:
     void onWalletOpened(bool success) {
         if (success && wallet) {
             if (!wallet->hasFolder(FOLDER_NAME)) {
-                 wallet->createFolder(FOLDER_NAME);
+                wallet->createFolder(FOLDER_NAME);
             }
             wallet->setFolder(FOLDER_NAME);
             QString token;
@@ -48,16 +47,17 @@ private slots:
         deleteLater();
     }
 
-private:
+   private:
     KWallet::Wallet *wallet = nullptr;
     QFutureInterface<QString> interface;
 };
 
 QString WalletManager::loadToken() {
-    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
+    KWallet::Wallet *wallet =
+        KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
     if (wallet) {
         if (!wallet->hasFolder(FOLDER_NAME)) {
-             wallet->createFolder(FOLDER_NAME);
+            wallet->createFolder(FOLDER_NAME);
         }
         wallet->setFolder(FOLDER_NAME);
         QString token;
@@ -74,10 +74,11 @@ QFuture<QString> WalletManager::loadTokenAsync() {
 }
 
 void WalletManager::saveToken(const QString &token) {
-    KWallet::Wallet *wallet = KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
+    KWallet::Wallet *wallet =
+        KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
     if (wallet) {
         if (!wallet->hasFolder(FOLDER_NAME)) {
-             wallet->createFolder(FOLDER_NAME);
+            wallet->createFolder(FOLDER_NAME);
         }
         wallet->setFolder(FOLDER_NAME);
         wallet->writePassword(KEY_NAME, token);
