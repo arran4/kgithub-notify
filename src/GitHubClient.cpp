@@ -1,13 +1,14 @@
 #include "GitHubClient.h"
-#include <QNetworkRequest>
-#include <QUrl>
-#include <QUrlQuery>
+
 #include <QDebug>
-#include <QJsonDocument>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QList>
+#include <QNetworkRequest>
 #include <QPixmap>
+#include <QUrl>
+#include <QUrlQuery>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -33,17 +34,11 @@ QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notific
     return htmlUrl;
 }
 
-void GitHubClient::setToken(const QString &token) {
-    m_token.set(token);
-}
+void GitHubClient::setToken(const QString &token) { m_token.set(token); }
 
-void GitHubClient::setApiUrl(const QString &url) {
-    m_apiUrl = url;
-}
+void GitHubClient::setApiUrl(const QString &url) { m_apiUrl = url; }
 
-void GitHubClient::setShowAll(bool all) {
-    m_showAll = all;
-}
+void GitHubClient::setShowAll(bool all) { m_showAll = all; }
 
 void GitHubClient::checkNotifications() {
     emit loadingStarted();
@@ -185,15 +180,15 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     // Check for verification request
     if (reply->url().toString().endsWith("/user")) {
         if (reply->error() == QNetworkReply::NoError) {
-             QByteArray data = reply->readAll();
-             QJsonDocument doc = QJsonDocument::fromJson(data);
-             if (doc.isObject()) {
-                 QJsonObject obj = doc.object();
-                 QString login = obj["login"].toString();
-                 emit tokenVerified(true, "Token valid for user: " + login);
-             } else {
-                 emit tokenVerified(true, "Token valid");
-             }
+            QByteArray data = reply->readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                QString login = obj["login"].toString();
+                emit tokenVerified(true, "Token valid for user: " + login);
+            } else {
+                emit tokenVerified(true, "Token valid");
+            }
         } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
             emit tokenVerified(false, "Invalid Token");
         } else {
@@ -203,7 +198,8 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         return;
     }
 
-    bool isPatch = (reply->operation() == QNetworkAccessManager::CustomOperation && reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH");
+    bool isPatch = (reply->operation() == QNetworkAccessManager::CustomOperation &&
+                    reply->request().attribute(QNetworkRequest::CustomVerbAttribute).toString() == "PATCH");
 
     if (isPatch) {
         m_pendingPatchRequests--;
@@ -253,7 +249,7 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         QJsonObject subject = obj["subject"].toObject();
         n.title = subject["title"].toString();
         n.type = subject["type"].toString();
-        n.url = subject["url"].toString(); // API URL
+        n.url = subject["url"].toString();  // API URL
         n.htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
 
         QJsonObject repo = obj["repository"].toObject();
