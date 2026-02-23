@@ -68,6 +68,15 @@ private:
     void createEmptyStatePage();
     void createLoadingPage();
 
+    void setupWindow();
+    void setupCentralWidget();
+    void setupNotificationList();
+    void setupToolbar();
+    void setupPages();
+    void setupMenus();
+    void setupStatusBar();
+    void loadToken();
+
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;
