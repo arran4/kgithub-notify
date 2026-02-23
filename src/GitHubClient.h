@@ -23,6 +23,8 @@ struct Notification {
 
 class GitHubClient : public QObject {
     Q_OBJECT
+    friend class TestGitHubClient;
+
 public:
     explicit GitHubClient(QObject *parent = nullptr);
     static QString apiToHtmlUrl(const QString &apiUrl, const QString &notificationId = "");
@@ -55,6 +57,12 @@ private:
     int m_pendingPatchRequests;
 
     QNetworkRequest createRequest(const QUrl &url) const;
+
+    void handleDetailsReply(QNetworkReply *reply);
+    void handleImageReply(QNetworkReply *reply);
+    void handleVerificationReply(QNetworkReply *reply);
+    void handlePatchReply(QNetworkReply *reply);
+    void handleNotificationsReply(QNetworkReply *reply);
 };
 
 #endif // GITHUBCLIENT_H
