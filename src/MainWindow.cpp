@@ -679,6 +679,7 @@ void MainWindow::positionPopup(QWidget *popup) {
 
 void MainWindow::sendNotification(const Notification &n) {
     KNotification *notification = new KNotification("NewNotification");
+    notification->setComponentName(QStringLiteral("kgithub-notify"));
     notification->setTitle(n.repository);
     notification->setText(n.title);
 
@@ -703,6 +704,7 @@ void MainWindow::sendNotification(const Notification &n) {
 
 void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
     KNotification *notification = new KNotification("NewNotification");
+    notification->setComponentName(QStringLiteral("kgithub-notify"));
     notification->setTitle(tr("%1 New Notifications").arg(count));
 
     QString summary;
