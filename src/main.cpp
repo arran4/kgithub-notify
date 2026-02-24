@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QGuiApplication>
 #include <QTimer>
 
 #include "GitHubClient.h"
@@ -11,6 +12,10 @@
 #endif
 
 int main(int argc, char *argv[]) {
+    QCoreApplication::setOrganizationName("Kgithub-notify");
+    QCoreApplication::setApplicationName("kgithub-notify");
+    QGuiApplication::setDesktopFileName("kgithub-notify");
+
     QApplication app(argc, argv);
     QApplication::setOrganizationName("Kgithub-notify");
     QApplication::setApplicationName("kgithub-notify");
