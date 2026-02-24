@@ -13,6 +13,7 @@
 #include <QProcess>
 #include <QSettings>
 #include <QScreen>
+#include <QSpinBox>
 #include <QStyle>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -650,6 +651,22 @@ void MainWindow::onOpenSelectedClicked() {
     }
 }
 
+void MainWindow::onOpenFirstNClicked() {
+    if (!notificationList) return;
+
+    int n = limitSpinBox->value();
+    int count = notificationList->count();
+    int limit = qMin(n, count);
+
+    for (int i = 0; i < limit; ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        QString id = item->data(Qt::UserRole + 1).toString();
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+        QDesktopServices::openUrl(QUrl(htmlUrl));
+    }
+}
+
 void MainWindow::updateStatusBar() {
     if (refreshTimer && refreshTimer->isActive()) {
         qint64 remaining = refreshTimer->remainingTime();
@@ -898,6 +915,24 @@ void MainWindow::setupToolbar() {
     openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
+
+    toolbar->addSeparator();
+
+    limitSpinBox = new QSpinBox(this);
+    limitSpinBox->setRange(1, 50);
+    limitSpinBox->setValue(5);
+    limitSpinBox->setToolTip(tr("Number of notifications to open"));
+    toolbar->addWidget(limitSpinBox);
+
+    openFirstNAction = new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")}, QString(),
+                                              QStyle::SP_DirOpenIcon),
+                                   tr("Open First %1").arg(limitSpinBox->value()), this);
+    connect(openFirstNAction, &QAction::triggered, this, &MainWindow::onOpenFirstNClicked);
+    toolbar->addAction(openFirstNAction);
+
+    connect(limitSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int i) {
+        openFirstNAction->setText(tr("Open First %1").arg(i));
+    });
 }
 
 void MainWindow::setupPages() {
