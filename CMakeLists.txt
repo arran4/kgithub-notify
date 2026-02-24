@@ -73,9 +73,9 @@ install(FILES kgithub-notify.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
 )
 
-install(FILES src/assets/icon.png
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/1024x1024/apps
-    RENAME kgithub-notify.png
+install(FILES src/assets/icon.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME kgithub-notify.svg
 )
 
 install(FILES src/kgithub-notify.notifyrc
