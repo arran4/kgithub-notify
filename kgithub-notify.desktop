@@ -1,10 +1,10 @@
 [Desktop Entry]
 Name=KGitHub Notify
 Comment=GitHub Notification System Tray
-Exec=Kgithub-notify
+Exec=kgithub-notify
 Icon=kgithub-notify
 Type=Application
 Categories=Development;Utility;Qt;KDE;
-StartupWMClass=Kgithub-notify
+StartupWMClass=kgithub-notify
 Terminal=false
 X-KDE-autostart-after=panel

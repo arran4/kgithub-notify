@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Kgithub-notify VERSION 0.1.0)
+project(kgithub-notify VERSION 0.1.0)
 
 include(GNUInstallDirs)
 
@@ -34,7 +34,7 @@ target_link_libraries(TestGitHubClient
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
 
-add_executable(Kgithub-notify
+add_executable(kgithub-notify
     src/main.cpp
     src/GitHubClient.cpp
     src/GitHubClient.h
@@ -52,7 +52,7 @@ add_executable(Kgithub-notify
     src/resources.qrc
 )
 
-target_link_libraries(Kgithub-notify
+target_link_libraries(kgithub-notify
     Qt5::Widgets
     Qt5::Network
     Qt5::Svg
@@ -60,11 +60,11 @@ target_link_libraries(Kgithub-notify
     KF5::Notifications
 )
 
-target_compile_definitions(Kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")
 
 
 # Installation
-install(TARGETS Kgithub-notify
+install(TARGETS kgithub-notify
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     BUNDLE DESTINATION .
 )
@@ -73,9 +73,9 @@ install(FILES kgithub-notify.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
 )
 
-install(FILES src/assets/icon.png
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/1024x1024/apps
-    RENAME kgithub-notify.png
+install(FILES src/assets/icon.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME kgithub-notify.svg
 )
 
 install(FILES src/kgithub-notify.notifyrc
