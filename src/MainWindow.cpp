@@ -3,11 +3,14 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QCloseEvent>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QDate>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QProcess>
 #include <QSettings>
 #include <QScreen>
 #include <QStyle>
@@ -168,6 +171,26 @@ void MainWindow::setClient(GitHubClient *c) {
     }
 }
 
+
+QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackResource,
+                             QStyle::StandardPixmap fallbackPixmap) const {
+    for (const QString &name : names) {
+        QIcon icon = QIcon::fromTheme(name);
+        if (!icon.isNull()) {
+            return icon;
+        }
+    }
+
+    if (!fallbackResource.isEmpty()) {
+        QIcon icon(fallbackResource);
+        if (!icon.isNull()) {
+            return icon;
+        }
+    }
+
+    return QApplication::style()->standardIcon(fallbackPixmap);
+}
+
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
     updateTrayMenu();
@@ -175,11 +198,8 @@ void MainWindow::createTrayIcon() {
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
 
-    QIcon icon(":/assets/icon.png");
-    if (icon.isNull()) {
-        icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-    }
-    trayIcon->setIcon(icon);
+    trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+                               QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
@@ -191,7 +211,9 @@ void MainWindow::updateTrayMenu() {
     if (!trayIconMenu) return;
     trayIconMenu->clear();
 
-    QAction *openAppAction = new QAction(tr("Open Kgithub-notify"), trayIconMenu);
+    QAction *openAppAction =
+        new QAction(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("knotifications")}),
+                    tr("Open Kgithub-notify"), trayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
     openAppAction->setFont(font);
@@ -259,15 +281,25 @@ void MainWindow::updateTrayMenu() {
 
     trayIconMenu->addSeparator();
 
-    QAction *trayRefreshAction = new QAction(tr("Force Refresh"), trayIconMenu);
+    QAction *trayRefreshAction =
+        new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), trayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     trayIconMenu->addAction(trayRefreshAction);
 
-    QAction *settingsAction = new QAction(tr("Settings"), trayIconMenu);
+    QAction *settingsAction =
+        new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("Settings"), trayIconMenu);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
 
-    QAction *quitAction = new QAction(tr("Quit"), trayIconMenu);
+    QAction *notificationSettingsAction =
+        new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
+                    tr("Configure Notifications"), trayIconMenu);
+    connect(notificationSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
+    trayIconMenu->addAction(notificationSettingsAction);
+
+    trayIconMenu->addSeparator();
+
+    QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
 }
@@ -362,11 +394,8 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             }
         }
     } else {
-        QIcon icon(":/assets/icon.png");
-        if (icon.isNull()) {
-            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-        }
-        trayIcon->setIcon(icon);
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -503,11 +532,8 @@ void MainWindow::dismissCurrentItem() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        QIcon icon(":/assets/icon.png");
-        if (icon.isNull()) {
-            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-        }
-        trayIcon->setIcon(icon);
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -606,11 +632,8 @@ void MainWindow::onDismissSelectedClicked() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        QIcon icon(":/assets/icon.png");
-        if (icon.isNull()) {
-            icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-        }
-        trayIcon->setIcon(icon);
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -734,6 +757,39 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     notification->sendEvent();
 }
 
+
+void MainWindow::showAboutDialog() {
+    const QString copyright = tr("© %1 Kgithub-notify contributors").arg(QDate::currentDate().year());
+    const QString description = tr("A KDE-friendly system tray client for GitHub notifications.");
+
+    QMessageBox aboutBox(this);
+    aboutBox.setWindowTitle(tr("About KGitHub Notify"));
+    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("knotifications")},
+                                      QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon)
+                               .pixmap(64, 64));
+    aboutBox.setText(tr("<b>KGitHub Notify</b>"));
+    aboutBox.setInformativeText(
+        tr("%1\n\nVersion: %2\n%3\n\nUses Qt, KDE Wallet, and KDE Notifications.")
+            .arg(description, QCoreApplication::applicationVersion().isEmpty() ? QStringLiteral("dev")
+                                                                                : QCoreApplication::applicationVersion(),
+                 copyright));
+    aboutBox.setStandardButtons(QMessageBox::Ok);
+    aboutBox.exec();
+}
+
+void MainWindow::openKdeNotificationSettings() {
+    bool launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
+                                            {QStringLiteral("kcm_notifications")});
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
+    }
+
+    if (!launched) {
+        showTrayMessage(tr("Notification settings unavailable"),
+                        tr("Could not launch KDE notification settings on this system."));
+    }
+}
+
 NotificationItemWidget* MainWindow::findNotificationWidget(const QString &id) {
     if (!notificationList) return nullptr;
     for(int i = 0; i < notificationList->count(); ++i) {
@@ -795,7 +851,8 @@ void MainWindow::setupToolbar() {
     toolbar->setMovable(false);
     addToolBar(Qt::TopToolBarArea, toolbar);
 
-    refreshAction = new QAction(QApplication::style()->standardIcon(QStyle::SP_BrowserReload), tr("Refresh"), this);
+    refreshAction = new QAction(themedIcon({QStringLiteral("view-refresh")}, QString(), QStyle::SP_BrowserReload),
+                                tr("Refresh"), this);
     refreshAction->setShortcut(QKeySequence::Refresh);
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
@@ -825,13 +882,17 @@ void MainWindow::setupToolbar() {
     toolbar->addSeparator();
 
     dismissSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DialogDiscardButton), tr("Dismiss Selected"), this);
+        new QAction(themedIcon({QStringLiteral("mail-mark-read"), QStringLiteral("edit-delete")}, QString(),
+                               QStyle::SP_DialogDiscardButton),
+                    tr("Dismiss Selected"), this);
     dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
 
     openSelectedAction =
-        new QAction(QApplication::style()->standardIcon(QStyle::SP_DirOpenIcon), tr("Open Selected"), this);
+        new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")}, QString(),
+                               QStyle::SP_DirOpenIcon),
+                    tr("Open Selected"), this);
     openSelectedAction->setShortcut(Qt::Key_Return);
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
@@ -852,15 +913,34 @@ void MainWindow::setupPages() {
 }
 
 void MainWindow::setupMenus() {
-    QMenu *fileMenu = menuBar()->addMenu("&File");
-    QAction *settingsAction = new QAction(tr("&Settings"), this);
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+
+    QAction *settingsAction = new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("&Settings"), this);
+    settingsAction->setShortcut(QKeySequence::Preferences);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     fileMenu->addAction(settingsAction);
 
-    QAction *quitAction = new QAction(tr("&Quit"), this);
+    QAction *notificationsSettingsAction =
+        new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
+                    tr("Configure &Notifications..."), this);
+    connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
+    fileMenu->addAction(notificationsSettingsAction);
+
+    fileMenu->addSeparator();
+
+    QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("&Quit"), this);
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
+
+    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+    QAction *aboutAction = new QAction(themedIcon({QStringLiteral("help-about")}), tr("&About KGitHub Notify"), this);
+    connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
+    helpMenu->addAction(aboutAction);
+
+    QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
+    connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+    helpMenu->addAction(aboutQtAction);
 }
 
 void MainWindow::setupStatusBar() {
