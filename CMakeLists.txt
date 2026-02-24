@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Kgithub-notify)
+project(Kgithub-notify VERSION 0.1.0)
 
 include(GNUInstallDirs)
 
@@ -59,6 +59,8 @@ target_link_libraries(Kgithub-notify
     KF5::Wallet
     KF5::Notifications
 )
+
+target_compile_definitions(Kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")
 
 
 # Installation

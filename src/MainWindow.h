@@ -13,6 +13,9 @@
 #include <QStatusBar>
 #include <QTimer>
 #include <QFutureWatcher>
+#include <QIcon>
+#include <QStyle>
+#include <QStringList>
 #include "GitHubClient.h"
 #include "AuthErrorNotification.h"
 #include <KNotification>
@@ -55,6 +58,8 @@ private slots:
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onToggleShowAll();
+    void showAboutDialog();
+    void openKdeNotificationSettings();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -76,6 +81,8 @@ private:
     void setupMenus();
     void setupStatusBar();
     void loadToken();
+    QIcon themedIcon(const QStringList &names, const QString &fallbackResource = QString(),
+                     QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;

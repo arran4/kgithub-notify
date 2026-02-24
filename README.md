@@ -9,6 +9,7 @@ A GitHub notification system tray application written in C++ using Qt5. It notif
 *   **System Tray Integration**: Runs in the background and sits in your system tray.
 *   **Periodic Polling**: Checks for new notifications every 5 minutes.
 *   **Desktop Notifications**: Shows system notifications when new items arrive.
+*   **KDE-First Integration**: Uses KWallet for token storage, KNotification for desktop alerts, KDE-themed icons, and quick links to KDE notification settings.
 *   **Quick Actions**:
     *   **Open**: Opens the notification URL in your default browser. This also marks the notification as read.
     *   **Copy Link**: Copies the link to the notification (without referrer ID) to your clipboard.
