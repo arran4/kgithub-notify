@@ -21,6 +21,7 @@
 #include <KNotification>
 
 class NotificationItemWidget;
+class QSpinBox;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -57,6 +58,7 @@ private slots:
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
+    void onOpenFirstNClicked();
     void onToggleShowAll();
     void showAboutDialog();
     void openKdeNotificationSettings();
@@ -117,6 +119,8 @@ private:
     QAction *selectTop10Action;
     QAction *dismissSelectedAction;
     QAction *openSelectedAction;
+    QSpinBox *limitSpinBox;
+    QAction *openFirstNAction;
 
     // New UI components
     QStackedWidget *stackWidget;
