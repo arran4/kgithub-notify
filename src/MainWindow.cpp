@@ -278,6 +278,9 @@ void MainWindow::onTrayMessageClicked() {
 }
 
 void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+    if (widget && widget->isLoading()) return;
+
     QString apiUrl = item->data(Qt::UserRole).toString();
     QString id = item->data(Qt::UserRole + 1).toString();
 
@@ -286,7 +289,6 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     }
 
     // Visual update
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
     if (widget) {
         widget->setRead(true);
     }
@@ -342,6 +344,9 @@ void MainWindow::onLoadingStarted() {
 void MainWindow::showContextMenu(const QPoint &pos) {
     QListWidgetItem *item = notificationList->itemAt(pos);
     if (item) {
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget && widget->isLoading()) return;
+
         notificationList->setCurrentItem(item);  // Ensure item is selected
 
         QString id = item->data(Qt::UserRole + 1).toString();
@@ -362,6 +367,10 @@ void MainWindow::dismissCurrentItem() {
     QListWidgetItem *item = notificationList->currentItem();
     if (!item) return;
 
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+    if (widget && widget->isLoading()) return;
+    if (widget) widget->setLoading(true);
+
     QString id = item->data(Qt::UserRole + 1).toString();
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
@@ -369,23 +378,15 @@ void MainWindow::dismissCurrentItem() {
     n.unread = false;
     saveDoneNotification(n);
 
+    // Update item data to reflect read status
+    item->setData(Qt::UserRole + 4, n.toJson());
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
     if (client) {
         client->markAsReadAndDone(id);
     }
-
-    knownNotificationIds.remove(id);
-
-    // Only remove from list if in Inbox
-    if (filterComboBox && filterComboBox->currentIndex() == 0) {
-        delete notificationList->takeItem(notificationList->row(item));
-
-        // Update icon if list is empty
-        if (notificationList->count() == 0) {
-            trayIcon->setIcon(
-                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
-        }
-    }
-    updateSelectionComboBox();
 
     updateTrayMenu();
 }
@@ -506,26 +507,27 @@ void MainWindow::onDismissSelectedClicked() {
 
     QList<QListWidgetItem *> items = notificationList->selectedItems();
     for (auto item : items) {
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget && !widget->isLoading()) {
+            widget->setLoading(true);
 
-        n.unread = false;
-        saveDoneNotification(n);
-        client->markAsReadAndDone(id);
-        knownNotificationIds.remove(id);
+            QString id = item->data(Qt::UserRole + 1).toString();
+            QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+            Notification n = Notification::fromJson(json);
 
-        if (filterComboBox && filterComboBox->currentIndex() == 0) {
-            delete notificationList->takeItem(notificationList->row(item));
+            n.unread = false;
+            saveDoneNotification(n);
+
+            // Update item data to reflect read status
+            item->setData(Qt::UserRole + 4, n.toJson());
+            QFont font = item->font();
+            font.setBold(false);
+            item->setFont(font);
+
+            client->markAsReadAndDone(id);
         }
     }
 
-    // Update icon if list is empty
-    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
-        trayIcon->setIcon(
-            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
-    }
-    updateSelectionComboBox();
     updateTrayMenu();
 }
 
@@ -988,10 +990,14 @@ void MainWindow::setupNotificationList() {
     connect(markAsReadAction, &QAction::triggered, this, [this]() {
         QListWidgetItem *item = notificationList->currentItem();
         if (!item) return;
+
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget && widget->isLoading()) return;
+        if (widget) widget->setLoading(true);
+
         QString id = item->data(Qt::UserRole + 1).toString();
         if (client) client->markAsRead(id);
 
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
         if (widget) {
             widget->setRead(true);
         }

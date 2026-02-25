@@ -11,7 +11,7 @@
 
 NotificationItemWidget::NotificationItemWidget(const Notification &n,
                                                QWidget *parent)
-    : QWidget(parent) {
+    : QWidget(parent), m_isLoading(false) {
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
 
@@ -123,6 +123,12 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     errorLabel->hide();
     contentLayout->addWidget(errorLabel);
 
+    // Loading Label
+    loadingLabel = new QLabel(tr("Processing..."), this);
+    loadingLabel->setStyleSheet("color: gray; font-style: italic;");
+    loadingLabel->hide();
+    contentLayout->addWidget(loadingLabel);
+
     mainLayout->addLayout(contentLayout);
 
     // Action Buttons
@@ -188,4 +194,17 @@ void NotificationItemWidget::setSaved(bool saved) {
 
 void NotificationItemWidget::setDone(bool done) {
     doneIndicator->setVisible(done);
+}
+
+void NotificationItemWidget::setLoading(bool loading) {
+    m_isLoading = loading;
+    saveButton->setEnabled(!loading);
+    doneButton->setEnabled(!loading);
+
+    if (loading) {
+        loadingLabel->show();
+        errorLabel->hide();
+    } else {
+        loadingLabel->hide();
+    }
 }
