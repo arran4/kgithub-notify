@@ -22,11 +22,17 @@ public:
     QLabel *dateLabel;
     QLabel *urlLabel;
     QLabel *errorLabel;
+    QLabel *unreadIndicator;
+    QLabel *savedIndicator;
+    QLabel *doneIndicator;
 
     QString getTitle() const { return titleLabel->text(); }
     void setAuthor(const QString &name, const QPixmap &avatar);
     void setHtmlUrl(const QString &url);
     void setError(const QString &error);
+    void setRead(bool read);
+    void setSaved(bool saved);
+    void setDone(bool done);
 
 signals:
     // No specific signals yet

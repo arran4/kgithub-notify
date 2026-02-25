@@ -62,7 +62,6 @@ class MainWindow : public QMainWindow {
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onFilterChanged(int index);
-    void onLoadMoreClicked();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
@@ -94,7 +93,7 @@ class MainWindow : public QMainWindow {
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;
-    QPushButton *loadMoreButton;
+    QListWidgetItem *loadMoreItem;
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;

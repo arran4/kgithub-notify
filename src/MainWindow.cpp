@@ -43,6 +43,7 @@ static int calculateSafeInterval(int minutes) {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       client(nullptr),
+      loadMoreItem(nullptr),
       m_isManualRefresh(false),
       pendingAuthError(false),
       authNotification(nullptr) {
@@ -69,7 +70,7 @@ void MainWindow::onTokenLoaded() {
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
     } else {
-        stackWidget->setCurrentWidget(notificationList->parentWidget());
+        stackWidget->setCurrentWidget(notificationList);
         if (client) {
             client->setToken(m_loadedToken);
             client->checkNotifications();
@@ -459,45 +460,72 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
         return;
     }
 
-    if (countLabel) {
-        int total = notifications.count();
-        if (append) total += notificationList->count();
-        countLabel->setText(tr("Items: %1").arg(total));
+    // If in Done view, do not update list
+    if (filterComboBox && filterComboBox->currentIndex() == 2) {
+        return;
     }
+
 
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
     }
 
     // Switch to list view on successful update
-    QWidget *container = notificationList->parentWidget();
     if (!append && notifications.isEmpty()) {
         if (stackWidget->currentWidget() != emptyStatePage) {
             stackWidget->setCurrentWidget(emptyStatePage);
         }
     } else {
-        if (stackWidget->currentWidget() != container) {
-            stackWidget->setCurrentWidget(container);
+        if (stackWidget->currentWidget() != notificationList) {
+            stackWidget->setCurrentWidget(notificationList);
         }
     }
 
     notificationList->setUpdatesEnabled(false);
-    if (!append) {
-        notificationList->clear();
+
+    if (loadMoreItem) {
+        int row = notificationList->row(loadMoreItem);
+        if (row >= 0) {
+            delete notificationList->takeItem(row);
+        }
+        loadMoreItem = nullptr;
     }
 
-    loadMoreButton->setVisible(hasMore);
-    loadMoreButton->setEnabled(true);
-    loadMoreButton->setText(tr("Load More"));
+    if (!append) {
+        notificationList->clear();
+        loadMoreItem = nullptr;
+    }
 
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
 
     for (const Notification &n : notifications) {
+        if (isNotificationDone(n.id)) continue;
         addNotificationItem(n);
     }
+
+    if (hasMore) {
+        loadMoreItem = new QListWidgetItem();
+        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+        connect(loadMoreBtn, &QPushButton::clicked, this, [this, loadMoreBtn]() {
+            loadMoreBtn->setEnabled(false);
+            loadMoreBtn->setText(tr("Loading..."));
+            if (client) client->loadMore();
+        });
+
+        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+        loadMoreItem->setFlags(Qt::NoItemFlags);
+
+        notificationList->addItem(loadMoreItem);
+        notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
+    }
+
     notificationList->setUpdatesEnabled(true);
 
     updateSelectionComboBox();
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(notificationList->count()));
+    }
 
     if (unreadCount > 0) {
         trayIcon->setIcon(loadSvgIcon(":/assets/icon-dotted.svg"));
@@ -534,6 +562,17 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     }
 
     // Visual update
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+    if (widget) {
+        widget->setRead(true);
+    }
+
+    // Update internal data
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+    n.unread = false;
+    item->setData(Qt::UserRole + 4, n.toJson());
+
     QFont font = item->font();
     font.setBold(false);
     item->setFont(font);
@@ -638,6 +677,11 @@ void MainWindow::showContextMenu(const QPoint &pos) {
 
         QString id = item->data(Qt::UserRole + 1).toString();
         bool saved = isNotificationSaved(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        if (markAsReadAction) markAsReadAction->setVisible(n.unread);
         if (saveAction) saveAction->setVisible(!saved);
         if (unsaveAction) unsaveAction->setVisible(saved);
 
@@ -655,7 +699,10 @@ void MainWindow::dismissCurrentItem() {
 
     saveDoneNotification(n);
 
-    if (client) client->markAsDone(id);
+    if (client) {
+        client->markAsRead(id);
+        client->markAsDone(id);
+    }
 
     knownNotificationIds.remove(id);
 
@@ -691,7 +738,7 @@ void MainWindow::showError(const QString &error) {
 
     if (stackWidget->currentWidget() == loadingPage) {
         if (notificationList->count() > 0) {
-            stackWidget->setCurrentWidget(notificationList->parentWidget());
+            stackWidget->setCurrentWidget(notificationList);
         } else {
             if (loadingLabel) {
                 loadingLabel->setText(tr("Error: %1").arg(error));
@@ -703,6 +750,13 @@ void MainWindow::showError(const QString &error) {
     loadMoreButton->setEnabled(true);
     loadMoreButton->setText(tr("Load More"));
     updateTrayToolTip();
+    if (loadMoreItem) {
+        QPushButton *btn = qobject_cast<QPushButton*>(notificationList->itemWidget(loadMoreItem));
+        if (btn) {
+            btn->setEnabled(true);
+            btn->setText(tr("Load More"));
+        }
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -731,19 +785,17 @@ void MainWindow::onFilterChanged(int index) {
             // Inbox: Show All (Read + Unread)
             client->setShowAll(true);
             client->checkNotifications();
-            if (loadMoreButton) loadMoreButton->setEnabled(true);
         } else if (index == 1) {
             // Saved view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
-
             if (m_savedNotifications.isEmpty()) {
                 stackWidget->setCurrentWidget(emptyStatePage);
             } else {
-                stackWidget->setCurrentWidget(notificationList->parentWidget());
+                stackWidget->setCurrentWidget(notificationList);
             }
 
             notificationList->setUpdatesEnabled(false);
             notificationList->clear();
+            loadMoreItem = nullptr;
 
             for (const Notification &n : m_savedNotifications) {
                 addNotificationItem(n);
@@ -755,16 +807,15 @@ void MainWindow::onFilterChanged(int index) {
             }
         } else if (index == 2) {
             // Done view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
-
             if (m_doneNotifications.isEmpty()) {
                 stackWidget->setCurrentWidget(emptyStatePage);
             } else {
-                stackWidget->setCurrentWidget(notificationList->parentWidget());
+                stackWidget->setCurrentWidget(notificationList);
             }
 
             notificationList->setUpdatesEnabled(false);
             notificationList->clear();
+            loadMoreItem = nullptr;
 
             for (const Notification &n : m_doneNotifications) {
                 addNotificationItem(n);
@@ -782,14 +833,6 @@ void MainWindow::onFilterChanged(int index) {
             refreshTimer->start();
             updateStatusBar();
         }
-    }
-}
-
-void MainWindow::onLoadMoreClicked() {
-    if (client) {
-        loadMoreButton->setEnabled(false);
-        loadMoreButton->setText(tr("Loading..."));
-        client->loadMore();
     }
 }
 
@@ -855,6 +898,7 @@ void MainWindow::onDismissSelectedClicked() {
         Notification n = Notification::fromJson(json);
 
         saveDoneNotification(n);
+        client->markAsRead(id);
         client->markAsDone(id);
         knownNotificationIds.remove(id);
 
@@ -1126,6 +1170,16 @@ void MainWindow::setupNotificationList() {
         QString id = item->data(Qt::UserRole + 1).toString();
         if (client) client->markAsRead(id);
 
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) {
+            widget->setRead(true);
+        }
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        n.unread = false;
+        item->setData(Qt::UserRole + 4, n.toJson());
+
         QFont font = item->font();
         font.setBold(false);
         item->setFont(font);
@@ -1140,6 +1194,9 @@ void MainWindow::setupNotificationList() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         saveNotification(n);
+
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) widget->setSaved(true);
     });
     contextMenu->addAction(saveAction);
 
@@ -1149,6 +1206,9 @@ void MainWindow::setupNotificationList() {
         if (!item) return;
         QString id = item->data(Qt::UserRole + 1).toString();
         unsaveNotification(id);
+
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) widget->setSaved(false);
     });
     contextMenu->addAction(unsaveAction);
 
@@ -1162,17 +1222,7 @@ void MainWindow::setupNotificationList() {
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
 
-    QWidget *container = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(container);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(notificationList);
-
-    loadMoreButton = new QPushButton(tr("Load More"), this);
-    loadMoreButton->setVisible(false);
-    connect(loadMoreButton, &QPushButton::clicked, this, &MainWindow::onLoadMoreClicked);
-    layout->addWidget(loadMoreButton);
-
-    stackWidget->addWidget(container);
+    stackWidget->addWidget(notificationList);
 }
 
 void MainWindow::setupToolbar() {
@@ -1416,6 +1466,10 @@ void MainWindow::addNotificationItem(const Notification &n) {
     item->setData(Qt::UserRole + 3, n.repository);
     item->setData(Qt::UserRole + 4, n.toJson());
     item->setSizeHint(widget->sizeHint());
+
+    widget->setSaved(isNotificationSaved(n.id));
+    widget->setDone(isNotificationDone(n.id));
+    widget->setRead(!n.unread);
 
     notificationList->addItem(item);
     notificationList->setItemWidget(item, widget);
