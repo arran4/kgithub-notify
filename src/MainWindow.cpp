@@ -405,11 +405,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
         return;
     }
 
-    if (countLabel) {
-        int total = notifications.count();
-        if (append) total += notificationList->count();
-        countLabel->setText(tr("Items: %1").arg(total));
+    // If in Done view, do not update list
+    if (filterComboBox && filterComboBox->currentIndex() == 2) {
+        return;
     }
+
 
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
@@ -444,6 +444,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
 
     for (const Notification &n : notifications) {
+        if (isNotificationDone(n.id)) continue;
         addNotificationItem(n);
     }
 
@@ -466,6 +467,10 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     notificationList->setUpdatesEnabled(true);
 
     updateSelectionComboBox();
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(notificationList->count()));
+    }
 
     if (unreadCount > 0) {
         trayIcon->setIcon(loadSvgIcon(":/assets/icon-dotted.svg"));
