@@ -759,8 +759,6 @@ void MainWindow::showError(const QString &error) {
     }
 
     // Reset load more button if error occurred during loading more
-    loadMoreButton->setEnabled(true);
-    loadMoreButton->setText(tr("Load More"));
     updateTrayToolTip();
     if (loadMoreItem) {
         QPushButton *btn = qobject_cast<QPushButton*>(notificationList->itemWidget(loadMoreItem));
