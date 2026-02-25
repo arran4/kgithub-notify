@@ -199,7 +199,7 @@ void MainWindow::createTrayIcon() {
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
 
-    trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+    trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
@@ -213,7 +213,7 @@ void MainWindow::updateTrayMenu() {
     trayIconMenu->clear();
 
     QAction *openAppAction =
-        new QAction(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("knotifications")}),
+        new QAction(themedIcon({QStringLiteral("kgithub-notify")}),
                     tr("Open Kgithub-notify"), trayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
@@ -395,7 +395,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
             }
         }
     } else {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                    QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
@@ -533,7 +533,7 @@ void MainWindow::dismissCurrentItem() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                    QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
@@ -633,7 +633,7 @@ void MainWindow::onDismissSelectedClicked() {
 
     // Update icon if list is empty
     if (notificationList->count() == 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                    QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
@@ -798,7 +798,7 @@ void MainWindow::showAboutDialog() {
 
     QMessageBox aboutBox(this);
     aboutBox.setWindowTitle(tr("About KGitHub Notify"));
-    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("knotifications")},
+    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")},
                                       QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon)
                                .pixmap(64, 64));
     aboutBox.setText(tr("<b>KGitHub Notify</b>"));
