@@ -1476,6 +1476,10 @@ void MainWindow::addNotificationItem(const Notification &n) {
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
+    connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() {
+        onNotificationItemActivated(item);
+    });
+
     connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
         if (!safeWidget) return;
         notificationList->setCurrentItem(item);
