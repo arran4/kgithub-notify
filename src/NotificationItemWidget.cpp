@@ -39,9 +39,6 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     avatarLabel->setPixmap(placeholder);
     mainLayout->addWidget(avatarLabel);
 
-    checkBox = new QCheckBox(this);
-    mainLayout->addWidget(checkBox);
-
     QVBoxLayout *contentLayout = new QVBoxLayout();
 
     // Title Layout (Title + Status Icons)
@@ -126,6 +123,32 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
 
     mainLayout->addLayout(contentLayout);
 
+    // Action Buttons
+    QVBoxLayout *actionLayout = new QVBoxLayout();
+    actionLayout->setContentsMargins(0, 0, 0, 0);
+    actionLayout->setAlignment(Qt::AlignTop);
+
+    saveButton = new QToolButton(this);
+    saveButton->setAutoRaise(true);
+    QIcon saveBtnIcon = QIcon::fromTheme("bookmark-new");
+    if (saveBtnIcon.isNull()) saveBtnIcon = style()->standardIcon(QStyle::SP_MessageBoxQuestion);
+    saveButton->setIcon(saveBtnIcon);
+    saveButton->setToolTip(tr("Save"));
+    connect(saveButton, &QToolButton::clicked, this, &NotificationItemWidget::saveClicked);
+    actionLayout->addWidget(saveButton);
+
+    doneButton = new QToolButton(this);
+    doneButton->setAutoRaise(true);
+    QIcon doneBtnIcon = QIcon::fromTheme("task-complete");
+    if (doneBtnIcon.isNull()) doneBtnIcon = style()->standardIcon(QStyle::SP_DialogApplyButton);
+    doneButton->setIcon(doneBtnIcon);
+    doneButton->setToolTip(tr("Mark as Done"));
+    connect(doneButton, &QToolButton::clicked, this, &NotificationItemWidget::doneClicked);
+    actionLayout->addWidget(doneButton);
+
+    actionLayout->addStretch();
+    mainLayout->addLayout(actionLayout);
+
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 }
 
@@ -154,6 +177,11 @@ void NotificationItemWidget::setRead(bool read) {
 
 void NotificationItemWidget::setSaved(bool saved) {
     savedIndicator->setVisible(saved);
+    if (saved) {
+        saveButton->setToolTip(tr("Unsave"));
+    } else {
+        saveButton->setToolTip(tr("Save"));
+    }
 }
 
 void NotificationItemWidget::setDone(bool done) {

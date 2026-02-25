@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QCheckBox>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include "GitHubClient.h"
@@ -13,7 +14,8 @@ class NotificationItemWidget : public QWidget {
 public:
     explicit NotificationItemWidget(const Notification &notification, QWidget *parent = nullptr);
 
-    QCheckBox *checkBox;
+    QToolButton *doneButton;
+    QToolButton *saveButton;
     QLabel *avatarLabel;
     QLabel *titleLabel;
     QLabel *repoLabel;
@@ -35,7 +37,8 @@ public:
     void setDone(bool done);
 
 signals:
-    // No specific signals yet
+    void doneClicked();
+    void saveClicked();
 };
 
 #endif // NOTIFICATIONITEMWIDGET_H
