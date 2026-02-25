@@ -442,6 +442,8 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     }
     notificationList->setUpdatesEnabled(true);
 
+    updateSelectionComboBox();
+
     if (unreadCount > 0) {
         trayIcon->setIcon(loadSvgIcon(":/assets/icon-dotted.svg"));
         if (newNotifications > 0) {
@@ -611,6 +613,7 @@ void MainWindow::dismissCurrentItem() {
                                        QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
         }
     }
+    updateSelectionComboBox();
 
     updateTrayMenu();
 }
@@ -711,6 +714,8 @@ void MainWindow::onFilterChanged(int index) {
             }
             notificationList->setUpdatesEnabled(true);
 
+            updateSelectionComboBox();
+
             if (countLabel) {
                 countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
             }
@@ -743,15 +748,44 @@ void MainWindow::onSelectNoneClicked() {
     }
 }
 
-void MainWindow::onSelectTop10Clicked() {
-    if (!notificationList) return;
+void MainWindow::updateSelectionComboBox() {
+    if (!selectionComboBox || !notificationList) return;
+
+    int count = notificationList->count();
+    bool wasBlocked = selectionComboBox->blockSignals(true);
+    selectionComboBox->clear();
+    selectionComboBox->addItem(tr("Select..."));
+
+    if (count > 0) {
+        if (count >= 5) selectionComboBox->addItem(tr("Top 5"), 5);
+        if (count >= 10) selectionComboBox->addItem(tr("Top 10"), 10);
+        if (count >= 20) selectionComboBox->addItem(tr("Top 20"), 20);
+        if (count >= 50) selectionComboBox->addItem(tr("Top 50"), 50);
+        selectionComboBox->addItem(tr("All (%1)").arg(count), count);
+    }
+
+    selectionComboBox->setCurrentIndex(0);
+    selectionComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::onSelectionChanged(int index) {
+    if (index <= 0) return;
+
+    int n = selectionComboBox->currentData().toInt();
+    if (n <= 0) return;
+
     notificationList->clearSelection();
     int count = notificationList->count();
-    int limit = qMin(10, count);
+    int limit = qMin(n, count);
+
     for (int i = 0; i < limit; ++i) {
         QListWidgetItem *item = notificationList->item(i);
         if (item) item->setSelected(true);
     }
+
+    bool wasBlocked = selectionComboBox->blockSignals(true);
+    selectionComboBox->setCurrentIndex(0);
+    selectionComboBox->blockSignals(wasBlocked);
 }
 
 void MainWindow::onDismissSelectedClicked() {
@@ -777,6 +811,7 @@ void MainWindow::onDismissSelectedClicked() {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                    QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
+    updateSelectionComboBox();
     updateTrayMenu();
 }
 
@@ -792,19 +827,6 @@ void MainWindow::onOpenSelectedClicked() {
     }
 }
 
-void MainWindow::onSelectTopNClicked() {
-    if (!notificationList) return;
-
-    notificationList->clearSelection();
-    int n = limitSpinBox->value();
-    int count = notificationList->count();
-    int limit = qMin(n, count);
-
-    for (int i = 0; i < limit; ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item) item->setSelected(true);
-    }
-}
 
 void MainWindow::updateStatusBar() {
     if (refreshTimer && refreshTimer->isActive()) {
@@ -884,6 +906,7 @@ void MainWindow::sendNotification(const Notification &n) {
                     break;
                 }
             }
+            updateSelectionComboBox();
             updateTrayMenu();
         }
     });
@@ -1125,10 +1148,11 @@ void MainWindow::setupToolbar() {
     connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
     toolbar->addAction(selectNoneAction);
 
-    selectTop10Action = new QAction(tr("Top 10"), this);
-    selectTop10Action->setShortcut(QKeySequence("Ctrl+1"));
-    connect(selectTop10Action, &QAction::triggered, this, &MainWindow::onSelectTop10Clicked);
-    toolbar->addAction(selectTop10Action);
+    selectionComboBox = new QComboBox(this);
+    selectionComboBox->addItem(tr("Select..."));
+    connect(selectionComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onSelectionChanged);
+    toolbar->addWidget(selectionComboBox);
 
     toolbar->addSeparator();
 
@@ -1147,20 +1171,7 @@ void MainWindow::setupToolbar() {
     connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
     toolbar->addAction(openSelectedAction);
 
-    toolbar->addSeparator();
-
-    limitSpinBox = new QSpinBox(this);
-    limitSpinBox->setRange(1, 50);
-    limitSpinBox->setValue(5);
-    limitSpinBox->setToolTip(tr("Number of notifications to select"));
-    toolbar->addWidget(limitSpinBox);
-
-    selectTopNAction = new QAction(tr("Select Top %1").arg(limitSpinBox->value()), this);
-    connect(selectTopNAction, &QAction::triggered, this, &MainWindow::onSelectTopNClicked);
-    toolbar->addAction(selectTopNAction);
-
-    connect(limitSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
-            [this](int i) { selectTopNAction->setText(tr("Select Top %1").arg(i)); });
+    updateSelectionComboBox();
 }
 
 void MainWindow::setupPages() {
