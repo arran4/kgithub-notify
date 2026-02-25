@@ -58,6 +58,7 @@ MainWindow::MainWindow(QWidget *parent)
     stackWidget->setCurrentWidget(loadingPage);
 
     loadSavedNotifications();
+    loadDoneNotifications();
     loadToken();
 }
 
@@ -437,28 +438,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
 
     for (const Notification &n : notifications) {
-        QListWidgetItem *item = new QListWidgetItem();
-        NotificationItemWidget *widget = new NotificationItemWidget(n);
-
-        if (detailsCache.contains(n.id)) {
-            const NotificationDetails &details = detailsCache[n.id];
-            if (details.hasDetails) {
-                widget->setAuthor(details.author, details.avatar);
-                widget->setHtmlUrl(details.htmlUrl);
-            }
-        } else {
-            if (client) client->fetchNotificationDetails(n.url, n.id);
-        }
-
-        item->setData(Qt::UserRole, n.url);
-        item->setData(Qt::UserRole + 1, n.id);
-        item->setData(Qt::UserRole + 2, n.title);
-        item->setData(Qt::UserRole + 3, n.repository);
-        item->setData(Qt::UserRole + 4, n.toJson());
-        item->setSizeHint(widget->sizeHint());
-
-        notificationList->addItem(item);
-        notificationList->setItemWidget(item, widget);
+        addNotificationItem(n);
     }
     notificationList->setUpdatesEnabled(true);
 
@@ -612,19 +592,29 @@ void MainWindow::showContextMenu(const QPoint &pos) {
 void MainWindow::dismissCurrentItem() {
     QListWidgetItem *item = notificationList->currentItem();
     if (!item) return;
+
     QString id = item->data(Qt::UserRole + 1).toString();
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    saveDoneNotification(n);
+
     if (client) client->markAsDone(id);
 
     knownNotificationIds.remove(id);
 
-    delete notificationList->takeItem(notificationList->row(item));
+    // Only remove from list if in Inbox
+    if (filterComboBox && filterComboBox->currentIndex() == 0) {
+        delete notificationList->takeItem(notificationList->row(item));
 
-    // Update icon if list is empty
-    if (notificationList->count() == 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+        // Update icon if list is empty
+        if (notificationList->count() == 0) {
+            trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
+                                       QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+        }
     }
     updateSelectionComboBox();
+
     updateTrayMenu();
 }
 
@@ -685,7 +675,7 @@ void MainWindow::onFilterChanged(int index) {
             client->setShowAll(true);
             client->checkNotifications();
             if (loadMoreButton) loadMoreButton->setEnabled(true);
-        } else {
+        } else if (index == 1) {
             // Saved view
             if (loadMoreButton) loadMoreButton->setVisible(false);
 
@@ -699,35 +689,35 @@ void MainWindow::onFilterChanged(int index) {
             notificationList->clear();
 
             for (const Notification &n : m_savedNotifications) {
-                QListWidgetItem *item = new QListWidgetItem();
-                NotificationItemWidget *widget = new NotificationItemWidget(n);
+                addNotificationItem(n);
+            }
+            notificationList->setUpdatesEnabled(true);
 
-                if (detailsCache.contains(n.id)) {
-                    const NotificationDetails &details = detailsCache[n.id];
-                    if (details.hasDetails) {
-                        widget->setAuthor(details.author, details.avatar);
-                        widget->setHtmlUrl(details.htmlUrl);
-                    }
-                } else {
-                    if (client) client->fetchNotificationDetails(n.url, n.id);
-                }
+            if (countLabel) {
+                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
+            }
+        } else if (index == 2) {
+            // Done view
+            if (loadMoreButton) loadMoreButton->setVisible(false);
 
-                item->setData(Qt::UserRole, n.url);
-                item->setData(Qt::UserRole + 1, n.id);
-                item->setData(Qt::UserRole + 2, n.title);
-                item->setData(Qt::UserRole + 3, n.repository);
-                item->setData(Qt::UserRole + 4, n.toJson());
-                item->setSizeHint(widget->sizeHint());
+            if (m_doneNotifications.isEmpty()) {
+                stackWidget->setCurrentWidget(emptyStatePage);
+            } else {
+                stackWidget->setCurrentWidget(notificationList->parentWidget());
+            }
 
-                notificationList->addItem(item);
-                notificationList->setItemWidget(item, widget);
+            notificationList->setUpdatesEnabled(false);
+            notificationList->clear();
+
+            for (const Notification &n : m_doneNotifications) {
+                addNotificationItem(n);
             }
             notificationList->setUpdatesEnabled(true);
 
             updateSelectionComboBox();
 
             if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
+                countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
             }
         }
         m_isManualRefresh = false;
@@ -804,13 +794,20 @@ void MainWindow::onDismissSelectedClicked() {
     QList<QListWidgetItem *> items = notificationList->selectedItems();
     for (auto item : items) {
         QString id = item->data(Qt::UserRole + 1).toString();
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        saveDoneNotification(n);
         client->markAsDone(id);
         knownNotificationIds.remove(id);
-        delete notificationList->takeItem(notificationList->row(item));
+
+        if (filterComboBox && filterComboBox->currentIndex() == 0) {
+            delete notificationList->takeItem(notificationList->row(item));
+        }
     }
 
     // Update icon if list is empty
-    if (notificationList->count() == 0) {
+    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
                                    QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
@@ -1135,6 +1132,7 @@ void MainWindow::setupToolbar() {
     filterComboBox = new QComboBox(this);
     filterComboBox->addItem(tr("Inbox"));
     filterComboBox->addItem(tr("Saved"));
+    filterComboBox->addItem(tr("Done"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 
@@ -1297,4 +1295,71 @@ bool MainWindow::isNotificationSaved(const QString &id) const {
         if (n.id == id) return true;
     }
     return false;
+}
+
+void MainWindow::loadDoneNotifications() {
+    QSettings settings;
+    QByteArray data = settings.value("doneNotifications").toByteArray();
+    if (!data.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &val : array) {
+                if (val.isObject()) {
+                    m_doneNotifications.append(Notification::fromJson(val.toObject()));
+                }
+            }
+        }
+    }
+}
+
+void MainWindow::saveDoneNotifications() {
+    QJsonArray array;
+    for (const Notification &n : m_doneNotifications) {
+        array.append(n.toJson());
+    }
+    QJsonDocument doc(array);
+    QSettings settings;
+    settings.setValue("doneNotifications", doc.toJson(QJsonDocument::Compact));
+}
+
+void MainWindow::saveDoneNotification(const Notification &n) {
+    if (isNotificationDone(n.id)) return;
+    m_doneNotifications.append(n);
+    while (m_doneNotifications.size() > MAX_DONE_NOTIFICATIONS) {
+        m_doneNotifications.removeFirst();
+    }
+    saveDoneNotifications();
+}
+
+bool MainWindow::isNotificationDone(const QString &id) const {
+    for (const Notification &n : m_doneNotifications) {
+        if (n.id == id) return true;
+    }
+    return false;
+}
+
+void MainWindow::addNotificationItem(const Notification &n) {
+    QListWidgetItem *item = new QListWidgetItem();
+    NotificationItemWidget *widget = new NotificationItemWidget(n);
+
+    if (detailsCache.contains(n.id)) {
+        const NotificationDetails &details = detailsCache[n.id];
+        if (details.hasDetails) {
+            widget->setAuthor(details.author, details.avatar);
+            widget->setHtmlUrl(details.htmlUrl);
+        }
+    } else {
+        if (client) client->fetchNotificationDetails(n.url, n.id);
+    }
+
+    item->setData(Qt::UserRole, n.url);
+    item->setData(Qt::UserRole + 1, n.id);
+    item->setData(Qt::UserRole + 2, n.title);
+    item->setData(Qt::UserRole + 3, n.repository);
+    item->setData(Qt::UserRole + 4, n.toJson());
+    item->setSizeHint(widget->sizeHint());
+
+    notificationList->addItem(item);
+    notificationList->setItemWidget(item, widget);
 }
