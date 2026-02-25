@@ -26,6 +26,7 @@
 class NotificationItemWidget;
 class QSpinBox;
 class QComboBox;
+class QLineEdit;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -63,6 +64,8 @@ class MainWindow : public QMainWindow {
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onFilterChanged(int index);
+    void onFilterUnreadToggled(bool checked);
+    void applyClientFilters();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
@@ -109,6 +112,7 @@ class MainWindow : public QMainWindow {
                                  QList<Notification> &newlyAddedNotifications);
     void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification> &newlyAddedNotifications);
     void updateListWidget(const QList<Notification> &notifications, bool append, bool hasMore);
+    void populateRepoFilter();
 
     // Member Variables
     QSystemTrayIcon *trayIcon;
@@ -142,6 +146,9 @@ class MainWindow : public QMainWindow {
     QToolBar *toolbar;
     QAction *refreshAction;
     QComboBox *filterComboBox;
+    QAction *filterUnreadAction;
+    QComboBox *repoFilterComboBox;
+    QLineEdit *searchLineEdit;
     QAction *selectAllAction;
     QAction *selectNoneAction;
     QComboBox *selectionComboBox;
