@@ -439,6 +439,7 @@ void MainWindow::onRefreshClicked() {
     if (filterComboBox->currentIndex() == 0) {
         m_isManualRefresh = true;
         client->checkNotifications();
+        lastRefreshTime[0] = QDateTime::currentDateTime();
         m_isManualRefresh = false;
     } else {
         // Local refresh for Saved/Done
@@ -544,25 +545,22 @@ void MainWindow::onFilterChanged(int index) {
     if (client) {
         if (index == 0) {
             // Inbox
-            client->setShowAll(true);
+            client->setShowAll(false);
 
-            int interval = SettingsDialog::getInterval();
             QDateTime now = QDateTime::currentDateTime();
-            bool recent = lastRefreshTime.contains(0) && lastRefreshTime[0].secsTo(now) < (interval * 60);
+            bool hasData = notificationList->count() > 0;
 
-            // If this call came from onRefreshClicked, m_isManualRefresh might be true?
-            // No, onRefreshClicked calls client->checkNotifications() directly for index 0.
-            // onFilterChanged(0) is only called by ComboBox or initial load.
-            // So we can assume it's NOT manual refresh here (unless we want to support calling onFilterChanged(0) manually).
+            // Check if stale (older than 1 minute)
+            bool stale = !lastRefreshTime.contains(0) || lastRefreshTime[0].secsTo(now) > 60;
 
-            if (!recent) {
+            if (!hasData || stale) {
                 client->checkNotifications();
                 lastRefreshTime[0] = now;
             } else {
-                // Ensure list is shown
-                if (stackWidget->currentWidget() != notificationList && notificationList->count() > 0) {
+                // Ensure list is shown if we have data and it's fresh enough
+                if (stackWidget->currentWidget() != notificationList && hasData) {
                     stackWidget->setCurrentWidget(notificationList);
-                } else if (notificationList->count() == 0 && stackWidget->currentWidget() != emptyStatePage) {
+                } else if (!hasData && stackWidget->currentWidget() != emptyStatePage) {
                     stackWidget->setCurrentWidget(emptyStatePage);
                 }
             }
