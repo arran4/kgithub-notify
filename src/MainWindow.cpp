@@ -26,6 +26,7 @@
 
 #include <QSvgRenderer>
 #include <QPainter>
+#include <QPointer>
 
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
@@ -1399,6 +1400,41 @@ void MainWindow::addNotificationItem(const Notification &n) {
     widget->setSaved(isNotificationSaved(n.id));
     widget->setDone(isNotificationDone(n.id));
     widget->setRead(!n.unread);
+
+    QPointer<NotificationItemWidget> safeWidget(widget);
+    connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
+        if (!safeWidget) return;
+        notificationList->setCurrentItem(item);
+        dismissCurrentItem();
+        // If item still valid (not deleted)
+        if (safeWidget) {
+            safeWidget->setDone(true);
+        }
+    }, Qt::QueuedConnection);
+
+    connect(widget, &NotificationItemWidget::saveClicked, this, [this, item, safeWidget]() {
+        if (!safeWidget) return;
+        notificationList->setCurrentItem(item);
+
+        // Double check validity before access
+        if (!item->listWidget()) return;
+
+        QString id = item->data(Qt::UserRole + 1).toString();
+        bool saved = isNotificationSaved(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        if (saved) {
+            bool wasInSavedView = (filterComboBox && filterComboBox->currentIndex() == 1);
+            unsaveNotification(id);
+            // If we were in Saved view, item is likely gone now if unsaveNotification reloaded list
+            if (!wasInSavedView && safeWidget) safeWidget->setSaved(false);
+        } else {
+            saveNotification(n);
+            if (safeWidget) safeWidget->setSaved(true);
+        }
+    }, Qt::QueuedConnection);
 
     notificationList->addItem(item);
     notificationList->setItemWidget(item, widget);
