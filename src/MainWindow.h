@@ -63,7 +63,6 @@ class MainWindow : public QMainWindow {
     void onFilterChanged(int index);
     void onLoadMoreClicked();
     void onSelectTopNClicked();
-    void onToggleShowAll();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
