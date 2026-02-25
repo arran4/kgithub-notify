@@ -1,42 +1,43 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <QSystemTrayIcon>
-#include <QListWidget>
-#include <QMenu>
-#include <QSet>
-#include <QStackedWidget>
-#include <QLabel>
-#include <QPushButton>
-#include <QToolBar>
-#include <QStatusBar>
-#include <QTimer>
+#include <KNotification>
 #include <QFutureWatcher>
 #include <QIcon>
-#include <QStyle>
+#include <QLabel>
+#include <QListWidget>
+#include <QMainWindow>
+#include <QMenu>
+#include <QPushButton>
+#include <QSet>
+#include <QStackedWidget>
+#include <QStatusBar>
 #include <QStringList>
-#include "GitHubClient.h"
+#include <QStyle>
+#include <QSystemTrayIcon>
+#include <QTimer>
+#include <QToolBar>
+
 #include "AuthErrorNotification.h"
-#include <KNotification>
+#include "GitHubClient.h"
 
 class NotificationItemWidget;
 class QSpinBox;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
-public:
+   public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
 
-public slots:
+   public slots:
     void updateNotifications(const QList<Notification> &notifications);
     void showError(const QString &error);
     void onAuthError(const QString &message);
 
-private slots:
+   private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayMessageClicked();
     void onNotificationItemActivated(QListWidgetItem *item);
@@ -58,15 +59,15 @@ private slots:
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
-    void onOpenFirstNClicked();
+    void onSelectTopNClicked();
     void onToggleShowAll();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
-protected:
+   protected:
     void closeEvent(QCloseEvent *event) override;
 
-private:
+   private:
     void createTrayIcon();
     void updateTrayMenu();
     void positionPopup(QWidget *popup);
@@ -75,6 +76,7 @@ private:
     void createEmptyStatePage();
     void createLoadingPage();
 
+    void ensureWindowActive();
     void setupWindow();
     void setupCentralWidget();
     void setupNotificationList();
@@ -108,7 +110,7 @@ private:
     };
     QMap<QString, NotificationDetails> detailsCache;
 
-    NotificationItemWidget* findNotificationWidget(const QString &id);
+    NotificationItemWidget *findNotificationWidget(const QString &id);
 
     // Toolbar
     QToolBar *toolbar;
@@ -120,7 +122,7 @@ private:
     QAction *dismissSelectedAction;
     QAction *openSelectedAction;
     QSpinBox *limitSpinBox;
-    QAction *openFirstNAction;
+    QAction *selectTopNAction;
 
     // New UI components
     QStackedWidget *stackWidget;
@@ -159,4 +161,4 @@ private:
     QString m_loadedToken;
 };
 
-#endif // MAINWINDOW_H
+#endif  // MAINWINDOW_H
