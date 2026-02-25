@@ -3,9 +3,8 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
-#include <QComboBox>
-#include <QCoreApplication>
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDate>
 #include <QDebug>
@@ -16,21 +15,24 @@
 #include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPointer>
 #include <QProcess>
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
 #include <QStyle>
+#include <QSvgRenderer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <limits>
 
-#include <QSvgRenderer>
-#include <QPainter>
-#include <QPointer>
-
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
+
+// -----------------------------------------------------------------------------
+// Constants / Static Helpers
+// -----------------------------------------------------------------------------
 
 static int calculateSafeInterval(int minutes) {
     if (minutes <= 0) minutes = 1;  // Minimum 1 minute
@@ -41,8 +43,13 @@ static int calculateSafeInterval(int minutes) {
     return static_cast<int>(msec);
 }
 
+// -----------------------------------------------------------------------------
+// Constructor / Destructor
+// -----------------------------------------------------------------------------
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
+      trayIcon(nullptr),
       client(nullptr),
       loadMoreItem(nullptr),
       m_isManualRefresh(false),
@@ -65,81 +72,15 @@ MainWindow::MainWindow(QWidget *parent)
     loadToken();
 }
 
-void MainWindow::onTokenLoaded() {
-    m_loadedToken = tokenWatcher->result();
-
-    if (m_loadedToken.isEmpty()) {
-        stackWidget->setCurrentWidget(loginPage);
-    } else {
-        stackWidget->setCurrentWidget(notificationList);
-        if (client) {
-            client->setToken(m_loadedToken);
-            client->checkNotifications();
-        }
-    }
-}
-
 MainWindow::~MainWindow() {
     QSettings settings;
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
 }
 
-void MainWindow::createErrorPage() {
-    errorPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(errorPage);
-    layout->setAlignment(Qt::AlignCenter);
-
-    errorLabel = new QLabel(tr("Authentication Error"), errorPage);
-    errorLabel->setWordWrap(true);
-    errorLabel->setAlignment(Qt::AlignCenter);
-
-    settingsButton = new QPushButton(tr("Open Settings"), errorPage);
-    connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
-
-    layout->addWidget(errorLabel);
-    layout->addWidget(settingsButton);
-}
-
-void MainWindow::createLoginPage() {
-    loginPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(loginPage);
-    layout->setAlignment(Qt::AlignCenter);
-
-    loginLabel = new QLabel(
-        tr("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started."),
-        loginPage);
-    loginLabel->setWordWrap(true);
-    loginLabel->setAlignment(Qt::AlignCenter);
-
-    loginButton = new QPushButton(tr("Open Settings"), loginPage);
-    connect(loginButton, &QPushButton::clicked, this, &MainWindow::showSettings);
-
-    layout->addWidget(loginLabel);
-    layout->addWidget(loginButton);
-}
-
-void MainWindow::createEmptyStatePage() {
-    emptyStatePage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
-    layout->setAlignment(Qt::AlignCenter);
-
-    emptyStateLabel = new QLabel(tr("No new notifications"), emptyStatePage);
-    emptyStateLabel->setAlignment(Qt::AlignCenter);
-
-    layout->addWidget(emptyStateLabel);
-}
-
-void MainWindow::createLoadingPage() {
-    loadingPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(loadingPage);
-    layout->setAlignment(Qt::AlignCenter);
-
-    loadingLabel = new QLabel(tr("Loading..."), loadingPage);
-    loadingLabel->setAlignment(Qt::AlignCenter);
-
-    layout->addWidget(loadingLabel);
-}
+// -----------------------------------------------------------------------------
+// Public Methods
+// -----------------------------------------------------------------------------
 
 void MainWindow::setClient(GitHubClient *c) {
     client = c;
@@ -148,25 +89,26 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
-    connect(client, &GitHubClient::detailsError, this, [this](const QString &id, const QString &error){
+    connect(client, &GitHubClient::detailsError, this, [this](const QString &id, const QString &error) {
         NotificationItemWidget *widget = findNotificationWidget(id);
         if (widget) {
             widget->setError(error);
         }
     });
 
-    connect(client, &GitHubClient::detailsReceived, this, [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl){
-        NotificationDetails &details = detailsCache[id];
-        details.author = author;
-        details.avatarUrl = avatarUrl;
-        details.htmlUrl = htmlUrl;
-        details.hasDetails = true;
+    connect(client, &GitHubClient::detailsReceived, this,
+            [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl) {
+                NotificationDetails &details = detailsCache[id];
+                details.author = author;
+                details.avatarUrl = avatarUrl;
+                details.htmlUrl = htmlUrl;
+                details.hasDetails = true;
 
-        NotificationItemWidget *widget = findNotificationWidget(id);
-        if (widget) {
-            widget->setAuthor(author, details.avatar);
-            widget->setHtmlUrl(htmlUrl);
-        }
+                NotificationItemWidget *widget = findNotificationWidget(id);
+                if (widget) {
+                    widget->setAuthor(author, details.avatar);
+                    widget->setHtmlUrl(htmlUrl);
+                }
 
                 if (!details.hasImage && !avatarUrl.isEmpty()) {
                     if (client) client->fetchImage(avatarUrl, id);
@@ -197,48 +139,557 @@ void MainWindow::setClient(GitHubClient *c) {
     }
 }
 
-QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackResource,
-                             QStyle::StandardPixmap fallbackPixmap) const {
-    for (const QString &name : names) {
-        QIcon icon = QIcon::fromTheme(name);
-        if (!icon.isNull()) {
-            return icon;
+void MainWindow::showTrayMessage(const QString &title, const QString &message) {
+    trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 3000);
+}
+
+// -----------------------------------------------------------------------------
+// Slots
+// -----------------------------------------------------------------------------
+
+void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
+    m_lastCheckTime = QDateTime::currentDateTime();
+    pendingAuthError = false;
+    lastError.clear();
+
+    int unreadCount = 0;
+    int newNotifications = 0;
+    QList<Notification> newlyAddedNotifications;
+
+    processNewNotifications(notifications, unreadCount, newNotifications, newlyAddedNotifications);
+    updateTrayIconState(unreadCount, newNotifications, newlyAddedNotifications);
+
+    // If in Saved/Done view, do not update list content, but ensure UI is not stuck on loading
+    if (filterComboBox && filterComboBox->currentIndex() != 0) {
+        if (stackWidget->currentWidget() == loadingPage) {
+            int idx = filterComboBox->currentIndex();
+            if (idx == 1) {  // Saved
+                if (m_savedNotifications.isEmpty())
+                    stackWidget->setCurrentWidget(emptyStatePage);
+                else
+                    stackWidget->setCurrentWidget(notificationList);
+            } else if (idx == 2) {  // Done
+                if (m_doneNotifications.isEmpty())
+                    stackWidget->setCurrentWidget(emptyStatePage);
+                else
+                    stackWidget->setCurrentWidget(notificationList);
+            }
+        }
+        if (statusLabel) statusLabel->setText(tr("Updated"));
+        return;
+    }
+
+    if (authNotification && authNotification->isVisible()) {
+        authNotification->close();
+    }
+
+    updateListWidget(notifications, append, hasMore);
+
+    updateSelectionComboBox();
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(notificationList->count()));
+    }
+}
+
+void MainWindow::showError(const QString &error) {
+    if (error == lastError) return;
+    lastError = error;
+
+    // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
+    if (trayIcon && trayIcon->isVisible()) {
+        trayIcon->showMessage(tr("GitHub Error"), error, QSystemTrayIcon::Warning, 5000);
+    } else {
+        // Maybe don't show message box on every polling error if window is hidden?
+        // But if window is visible, we should show it.
+        if (isVisible()) {
+            QMessageBox::warning(this, tr("GitHub Error"), error);
         }
     }
 
-    if (!fallbackResource.isEmpty()) {
-        QIcon icon(fallbackResource);
-        if (!icon.isNull()) {
-            return icon;
+    if (stackWidget->currentWidget() == loadingPage) {
+        if (notificationList->count() > 0) {
+            stackWidget->setCurrentWidget(notificationList);
+        } else {
+            if (loadingLabel) {
+                loadingLabel->setText(tr("Error: %1").arg(error));
+            }
         }
     }
 
-    return QApplication::style()->standardIcon(fallbackPixmap);
+    // Reset load more button if error occurred during loading more
+    updateTrayToolTip();
+    if (loadMoreItem) {
+        QPushButton *btn = qobject_cast<QPushButton *>(notificationList->itemWidget(loadMoreItem));
+        if (btn) {
+            btn->setEnabled(true);
+            btn->setText(tr("Load More"));
+        }
+    }
 }
 
-QIcon MainWindow::loadSvgIcon(const QString &path) {
-    QSvgRenderer renderer(path);
-    if (!renderer.isValid()) {
-        return QIcon(path);
+void MainWindow::onAuthError(const QString &message) {
+    pendingAuthError = true;
+
+    // Update error page
+    errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
+    stackWidget->setCurrentWidget(errorPage);
+
+    if (!authNotification) {
+        authNotification = new AuthErrorNotification(this);
+        connect(authNotification, &AuthErrorNotification::settingsClicked, this,
+                &MainWindow::onAuthNotificationSettingsClicked);
+        // dismissed signal is handled by AuthErrorNotification internally closing itself, but we can hook if needed.
     }
 
-    QIcon icon;
-    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
-        QPixmap pixmap(size, size);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        renderer.render(&painter);
-        icon.addPixmap(pixmap);
+    authNotification->setMessage(message);
+
+    positionPopup(authNotification);
+    authNotification->show();
+
+    if (!trayIcon || !trayIcon->isVisible()) {
+        // If tray not visible, show settings or ensure window is visible
+        if (isVisible()) {
+            showSettings();
+        }
     }
-    return icon;
 }
+
+void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
+    if (reason == QSystemTrayIcon::Trigger) {
+        if (isVisible()) {
+            hide();
+            return;
+        }
+        ensureWindowActive();
+        return;
+    }
+
+    if (reason == QSystemTrayIcon::Context && trayIcon->contextMenu()) {
+        trayIcon->contextMenu()->exec(QCursor::pos());
+    }
+}
+
+void MainWindow::onTrayMessageClicked() {
+    if (pendingAuthError) {
+        showSettings();
+        // Don't clear pendingAuthError here, wait for successful update
+    }
+}
+
+void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
+    QString apiUrl = item->data(Qt::UserRole).toString();
+    QString id = item->data(Qt::UserRole + 1).toString();
+
+    if (client) {
+        client->markAsRead(id);
+    }
+
+    // Visual update
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+    if (widget) {
+        widget->setRead(true);
+    }
+
+    // Update internal data
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+    n.unread = false;
+    item->setData(Qt::UserRole + 4, n.toJson());
+
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
+    updateTrayMenu();
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+    QDesktopServices::openUrl(QUrl(htmlUrl));
+}
+
+void MainWindow::showSettings() {
+    SettingsDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        QString newToken = dialog.getToken();
+        int interval = SettingsDialog::getInterval();
+        if (client) {
+            client->setToken(newToken);
+            m_isManualRefresh = true;
+            client->checkNotifications();  // Force check immediately
+            m_isManualRefresh = false;
+        }
+        if (refreshTimer) {
+            refreshTimer->setInterval(calculateSafeInterval(interval));
+            refreshTimer->start();
+            updateStatusBar();
+        }
+    }
+}
+
+void MainWindow::onLoadingStarted() {
+    if (!notificationList) return;
+    if (notificationList->count() == 0 || m_isManualRefresh) {
+        if (stackWidget->currentWidget() != loadingPage) {
+            stackWidget->setCurrentWidget(loadingPage);
+        }
+        if (loadingLabel) {
+            loadingLabel->setText(tr("Loading..."));
+        }
+    }
+    updateTrayToolTip();
+}
+
+void MainWindow::showContextMenu(const QPoint &pos) {
+    QListWidgetItem *item = notificationList->itemAt(pos);
+    if (item) {
+        notificationList->setCurrentItem(item);  // Ensure item is selected
+
+        QString id = item->data(Qt::UserRole + 1).toString();
+        bool saved = isNotificationSaved(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        if (markAsReadAction) markAsReadAction->setVisible(n.unread);
+        if (saveAction) saveAction->setVisible(!saved);
+        if (unsaveAction) unsaveAction->setVisible(saved);
+
+        contextMenu->exec(notificationList->mapToGlobal(pos));
+    }
+}
+
+void MainWindow::dismissCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (!item) return;
+
+    QString id = item->data(Qt::UserRole + 1).toString();
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    saveDoneNotification(n);
+
+    if (client) {
+        client->markAsRead(id);
+        client->markAsDone(id);
+    }
+
+    knownNotificationIds.remove(id);
+
+    // Only remove from list if in Inbox
+    if (filterComboBox && filterComboBox->currentIndex() == 0) {
+        delete notificationList->takeItem(notificationList->row(item));
+
+        // Update icon if list is empty
+        if (notificationList->count() == 0) {
+            trayIcon->setIcon(
+                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+        }
+    }
+    updateSelectionComboBox();
+
+    updateTrayMenu();
+}
+
+void MainWindow::openCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        onNotificationItemActivated(item);
+    }
+}
+
+void MainWindow::copyLinkCurrentItem() {
+    QListWidgetItem *item = notificationList->currentItem();
+    if (item) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        // Don't include notification_referrer_id for copied links
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
+        QApplication::clipboard()->setText(htmlUrl);
+    }
+}
+
+void MainWindow::onAuthNotificationSettingsClicked() {
+    if (authNotification) {
+        authNotification->close();
+    }
+    showSettings();
+}
+
+void MainWindow::dismissAllNotifications() {
+    onSelectAllClicked();
+    onDismissSelectedClicked();
+}
+
+void MainWindow::onTokenLoaded() {
+    m_loadedToken = tokenWatcher->result();
+
+    if (m_loadedToken.isEmpty()) {
+        stackWidget->setCurrentWidget(loginPage);
+    } else {
+        stackWidget->setCurrentWidget(notificationList);
+        if (client) {
+            client->setToken(m_loadedToken);
+            client->checkNotifications();
+        }
+    }
+}
+
+void MainWindow::onRefreshClicked() {
+    if (!client) return;
+
+    if (filterComboBox->currentIndex() == 0) {
+        m_isManualRefresh = true;
+        client->checkNotifications();
+        m_isManualRefresh = false;
+    } else {
+        // Local refresh for Saved/Done
+        onFilterChanged(filterComboBox->currentIndex());
+        if (statusLabel) statusLabel->setText(tr("Refreshed"));
+    }
+
+    if (refreshTimer) {
+        refreshTimer->start();  // Restart timer
+        updateStatusBar();      // Force update
+    }
+}
+
+void MainWindow::updateStatusBar() {
+    if (refreshTimer && refreshTimer->isActive()) {
+        qint64 remaining = refreshTimer->remainingTime();
+        if (remaining >= 0) {
+            int seconds = (remaining / 1000) % 60;
+            int minutes = (remaining / 60000);
+            timerLabel->setText(
+                tr("Next refresh: %1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0')));
+            return;
+        }
+    }
+    if (timerLabel) {
+        timerLabel->setText(tr("Next refresh: --:--"));
+    }
+}
+
+void MainWindow::onSelectAllClicked() {
+    if (notificationList) {
+        notificationList->selectAll();
+    }
+}
+
+void MainWindow::onSelectNoneClicked() {
+    if (notificationList) {
+        notificationList->clearSelection();
+    }
+}
+
+void MainWindow::onSelectionChanged(int index) {
+    if (index <= 0) return;
+
+    int n = selectionComboBox->currentData().toInt();
+    if (n <= 0) return;
+
+    notificationList->clearSelection();
+    int count = notificationList->count();
+    int limit = qMin(n, count);
+
+    for (int i = 0; i < limit; ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item) item->setSelected(true);
+    }
+
+    bool wasBlocked = selectionComboBox->blockSignals(true);
+    selectionComboBox->setCurrentIndex(0);
+    selectionComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::onDismissSelectedClicked() {
+    if (!notificationList || !client) return;
+
+    QList<QListWidgetItem *> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString id = item->data(Qt::UserRole + 1).toString();
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        saveDoneNotification(n);
+        client->markAsRead(id);
+        client->markAsDone(id);
+        knownNotificationIds.remove(id);
+
+        if (filterComboBox && filterComboBox->currentIndex() == 0) {
+            delete notificationList->takeItem(notificationList->row(item));
+        }
+    }
+
+    // Update icon if list is empty
+    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
+        trayIcon->setIcon(
+            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+    }
+    updateSelectionComboBox();
+    updateTrayMenu();
+}
+
+void MainWindow::onOpenSelectedClicked() {
+    if (!notificationList) return;
+
+    QList<QListWidgetItem *> items = notificationList->selectedItems();
+    for (auto item : items) {
+        QString apiUrl = item->data(Qt::UserRole).toString();
+        QString id = item->data(Qt::UserRole + 1).toString();
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+        QDesktopServices::openUrl(QUrl(htmlUrl));
+    }
+}
+
+void MainWindow::onFilterChanged(int index) {
+    if (client) {
+        if (index == 0) {
+            // Inbox
+            client->setShowAll(true);
+
+            int interval = SettingsDialog::getInterval();
+            QDateTime now = QDateTime::currentDateTime();
+            bool recent = lastRefreshTime.contains(0) && lastRefreshTime[0].secsTo(now) < (interval * 60);
+
+            // If this call came from onRefreshClicked, m_isManualRefresh might be true?
+            // No, onRefreshClicked calls client->checkNotifications() directly for index 0.
+            // onFilterChanged(0) is only called by ComboBox or initial load.
+            // So we can assume it's NOT manual refresh here (unless we want to support calling onFilterChanged(0) manually).
+
+            if (!recent) {
+                client->checkNotifications();
+                lastRefreshTime[0] = now;
+            } else {
+                // Ensure list is shown
+                if (stackWidget->currentWidget() != notificationList && notificationList->count() > 0) {
+                    stackWidget->setCurrentWidget(notificationList);
+                } else if (notificationList->count() == 0 && stackWidget->currentWidget() != emptyStatePage) {
+                    stackWidget->setCurrentWidget(emptyStatePage);
+                }
+            }
+
+        } else if (index == 1) {
+            // Saved view
+            if (m_savedNotifications.isEmpty()) {
+                stackWidget->setCurrentWidget(emptyStatePage);
+            } else {
+                stackWidget->setCurrentWidget(notificationList);
+            }
+
+            notificationList->setUpdatesEnabled(false);
+            notificationList->clear();
+            loadMoreItem = nullptr;
+
+            for (const Notification &n : m_savedNotifications) {
+                addNotificationItem(n);
+            }
+            notificationList->setUpdatesEnabled(true);
+
+            if (countLabel) {
+                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
+            }
+        } else if (index == 2) {
+            // Done view
+            if (m_doneNotifications.isEmpty()) {
+                stackWidget->setCurrentWidget(emptyStatePage);
+            } else {
+                stackWidget->setCurrentWidget(notificationList);
+            }
+
+            notificationList->setUpdatesEnabled(false);
+            notificationList->clear();
+            loadMoreItem = nullptr;
+
+            for (const Notification &n : m_doneNotifications) {
+                addNotificationItem(n);
+            }
+            notificationList->setUpdatesEnabled(true);
+
+            updateSelectionComboBox();
+
+            if (countLabel) {
+                countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
+            }
+        }
+        m_isManualRefresh = false;
+        if (refreshTimer) {
+            refreshTimer->start();
+            updateStatusBar();
+        }
+    }
+}
+
+void MainWindow::showAboutDialog() {
+    const QString copyright = tr("© %1 Kgithub-notify contributors").arg(QDate::currentDate().year());
+    const QString description = tr("A KDE-friendly system tray client for GitHub notifications.");
+
+    QMessageBox aboutBox(this);
+    aboutBox.setWindowTitle(tr("About KGitHub Notify"));
+    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+                                      QStyle::SP_ComputerIcon)
+                               .pixmap(64, 64));
+    aboutBox.setText(tr("<b>KGitHub Notify</b>"));
+    aboutBox.setInformativeText(tr("%1\n\nVersion: %2\n%3\n\nUses Qt, KDE Wallet, and KDE Notifications.")
+                                    .arg(description,
+                                         QCoreApplication::applicationVersion().isEmpty()
+                                             ? QStringLiteral("dev")
+                                             : QCoreApplication::applicationVersion(),
+                                         copyright));
+    aboutBox.setStandardButtons(QMessageBox::Ok);
+    aboutBox.exec();
+}
+
+void MainWindow::openKdeNotificationSettings() {
+    // Try generic systemsettings first (works on Plasma 6 and often 5)
+    bool launched = QProcess::startDetached(QStringLiteral("systemsettings"), {QStringLiteral("kcm_notifications")});
+
+    // Try Plasma 6 kcmshell
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 systemsettings
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 kcmshell
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Fallback: Check if generic kcmshell exists
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
+    }
+
+    if (!launched) {
+        showTrayMessage(tr("Notification settings unavailable"),
+                        tr("Could not launch KDE notification settings on this system."));
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Protected
+// -----------------------------------------------------------------------------
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    if (trayIcon->isVisible()) {
+        hide();
+        event->ignore();
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Private Helpers
+// -----------------------------------------------------------------------------
 
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
-    updateTrayMenu();
 
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
+
+    updateTrayMenu();
 
     QIcon icon = QIcon::fromTheme("kgithub-notify");
     if (icon.isNull()) {
@@ -257,8 +708,7 @@ void MainWindow::updateTrayMenu() {
     trayIconMenu->clear();
 
     QAction *openAppAction =
-        new QAction(themedIcon({QStringLiteral("kgithub-notify")}),
-                    tr("Open Kgithub-notify"), trayIconMenu);
+        new QAction(themedIcon({QStringLiteral("kgithub-notify")}), tr("Open Kgithub-notify"), trayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
     openAppAction->setFont(font);
@@ -401,753 +851,88 @@ void MainWindow::updateTrayToolTip() {
     trayIcon->setToolTip(parts.join(QStringLiteral("\n")));
 }
 
-void MainWindow::dismissAllNotifications() {
-    onSelectAllClicked();
-    onDismissSelectedClicked();
-}
-
-void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
-    if (reason == QSystemTrayIcon::Trigger) {
-        if (isVisible()) {
-            hide();
-        } else {
-            ensureWindowActive();
-        }
-    } else if (reason == QSystemTrayIcon::Context) {
-        if (trayIcon->contextMenu()) {
-            trayIcon->contextMenu()->exec(QCursor::pos());
-        }
-    }
-}
-
-void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
-    m_lastCheckTime = QDateTime::currentDateTime();
-    pendingAuthError = false;
-    lastError.clear();
-
-    int unreadCount = 0;
-    int newNotifications = 0;
-    QList<Notification> newlyAddedNotifications;
-
-    for (const Notification &n : notifications) {
-        if (n.unread) {
-            unreadCount++;
-
-            if (!knownNotificationIds.contains(n.id)) {
-                newNotifications++;
-                knownNotificationIds.insert(n.id);
-                newlyAddedNotifications.append(n);
-            }
-        }
-    }
-
-    if (unreadCount > 0) {
-        trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
-        if (newNotifications > 0) {
-            if (newNotifications == 1) {
-                sendNotification(newlyAddedNotifications.first());
-            } else {
-                sendSummaryNotification(newNotifications, newlyAddedNotifications);
-            }
-        }
-    } else {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
-    }
-    updateTrayMenu();
-
-    // If in Saved/Done view, do not update list content, but ensure UI is not stuck on loading
-    if (filterComboBox && filterComboBox->currentIndex() != 0) {
-        if (stackWidget->currentWidget() == loadingPage) {
-             int idx = filterComboBox->currentIndex();
-             if (idx == 1) { // Saved
-                 if (m_savedNotifications.isEmpty()) stackWidget->setCurrentWidget(emptyStatePage);
-                 else stackWidget->setCurrentWidget(notificationList);
-             } else if (idx == 2) { // Done
-                 if (m_doneNotifications.isEmpty()) stackWidget->setCurrentWidget(emptyStatePage);
-                 else stackWidget->setCurrentWidget(notificationList);
-             }
-        }
-        if (statusLabel) statusLabel->setText(tr("Updated"));
-        return;
-    }
-
-    // If in Done view, do not update list
-    if (filterComboBox && filterComboBox->currentIndex() == 2) {
-        return;
-    }
-
-
-    if (authNotification && authNotification->isVisible()) {
-        authNotification->close();
-    }
-
-    // Switch to list view on successful update
-    if (!append && notifications.isEmpty()) {
-        if (stackWidget->currentWidget() != emptyStatePage) {
-            stackWidget->setCurrentWidget(emptyStatePage);
-        }
-    } else {
-        if (stackWidget->currentWidget() != notificationList) {
-            stackWidget->setCurrentWidget(notificationList);
-        }
-    }
-
-    notificationList->setUpdatesEnabled(false);
-
-    if (loadMoreItem) {
-        int row = notificationList->row(loadMoreItem);
-        if (row >= 0) {
-            delete notificationList->takeItem(row);
-        }
-        loadMoreItem = nullptr;
-    }
-
-    if (!append) {
-        notificationList->clear();
-        loadMoreItem = nullptr;
-    }
-
-    if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
-
-    for (const Notification &n : notifications) {
-        if (isNotificationDone(n.id)) continue;
-        addNotificationItem(n);
-    }
-
-    if (hasMore) {
-        loadMoreItem = new QListWidgetItem();
-        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
-        connect(loadMoreBtn, &QPushButton::clicked, this, [this, loadMoreBtn]() {
-            loadMoreBtn->setEnabled(false);
-            loadMoreBtn->setText(tr("Loading..."));
-            if (client) client->loadMore();
-        });
-
-        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
-        loadMoreItem->setFlags(Qt::NoItemFlags);
-
-        notificationList->addItem(loadMoreItem);
-        notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
-    }
-
-    notificationList->setUpdatesEnabled(true);
-
-    updateSelectionComboBox();
-
-    if (countLabel) {
-        countLabel->setText(tr("Items: %1").arg(notificationList->count()));
-    }
-
-    if (unreadCount > 0) {
-        trayIcon->setIcon(loadSvgIcon(":/assets/icon-dotted.svg"));
-        if (newNotifications > 0) {
-            if (newNotifications == 1) {
-                sendNotification(newlyAddedNotifications.first());
-            } else {
-                sendSummaryNotification(newNotifications, newlyAddedNotifications);
-            }
-        }
-    } else {
-        QIcon icon = QIcon::fromTheme("kgithub-notify");
-        if (icon.isNull()) {
-            icon = loadSvgIcon(":/assets/icon.svg");
-        }
-        trayIcon->setIcon(icon);
-    }
-    updateTrayMenu();
-}
-
-void MainWindow::onAuthNotificationSettingsClicked() {
-    if (authNotification) {
-        authNotification->close();
-    }
-    showSettings();
-}
-
-void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
-    QString apiUrl = item->data(Qt::UserRole).toString();
-    QString id = item->data(Qt::UserRole + 1).toString();
-
-    if (client) {
-        client->markAsRead(id);
-    }
-
-    // Visual update
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-    if (widget) {
-        widget->setRead(true);
-    }
-
-    // Update internal data
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
-    n.unread = false;
-    item->setData(Qt::UserRole + 4, n.toJson());
-
-    QFont font = item->font();
-    font.setBold(false);
-    item->setFont(font);
-
-    updateTrayMenu();
-
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-    QDesktopServices::openUrl(QUrl(htmlUrl));
-}
-
-void MainWindow::openCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (item) {
-        onNotificationItemActivated(item);
-    }
-}
-
-void MainWindow::copyLinkCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (item) {
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        // Don't include notification_referrer_id for copied links
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
-        QApplication::clipboard()->setText(htmlUrl);
-    }
-}
-
-void MainWindow::showTrayMessage(const QString &title, const QString &message) {
-    trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 3000);
-}
-
-void MainWindow::showSettings() {
-    SettingsDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted) {
-        QString newToken = dialog.getToken();
-        int interval = SettingsDialog::getInterval();
-        if (client) {
-            client->setToken(newToken);
-            m_isManualRefresh = true;
-            client->checkNotifications();  // Force check immediately
-            m_isManualRefresh = false;
-        }
-        if (refreshTimer) {
-            refreshTimer->setInterval(calculateSafeInterval(interval));
-            refreshTimer->start();
-            updateStatusBar();
-        }
-    }
-}
-
-void MainWindow::onLoadingStarted() {
-    if (!notificationList) return;
-    if (notificationList->count() == 0 || m_isManualRefresh) {
-        if (stackWidget->currentWidget() != loadingPage) {
-            stackWidget->setCurrentWidget(loadingPage);
-        }
-        if (loadingLabel) {
-            loadingLabel->setText(tr("Loading..."));
-        }
-    }
-    updateTrayToolTip();
-}
-
-void MainWindow::onAuthError(const QString &message) {
-    pendingAuthError = true;
-
-    // Update error page
-    errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
-    stackWidget->setCurrentWidget(errorPage);
-
-    if (!authNotification) {
-        authNotification = new AuthErrorNotification(this);
-        connect(authNotification, &AuthErrorNotification::settingsClicked, this,
-                &MainWindow::onAuthNotificationSettingsClicked);
-        // dismissed signal is handled by AuthErrorNotification internally closing itself, but we can hook if needed.
-    }
-
-    authNotification->setMessage(message);
-
-    positionPopup(authNotification);
-    authNotification->show();
-
-    if (!trayIcon || !trayIcon->isVisible()) {
-        // If tray not visible, show settings or ensure window is visible
-        if (isVisible()) {
-            showSettings();
-        }
-    }
-}
-
-void MainWindow::onTrayMessageClicked() {
-    if (pendingAuthError) {
-        showSettings();
-        // Don't clear pendingAuthError here, wait for successful update
-    }
-}
-
-void MainWindow::showContextMenu(const QPoint &pos) {
-    QListWidgetItem *item = notificationList->itemAt(pos);
-    if (item) {
-        notificationList->setCurrentItem(item);  // Ensure item is selected
-
-        QString id = item->data(Qt::UserRole + 1).toString();
-        bool saved = isNotificationSaved(id);
-
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-
-        if (markAsReadAction) markAsReadAction->setVisible(n.unread);
-        if (saveAction) saveAction->setVisible(!saved);
-        if (unsaveAction) unsaveAction->setVisible(saved);
-
-        contextMenu->exec(notificationList->mapToGlobal(pos));
-    }
-}
-
-void MainWindow::dismissCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (!item) return;
-
-    QString id = item->data(Qt::UserRole + 1).toString();
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
-
-    saveDoneNotification(n);
-
-    if (client) {
-        client->markAsRead(id);
-        client->markAsDone(id);
-    }
-
-    knownNotificationIds.remove(id);
-
-    // Only remove from list if in Inbox
-    if (filterComboBox && filterComboBox->currentIndex() == 0) {
-        delete notificationList->takeItem(notificationList->row(item));
-
-        // Update icon if list is empty
-        if (notificationList->count() == 0) {
-            trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                                       QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
-        }
-    }
-    updateSelectionComboBox();
-
-    updateTrayMenu();
-}
-
-void MainWindow::showError(const QString &error) {
-    if (error == lastError) return;
-    lastError = error;
-
-    // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
-    if (trayIcon && trayIcon->isVisible()) {
-        trayIcon->showMessage(tr("GitHub Error"), error, QSystemTrayIcon::Warning, 5000);
-    } else {
-        // Maybe don't show message box on every polling error if window is hidden?
-        // But if window is visible, we should show it.
-        if (isVisible()) {
-            QMessageBox::warning(this, tr("GitHub Error"), error);
-        }
-    }
-
-    if (stackWidget->currentWidget() == loadingPage) {
-        if (notificationList->count() > 0) {
-            stackWidget->setCurrentWidget(notificationList);
-        } else {
-            if (loadingLabel) {
-                loadingLabel->setText(tr("Error: %1").arg(error));
-            }
-        }
-    }
-
-    // Reset load more button if error occurred during loading more
-    updateTrayToolTip();
-    if (loadMoreItem) {
-        QPushButton *btn = qobject_cast<QPushButton*>(notificationList->itemWidget(loadMoreItem));
-        if (btn) {
-            btn->setEnabled(true);
-            btn->setText(tr("Load More"));
-        }
-    }
-}
-
-void MainWindow::closeEvent(QCloseEvent *event) {
-    if (trayIcon->isVisible()) {
-        hide();
-        event->ignore();
-    }
-}
-
-void MainWindow::onRefreshClicked() {
-    if (!client) return;
-
-    if (filterComboBox->currentIndex() == 0) {
-        m_isManualRefresh = true;
-        client->checkNotifications();
-        m_isManualRefresh = false;
-    } else {
-        // Local refresh for Saved/Done
-        onFilterChanged(filterComboBox->currentIndex());
-        if (statusLabel) statusLabel->setText(tr("Refreshed"));
-    }
-
-    if (refreshTimer) {
-        refreshTimer->start();  // Restart timer
-        updateStatusBar();      // Force update
-    }
-}
-
-void MainWindow::onFilterChanged(int index) {
-    if (client) {
-        if (index == 0) {
-            // Inbox
-            client->setShowAll(true);
-
-            int interval = SettingsDialog::getInterval();
-            QDateTime now = QDateTime::currentDateTime();
-            bool recent = lastRefreshTime.contains(0) &&
-                          lastRefreshTime[0].secsTo(now) < (interval * 60);
-
-            // If this call came from onRefreshClicked, m_isManualRefresh might be true?
-            // No, onRefreshClicked calls client->checkNotifications() directly for index 0.
-            // onFilterChanged(0) is only called by ComboBox or initial load.
-            // So we can assume it's NOT manual refresh here (unless we want to support calling onFilterChanged(0) manually).
-
-            if (!recent) {
-                 client->checkNotifications();
-                 lastRefreshTime[0] = now;
-            } else {
-                // Ensure list is shown
-                if (stackWidget->currentWidget() != notificationList && notificationList->count() > 0) {
-                    stackWidget->setCurrentWidget(notificationList);
-                } else if (notificationList->count() == 0 && stackWidget->currentWidget() != emptyStatePage) {
-                    stackWidget->setCurrentWidget(emptyStatePage);
-                }
-            }
-
-        } else if (index == 1) {
-            // Saved view
-            if (m_savedNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
-                stackWidget->setCurrentWidget(notificationList);
-            }
-
-            notificationList->setUpdatesEnabled(false);
-            notificationList->clear();
-            loadMoreItem = nullptr;
-
-            for (const Notification &n : m_savedNotifications) {
-                addNotificationItem(n);
-            }
-            notificationList->setUpdatesEnabled(true);
-
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
-            }
-        } else if (index == 2) {
-            // Done view
-            if (m_doneNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
-                stackWidget->setCurrentWidget(notificationList);
-            }
-
-            notificationList->setUpdatesEnabled(false);
-            notificationList->clear();
-            loadMoreItem = nullptr;
-
-            for (const Notification &n : m_doneNotifications) {
-                addNotificationItem(n);
-            }
-            notificationList->setUpdatesEnabled(true);
-
-            updateSelectionComboBox();
-
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
-            }
-        }
-        m_isManualRefresh = false;
-        if (refreshTimer) {
-            refreshTimer->start();
-            updateStatusBar();
-        }
-    }
-}
-
-void MainWindow::onSelectAllClicked() {
-    if (notificationList) {
-        notificationList->selectAll();
-    }
-}
-
-void MainWindow::onSelectNoneClicked() {
-    if (notificationList) {
-        notificationList->clearSelection();
-    }
-}
-
-void MainWindow::updateSelectionComboBox() {
-    if (!selectionComboBox || !notificationList) return;
-
-    int count = notificationList->count();
-    bool wasBlocked = selectionComboBox->blockSignals(true);
-    selectionComboBox->clear();
-    selectionComboBox->addItem(tr("Select..."));
-
-    if (count > 0) {
-        if (count >= 5) selectionComboBox->addItem(tr("Top 5"), 5);
-        if (count >= 10) selectionComboBox->addItem(tr("Top 10"), 10);
-        if (count >= 20) selectionComboBox->addItem(tr("Top 20"), 20);
-        if (count >= 50) selectionComboBox->addItem(tr("Top 50"), 50);
-        selectionComboBox->addItem(tr("All (%1)").arg(count), count);
-    }
-
-    selectionComboBox->setCurrentIndex(0);
-    selectionComboBox->blockSignals(wasBlocked);
-}
-
-void MainWindow::onSelectionChanged(int index) {
-    if (index <= 0) return;
-
-    int n = selectionComboBox->currentData().toInt();
-    if (n <= 0) return;
-
-    notificationList->clearSelection();
-    int count = notificationList->count();
-    int limit = qMin(n, count);
-
-    for (int i = 0; i < limit; ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item) item->setSelected(true);
-    }
-
-    bool wasBlocked = selectionComboBox->blockSignals(true);
-    selectionComboBox->setCurrentIndex(0);
-    selectionComboBox->blockSignals(wasBlocked);
-}
-
-void MainWindow::onDismissSelectedClicked() {
-    if (!notificationList || !client) return;
-
-    QList<QListWidgetItem *> items = notificationList->selectedItems();
-    for (auto item : items) {
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-
-        saveDoneNotification(n);
-        client->markAsRead(id);
-        client->markAsDone(id);
-        knownNotificationIds.remove(id);
-
-        if (filterComboBox && filterComboBox->currentIndex() == 0) {
-            delete notificationList->takeItem(notificationList->row(item));
-        }
-    }
-
-    // Update icon if list is empty
-    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
-    }
-    updateSelectionComboBox();
-    updateTrayMenu();
-}
-
-void MainWindow::onOpenSelectedClicked() {
-    if (!notificationList) return;
-
-    QList<QListWidgetItem *> items = notificationList->selectedItems();
-    for (auto item : items) {
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
-    }
-}
-
-
-void MainWindow::updateStatusBar() {
-    if (refreshTimer && refreshTimer->isActive()) {
-        qint64 remaining = refreshTimer->remainingTime();
-        if (remaining >= 0) {
-            int seconds = (remaining / 1000) % 60;
-            int minutes = (remaining / 60000);
-            timerLabel->setText(
-                tr("Next refresh: %1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0')));
-            return;
-        }
-    }
-    if (timerLabel) {
-        timerLabel->setText(tr("Next refresh: --:--"));
-    }
-}
-
 void MainWindow::positionPopup(QWidget *popup) {
     if (!popup) return;
 
     QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
-    bool positioned = false;
 
-    if (trayIcon && trayIcon->isVisible()) {
-        QRect trayGeom = trayIcon->geometry();
-        if (!trayGeom.isEmpty()) {
-            int x = trayGeom.center().x() - popup->width() / 2;
-            int y;
-
-            // If tray is in top half, show below
-            if (trayGeom.center().y() < screenGeom.height() / 2) {
-                y = trayGeom.bottom() + 10;
-            } else {
-                // Show above
-                y = trayGeom.top() - popup->height() - 10;
-            }
-
-            // Clamp X
-            if (x < screenGeom.left()) x = screenGeom.left() + 10;
-            if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
-
-            popup->move(x, y);
-            positioned = true;
-        }
-    }
-
-    if (!positioned) {
-        // Fallback: Bottom right
+    if (!trayIcon || !trayIcon->isVisible() || trayIcon->geometry().isEmpty()) {
         popup->move(screenGeom.bottomRight() - QPoint(popup->width() + 10, popup->height() + 10));
+        return;
     }
+
+    QRect trayGeom = trayIcon->geometry();
+    int x = trayGeom.center().x() - popup->width() / 2;
+    int y;
+
+    // If tray is in top half, show below
+    if (trayGeom.center().y() < screenGeom.height() / 2) {
+        y = trayGeom.bottom() + 10;
+    } else {
+        // Show above
+        y = trayGeom.top() - popup->height() - 10;
+    }
+
+    // Clamp X
+    if (x < screenGeom.left()) x = screenGeom.left() + 10;
+    if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
+
+    popup->move(x, y);
 }
 
-void MainWindow::sendNotification(const Notification &n) {
-    KNotification *notification = new KNotification("NewNotification");
-    notification->setComponentName(QStringLiteral("kgithub-notify"));
-    notification->setTitle(n.repository);
-    notification->setText(n.title);
+void MainWindow::createErrorPage() {
+    errorPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(errorPage);
+    layout->setAlignment(Qt::AlignCenter);
 
-    // Actions
-    QStringList actions;
-    actions << tr("Open") << tr("Dismiss");
-    notification->setActions(actions);
+    errorLabel = new QLabel(tr("Authentication Error"), errorPage);
+    errorLabel->setWordWrap(true);
+    errorLabel->setAlignment(Qt::AlignCenter);
 
-    connect(notification, &KNotification::action1Activated, this, [this, n]() {
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
-    });
+    settingsButton = new QPushButton(tr("Open Settings"), errorPage);
+    connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
 
-    connect(notification, &KNotification::action2Activated, this, [this, n]() {
-        if (client) {
-            client->markAsRead(n.id);
-            // Ideally remove from list immediately too
-            for (int i = 0; i < notificationList->count(); ++i) {
-                QListWidgetItem *item = notificationList->item(i);
-                if (item->data(Qt::UserRole + 1).toString() == n.id) {
-                    delete notificationList->takeItem(i);
-                    break;
-                }
-            }
-            updateSelectionComboBox();
-            updateTrayMenu();
-        }
-    });
-
-    connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
-    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
-
-    notification->sendEvent();
+    layout->addWidget(errorLabel);
+    layout->addWidget(settingsButton);
 }
 
-void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
-    KNotification *notification = new KNotification("NewNotification");
-    notification->setComponentName(QStringLiteral("kgithub-notify"));
-    notification->setTitle(tr("%1 New Notifications").arg(count));
+void MainWindow::createLoginPage() {
+    loginPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(loginPage);
+    layout->setAlignment(Qt::AlignCenter);
 
-    QString summary;
-    int limit = qMin(count, 5);
-    for (int i = 0; i < limit; ++i) {
-        summary += "- " + notifications[i].title + "\n";
-    }
-    if (count > limit) {
-        summary += tr("... and %1 more").arg(count - limit);
-    }
-    notification->setText(summary.trimmed());
+    loginLabel = new QLabel(
+        tr("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started."), loginPage);
+    loginLabel->setWordWrap(true);
+    loginLabel->setAlignment(Qt::AlignCenter);
 
-    // Actions
-    QStringList actions;
-    actions << tr("Open Client");
-    notification->setActions(actions);
+    loginButton = new QPushButton(tr("Open Settings"), loginPage);
+    connect(loginButton, &QPushButton::clicked, this, &MainWindow::showSettings);
 
-    connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
-
-    connect(notification, &KNotification::defaultActivated, this, [this]() {
-        this->showNormal();
-        this->activateWindow();
-    });
-    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
-
-    notification->sendEvent();
+    layout->addWidget(loginLabel);
+    layout->addWidget(loginButton);
 }
 
-void MainWindow::showAboutDialog() {
-    const QString copyright = tr("© %1 Kgithub-notify contributors").arg(QDate::currentDate().year());
-    const QString description = tr("A KDE-friendly system tray client for GitHub notifications.");
+void MainWindow::createEmptyStatePage() {
+    emptyStatePage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
+    layout->setAlignment(Qt::AlignCenter);
 
-    QMessageBox aboutBox(this);
-    aboutBox.setWindowTitle(tr("About KGitHub Notify"));
-    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")},
-                                      QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon)
-                               .pixmap(64, 64));
-    aboutBox.setText(tr("<b>KGitHub Notify</b>"));
-    aboutBox.setInformativeText(tr("%1\n\nVersion: %2\n%3\n\nUses Qt, KDE Wallet, and KDE Notifications.")
-                                    .arg(description,
-                                         QCoreApplication::applicationVersion().isEmpty()
-                                             ? QStringLiteral("dev")
-                                             : QCoreApplication::applicationVersion(),
-                                         copyright));
-    aboutBox.setStandardButtons(QMessageBox::Ok);
-    aboutBox.exec();
+    emptyStateLabel = new QLabel(tr("No new notifications"), emptyStatePage);
+    emptyStateLabel->setAlignment(Qt::AlignCenter);
+
+    layout->addWidget(emptyStateLabel);
 }
 
-void MainWindow::openKdeNotificationSettings() {
-    // Try generic systemsettings first (works on Plasma 6 and often 5)
-    bool launched = QProcess::startDetached(QStringLiteral("systemsettings"),
-                                            {QStringLiteral("kcm_notifications")});
+void MainWindow::createLoadingPage() {
+    loadingPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(loadingPage);
+    layout->setAlignment(Qt::AlignCenter);
 
-    // Try Plasma 6 kcmshell
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
-    }
+    loadingLabel = new QLabel(tr("Loading..."), loadingPage);
+    loadingLabel->setAlignment(Qt::AlignCenter);
 
-    // Try Plasma 5 systemsettings
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
-                                            {QStringLiteral("kcm_notifications")});
-    }
-
-    // Try Plasma 5 kcmshell
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
-    }
-
-    // Fallback: Check if generic kcmshell exists
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
-    }
-
-    if (!launched) {
-        showTrayMessage(tr("Notification settings unavailable"),
-                        tr("Could not launch KDE notification settings on this system."));
-    }
-}
-
-NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
-    if (!notificationList) return nullptr;
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item->data(Qt::UserRole + 1).toString() == id) {
-            return qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        }
-    }
-    return nullptr;
+    layout->addWidget(loadingLabel);
 }
 
 void MainWindow::ensureWindowActive() {
@@ -1390,6 +1175,122 @@ void MainWindow::loadToken() {
     tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
 }
 
+QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackResource,
+                             QStyle::StandardPixmap fallbackPixmap) const {
+    for (const QString &name : names) {
+        QIcon icon = QIcon::fromTheme(name);
+        if (!icon.isNull()) {
+            return icon;
+        }
+    }
+
+    if (!fallbackResource.isEmpty()) {
+        QIcon icon(fallbackResource);
+        if (!icon.isNull()) {
+            return icon;
+        }
+    }
+
+    return QApplication::style()->standardIcon(fallbackPixmap);
+}
+
+QIcon MainWindow::loadSvgIcon(const QString &path) {
+    QSvgRenderer renderer(path);
+    if (!renderer.isValid()) {
+        return QIcon(path);
+    }
+
+    QIcon icon;
+    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        renderer.render(&painter);
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+
+void MainWindow::sendNotification(const Notification &n) {
+    KNotification *notification = new KNotification("NewNotification");
+    notification->setComponentName(QStringLiteral("kgithub-notify"));
+    notification->setTitle(n.repository);
+    notification->setText(n.title);
+
+    // Actions
+    QStringList actions;
+    actions << tr("Open") << tr("Dismiss");
+    notification->setActions(actions);
+
+    connect(notification, &KNotification::action1Activated, this, [this, n]() {
+        QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
+        QDesktopServices::openUrl(QUrl(htmlUrl));
+    });
+
+    connect(notification, &KNotification::action2Activated, this, [this, n]() {
+        if (client) {
+            client->markAsRead(n.id);
+            // Ideally remove from list immediately too
+            for (int i = 0; i < notificationList->count(); ++i) {
+                QListWidgetItem *item = notificationList->item(i);
+                if (item->data(Qt::UserRole + 1).toString() == n.id) {
+                    delete notificationList->takeItem(i);
+                    break;
+                }
+            }
+            updateSelectionComboBox();
+            updateTrayMenu();
+        }
+    });
+
+    connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
+    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
+
+    notification->sendEvent();
+}
+
+void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
+    KNotification *notification = new KNotification("NewNotification");
+    notification->setComponentName(QStringLiteral("kgithub-notify"));
+    notification->setTitle(tr("%1 New Notifications").arg(count));
+
+    QString summary;
+    int limit = qMin(count, 5);
+    for (int i = 0; i < limit; ++i) {
+        summary += "- " + notifications[i].title + "\n";
+    }
+    if (count > limit) {
+        summary += tr("... and %1 more").arg(count - limit);
+    }
+    notification->setText(summary.trimmed());
+
+    // Actions
+    QStringList actions;
+    actions << tr("Open Client");
+    notification->setActions(actions);
+
+    connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
+
+    connect(notification, &KNotification::defaultActivated, this, [this]() {
+        this->showNormal();
+        this->activateWindow();
+    });
+    connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
+
+    notification->sendEvent();
+}
+
+NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
+    if (!notificationList) return nullptr;
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == id) {
+            return qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        }
+    }
+    return nullptr;
+}
+
 void MainWindow::loadSavedNotifications() {
     QSettings settings;
     QByteArray data = settings.value("savedNotifications").toByteArray();
@@ -1421,7 +1322,7 @@ void MainWindow::saveNotification(const Notification &n) {
     m_savedNotifications.append(n);
     saveSavedNotifications();
     // If we are currently viewing "Saved", refresh the list
-    if (filterComboBox && filterComboBox->currentIndex() == 1) { // 1 will be Saved
+    if (filterComboBox && filterComboBox->currentIndex() == 1) {  // 1 will be Saved
         onFilterChanged(1);
     }
 }
@@ -1486,6 +1387,97 @@ bool MainWindow::isNotificationDone(const QString &id) const {
         if (n.id == id) return true;
     }
     return false;
+}
+
+void MainWindow::processNewNotifications(const QList<Notification> &notifications, int &unreadCount,
+                                         int &newNotifications, QList<Notification> &newlyAddedNotifications) {
+    unreadCount = 0;
+    newNotifications = 0;
+    newlyAddedNotifications.clear();
+
+    for (const Notification &n : notifications) {
+        if (n.unread) {
+            unreadCount++;
+            if (!knownNotificationIds.contains(n.id)) {
+                newNotifications++;
+                knownNotificationIds.insert(n.id);
+                newlyAddedNotifications.append(n);
+            }
+        }
+    }
+}
+
+void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
+                                     const QList<Notification> &newlyAddedNotifications) {
+    if (unreadCount <= 0) {
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+                                     QStyle::SP_ComputerIcon));
+        updateTrayMenu();
+        return;
+    }
+
+    trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
+    if (newNotifications > 0) {
+        if (newNotifications == 1) {
+            sendNotification(newlyAddedNotifications.first());
+        } else {
+            sendSummaryNotification(newNotifications, newlyAddedNotifications);
+        }
+    }
+    updateTrayMenu();
+}
+
+void MainWindow::updateListWidget(const QList<Notification> &notifications, bool append, bool hasMore) {
+    // Switch to list view on successful update
+    if (!append && notifications.isEmpty()) {
+        if (stackWidget->currentWidget() != emptyStatePage) {
+            stackWidget->setCurrentWidget(emptyStatePage);
+        }
+    } else {
+        if (stackWidget->currentWidget() != notificationList) {
+            stackWidget->setCurrentWidget(notificationList);
+        }
+    }
+
+    notificationList->setUpdatesEnabled(false);
+
+    if (loadMoreItem) {
+        int row = notificationList->row(loadMoreItem);
+        if (row >= 0) {
+            delete notificationList->takeItem(row);
+        }
+        loadMoreItem = nullptr;
+    }
+
+    if (!append) {
+        notificationList->clear();
+        loadMoreItem = nullptr;
+    }
+
+    if (loadingLabel && !append) loadingLabel->setText(tr("Loading..."));
+
+    for (const Notification &n : notifications) {
+        if (isNotificationDone(n.id)) continue;
+        addNotificationItem(n);
+    }
+
+    if (hasMore) {
+        loadMoreItem = new QListWidgetItem();
+        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+        connect(loadMoreBtn, &QPushButton::clicked, this, [this, loadMoreBtn]() {
+            loadMoreBtn->setEnabled(false);
+            loadMoreBtn->setText(tr("Loading..."));
+            if (client) client->loadMore();
+        });
+
+        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+        loadMoreItem->setFlags(Qt::NoItemFlags);
+
+        notificationList->addItem(loadMoreItem);
+        notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
+    }
+
+    notificationList->setUpdatesEnabled(true);
 }
 
 void MainWindow::addNotificationItem(const Notification &n) {
@@ -1553,4 +1545,24 @@ void MainWindow::addNotificationItem(const Notification &n) {
 
     notificationList->addItem(item);
     notificationList->setItemWidget(item, widget);
+}
+
+void MainWindow::updateSelectionComboBox() {
+    if (!selectionComboBox || !notificationList) return;
+
+    int count = notificationList->count();
+    bool wasBlocked = selectionComboBox->blockSignals(true);
+    selectionComboBox->clear();
+    selectionComboBox->addItem(tr("Select..."));
+
+    if (count > 0) {
+        if (count >= 5) selectionComboBox->addItem(tr("Top 5"), 5);
+        if (count >= 10) selectionComboBox->addItem(tr("Top 10"), 10);
+        if (count >= 20) selectionComboBox->addItem(tr("Top 20"), 20);
+        if (count >= 50) selectionComboBox->addItem(tr("Top 50"), 50);
+        selectionComboBox->addItem(tr("All (%1)").arg(count), count);
+    }
+
+    selectionComboBox->setCurrentIndex(0);
+    selectionComboBox->blockSignals(wasBlocked);
 }

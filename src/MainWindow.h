@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMainWindow>
+#include <QMap>
 #include <QMenu>
 #include <QPushButton>
 #include <QSet>
@@ -18,8 +19,6 @@
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QToolBar>
-#include <QDateTime>
-#include <QMap>
 
 #include "AuthErrorNotification.h"
 #include "GitHubClient.h"
@@ -33,10 +32,10 @@ class MainWindow : public QMainWindow {
    public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-    void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
+    void showTrayMessage(const QString &title, const QString &message);
 
-  public slots:
+   public slots:
     void updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
     void showError(const QString &error);
     void onAuthError(const QString &message);
@@ -71,14 +70,15 @@ class MainWindow : public QMainWindow {
     void closeEvent(QCloseEvent *event) override;
 
    private:
+    // Helpers
     void createTrayIcon();
     void updateTrayMenu();
+    void updateTrayToolTip();
     void positionPopup(QWidget *popup);
     void createErrorPage();
     void createLoginPage();
     void createEmptyStatePage();
     void createLoadingPage();
-
     void ensureWindowActive();
     void setupWindow();
     void setupCentralWidget();
@@ -91,7 +91,26 @@ class MainWindow : public QMainWindow {
     QIcon themedIcon(const QStringList &names, const QString &fallbackResource = QString(),
                      QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
     QIcon loadSvgIcon(const QString &path);
+    void sendNotification(const Notification &n);
+    void sendSummaryNotification(int count, const QList<Notification> &notifications);
+    NotificationItemWidget *findNotificationWidget(const QString &id);
+    void loadSavedNotifications();
+    void saveSavedNotifications();
+    void saveNotification(const Notification &n);
+    void unsaveNotification(const QString &id);
+    bool isNotificationSaved(const QString &id) const;
+    void loadDoneNotifications();
+    void saveDoneNotifications();
+    void saveDoneNotification(const Notification &n);
+    bool isNotificationDone(const QString &id) const;
+    void addNotificationItem(const Notification &n);
+    void updateSelectionComboBox();
+    void processNewNotifications(const QList<Notification> &notifications, int &unreadCount, int &newNotifications,
+                                 QList<Notification> &newlyAddedNotifications);
+    void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification> &newlyAddedNotifications);
+    void updateListWidget(const QList<Notification> &notifications, bool append, bool hasMore);
 
+    // Member Variables
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;
@@ -119,8 +138,6 @@ class MainWindow : public QMainWindow {
     };
     QMap<QString, NotificationDetails> detailsCache;
 
-    NotificationItemWidget *findNotificationWidget(const QString &id);
-
     // Toolbar
     QToolBar *toolbar;
     QAction *refreshAction;
@@ -131,33 +148,21 @@ class MainWindow : public QMainWindow {
     QAction *dismissSelectedAction;
     QAction *openSelectedAction;
 
-    void updateSelectionComboBox();
-
-    // New UI components
+    // UI components
     QStackedWidget *stackWidget;
     QWidget *errorPage;
     QLabel *errorLabel;
     QPushButton *settingsButton;
-
-    // Login page components
     QWidget *loginPage;
     QLabel *loginLabel;
     QPushButton *loginButton;
-
-    // Empty state components
     QWidget *emptyStatePage;
     QLabel *emptyStateLabel;
-
-    // Loading page components
     QWidget *loadingPage;
     QLabel *loadingLabel;
+
     bool m_isManualRefresh;
-
-    // Custom notification
     AuthErrorNotification *authNotification;
-
-    void sendNotification(const Notification &n);
-    void sendSummaryNotification(int count, const QList<Notification> &notifications);
 
     // Status Bar
     QStatusBar *statusBar;
@@ -169,26 +174,13 @@ class MainWindow : public QMainWindow {
 
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
-
     QMap<int, QDateTime> lastRefreshTime;
 
     QList<Notification> m_savedNotifications;
-    void loadSavedNotifications();
-    void saveSavedNotifications();
-    void saveNotification(const Notification &n);
-    void unsaveNotification(const QString &id);
-    bool isNotificationSaved(const QString &id) const;
-
     QList<Notification> m_doneNotifications;
-    void loadDoneNotifications();
-    void saveDoneNotifications();
-    void saveDoneNotification(const Notification &n);
-    bool isNotificationDone(const QString &id) const;
-    void addNotificationItem(const Notification &n);
-    static const int MAX_DONE_NOTIFICATIONS = 100;
 
+    static const int MAX_DONE_NOTIFICATIONS = 100;
     QDateTime m_lastCheckTime;
-    void updateTrayToolTip();
 };
 
 #endif  // MAINWINDOW_H
