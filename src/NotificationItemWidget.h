@@ -16,6 +16,7 @@ public:
 
     QToolButton *doneButton;
     QToolButton *saveButton;
+    QToolButton *openButton;
     QLabel *avatarLabel;
     QLabel *titleLabel;
     QLabel *repoLabel;
@@ -42,6 +43,7 @@ public:
 signals:
     void doneClicked();
     void saveClicked();
+    void openClicked();
 
 private:
     bool m_isLoading;

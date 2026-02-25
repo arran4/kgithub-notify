@@ -15,14 +15,13 @@
 #include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPainter>
 #include <QPointer>
 #include <QProcess>
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
+#include <QLineEdit>
 #include <QStyle>
-#include <QSvgRenderer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <limits>
@@ -388,6 +387,20 @@ void MainWindow::dismissCurrentItem() {
         client->markAsReadAndDone(id);
     }
 
+    knownNotificationIds.remove(id);
+
+    // Only remove from list if in Inbox
+    if (filterComboBox && filterComboBox->currentIndex() == 0) {
+        delete notificationList->takeItem(notificationList->row(item));
+
+        // Update icon if list is empty
+        if (notificationList->count() == 0) {
+            trayIcon->setIcon(
+                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+        }
+    }
+    updateSelectionComboBox();
+
     updateTrayMenu();
 }
 
@@ -528,6 +541,12 @@ void MainWindow::onDismissSelectedClicked() {
         }
     }
 
+    // Update icon if list is empty
+    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
+        trayIcon->setIcon(
+            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+    }
+    updateSelectionComboBox();
     updateTrayMenu();
 }
 
@@ -544,10 +563,15 @@ void MainWindow::onOpenSelectedClicked() {
 }
 
 void MainWindow::onFilterChanged(int index) {
+    if (filterUnreadAction) {
+        filterUnreadAction->setEnabled(index == 0);
+    }
     if (client) {
         if (index == 0) {
             // Inbox
-            client->setShowAll(false);
+            if (filterUnreadAction) {
+                client->setShowAll(!filterUnreadAction->isChecked());
+            }
 
             QDateTime now = QDateTime::currentDateTime();
             bool hasData = notificationList->count() > 0;
@@ -624,7 +648,7 @@ void MainWindow::showAboutDialog() {
 
     QMessageBox aboutBox(this);
     aboutBox.setWindowTitle(tr("About KGitHub Notify"));
-    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                       QStyle::SP_ComputerIcon)
                                .pixmap(64, 64));
     aboutBox.setText(tr("<b>KGitHub Notify</b>"));
@@ -691,10 +715,7 @@ void MainWindow::createTrayIcon() {
 
     updateTrayMenu();
 
-    QIcon icon = QIcon::fromTheme("kgithub-notify");
-    if (icon.isNull()) {
-        icon = loadSvgIcon(":/assets/icon.svg");
-    }
+    QIcon icon = QIcon::fromTheme("kgithub-notify", QIcon(":/assets/icon.png"));
     trayIcon->setIcon(icon);
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
@@ -950,7 +971,7 @@ void MainWindow::ensureWindowActive() {
 
 void MainWindow::setupWindow() {
     setWindowTitle(tr("Kgithub-notify"));
-    setWindowIcon(QIcon(":/assets/icon.svg"));
+    setWindowIcon(QIcon(":/assets/icon.png"));
     resize(800, 600);
 
     QSettings settings;
@@ -1069,6 +1090,27 @@ void MainWindow::setupToolbar() {
     filterComboBox->addItem(tr("Done"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
+
+    filterUnreadAction = new QAction(themedIcon({QStringLiteral("view-filter")}, QString(), QStyle::SP_FileDialogContentsView),
+                                     tr("Filter Unread"), this);
+    filterUnreadAction->setCheckable(true);
+    filterUnreadAction->setChecked(false);
+    connect(filterUnreadAction, &QAction::toggled, this, &MainWindow::onFilterUnreadToggled);
+    toolbar->addAction(filterUnreadAction);
+
+    toolbar->addSeparator();
+
+    repoFilterComboBox = new QComboBox(this);
+    repoFilterComboBox->addItem(tr("All Repositories"));
+    repoFilterComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::applyClientFilters);
+    toolbar->addWidget(repoFilterComboBox);
+
+    searchLineEdit = new QLineEdit(this);
+    searchLineEdit->setPlaceholderText(tr("Search..."));
+    searchLineEdit->setFixedWidth(200);
+    connect(searchLineEdit, &QLineEdit::textChanged, this, &MainWindow::applyClientFilters);
+    toolbar->addWidget(searchLineEdit);
 
     toolbar->addSeparator();
 
@@ -1198,22 +1240,6 @@ QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackRe
     return QApplication::style()->standardIcon(fallbackPixmap);
 }
 
-QIcon MainWindow::loadSvgIcon(const QString &path) {
-    QSvgRenderer renderer(path);
-    if (!renderer.isValid()) {
-        return QIcon(path);
-    }
-
-    QIcon icon;
-    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
-        QPixmap pixmap(size, size);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        renderer.render(&painter);
-        icon.addPixmap(pixmap);
-    }
-    return icon;
-}
 
 void MainWindow::sendNotification(const Notification &n) {
     KNotification *notification = new KNotification("NewNotification");
@@ -1402,13 +1428,13 @@ void MainWindow::processNewNotifications(const QList<Notification> &notification
 void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
                                      const QList<Notification> &newlyAddedNotifications) {
     if (unreadCount <= 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                      QStyle::SP_ComputerIcon));
         updateTrayMenu();
         return;
     }
 
-    trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
+    trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
     if (newNotifications > 0) {
         if (newNotifications > 10) {
             sendSummaryNotification(newNotifications, newlyAddedNotifications);
@@ -1471,6 +1497,9 @@ void MainWindow::updateListWidget(const QList<Notification> &notifications, bool
         notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
     }
 
+    populateRepoFilter();
+    applyClientFilters();
+
     notificationList->setUpdatesEnabled(true);
 }
 
@@ -1503,6 +1532,10 @@ void MainWindow::addNotificationItem(const Notification &n) {
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
+    connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() {
+        onNotificationItemActivated(item);
+    });
+
     connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
         if (!safeWidget) return;
         notificationList->setCurrentItem(item);
@@ -1579,4 +1612,84 @@ void MainWindow::updateSelectionComboBox() {
 
     selectionComboBox->setCurrentIndex(0);
     selectionComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::onFilterUnreadToggled(bool checked) {
+    if (client) {
+        client->setShowAll(!checked);
+        onRefreshClicked();
+    }
+}
+
+void MainWindow::populateRepoFilter() {
+    if (!notificationList || !repoFilterComboBox) return;
+
+    QString currentRepo = repoFilterComboBox->currentText();
+    bool wasBlocked = repoFilterComboBox->blockSignals(true);
+
+    repoFilterComboBox->clear();
+    repoFilterComboBox->addItem(tr("All Repositories"));
+
+    QSet<QString> repos;
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item == loadMoreItem) continue;
+        QString repo = item->data(Qt::UserRole + 3).toString();
+        if (!repo.isEmpty()) {
+            repos.insert(repo);
+        }
+    }
+
+    QStringList repoList = repos.values();
+    repoList.sort();
+    repoFilterComboBox->addItems(repoList);
+
+    int index = repoFilterComboBox->findText(currentRepo);
+    if (index >= 0) {
+        repoFilterComboBox->setCurrentIndex(index);
+    } else {
+        repoFilterComboBox->setCurrentIndex(0);
+    }
+
+    repoFilterComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::applyClientFilters() {
+    if (!notificationList || !repoFilterComboBox || !searchLineEdit) return;
+
+    QString repoFilter = repoFilterComboBox->currentText();
+    QString searchText = searchLineEdit->text().trimmed();
+    bool filterRepo = (repoFilter != tr("All Repositories"));
+    bool filterText = !searchText.isEmpty();
+
+    int visibleCount = 0;
+
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item == loadMoreItem) continue;
+
+        bool matchRepo = true;
+        if (filterRepo) {
+            QString repo = item->data(Qt::UserRole + 3).toString();
+            if (repo != repoFilter) matchRepo = false;
+        }
+
+        bool matchText = true;
+        if (filterText) {
+            QString title = item->data(Qt::UserRole + 2).toString();
+            QString repo = item->data(Qt::UserRole + 3).toString();
+            if (!title.contains(searchText, Qt::CaseInsensitive) &&
+                !repo.contains(searchText, Qt::CaseInsensitive)) {
+                matchText = false;
+            }
+        }
+
+        bool visible = matchRepo && matchText;
+        item->setHidden(!visible);
+        if (visible) visibleCount++;
+    }
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(visibleCount));
+    }
 }
