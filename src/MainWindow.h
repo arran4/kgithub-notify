@@ -76,6 +76,7 @@ class MainWindow : public QMainWindow {
     void createEmptyStatePage();
     void createLoadingPage();
 
+    void ensureWindowActive();
     void setupWindow();
     void setupCentralWidget();
     void setupNotificationList();

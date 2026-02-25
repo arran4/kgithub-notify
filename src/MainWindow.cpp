@@ -205,7 +205,7 @@ void MainWindow::createTrayIcon() {
     trayIcon->setContextMenu(trayIconMenu);
 
     trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                               QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+                                 QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
@@ -319,8 +319,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
         if (isVisible()) {
             hide();
         } else {
-            showNormal();
-            activateWindow();
+            ensureWindowActive();
         }
     }
 }
@@ -400,7 +399,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
     } else {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -538,7 +537,7 @@ void MainWindow::dismissCurrentItem() {
     // Update icon if list is empty
     if (notificationList->count() == 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -638,7 +637,7 @@ void MainWindow::onDismissSelectedClicked() {
     // Update icon if list is empty
     if (notificationList->count() == 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -740,7 +739,7 @@ void MainWindow::sendNotification(const Notification &n) {
         if (client) {
             client->markAsRead(n.id);
             // Ideally remove from list immediately too
-            for(int i = 0; i < notificationList->count(); ++i) {
+            for (int i = 0; i < notificationList->count(); ++i) {
                 QListWidgetItem *item = notificationList->item(i);
                 if (item->data(Qt::UserRole + 1).toString() == n.id) {
                     delete notificationList->takeItem(i);
@@ -751,10 +750,7 @@ void MainWindow::sendNotification(const Notification &n) {
         }
     });
 
-    connect(notification, &KNotification::defaultActivated, this, [this](){
-        this->showNormal();
-        this->activateWindow();
-    });
+    connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
     connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
     notification->sendEvent();
@@ -780,10 +776,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     actions << tr("Open Client");
     notification->setActions(actions);
 
-    connect(notification, &KNotification::action1Activated, this, [this]() {
-        this->showNormal();
-        this->activateWindow();
-    });
+    connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
 
     connect(notification, &KNotification::defaultActivated, this, [this]() {
         this->showNormal();
@@ -855,6 +848,19 @@ NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
         }
     }
     return nullptr;
+}
+
+void MainWindow::ensureWindowActive() {
+    showNormal();
+    raise();
+
+    // Check if running on Wayland
+    if (QGuiApplication::platformName().startsWith(QLatin1String("wayland"), Qt::CaseInsensitive)) {
+        // Wayland doesn't support requestActivate(), so we alert the user
+        QApplication::alert(this, 0);
+    } else {
+        activateWindow();
+    }
 }
 
 void MainWindow::setupWindow() {
