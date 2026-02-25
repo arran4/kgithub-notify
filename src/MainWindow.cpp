@@ -366,6 +366,7 @@ void MainWindow::dismissCurrentItem() {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
 
+    n.unread = false;
     saveDoneNotification(n);
 
     if (client) {
@@ -508,6 +509,7 @@ void MainWindow::onDismissSelectedClicked() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
 
+        n.unread = false;
         saveDoneNotification(n);
         client->markAsDone(id);
         knownNotificationIds.remove(id);
