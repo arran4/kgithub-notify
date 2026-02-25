@@ -456,8 +456,19 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     }
     updateTrayMenu();
 
-    // If in Saved view, do not update list
-    if (filterComboBox && filterComboBox->currentIndex() == 1) {
+    // If in Saved/Done view, do not update list content, but ensure UI is not stuck on loading
+    if (filterComboBox && filterComboBox->currentIndex() != 0) {
+        if (stackWidget->currentWidget() == loadingPage) {
+             int idx = filterComboBox->currentIndex();
+             if (idx == 1) { // Saved
+                 if (m_savedNotifications.isEmpty()) stackWidget->setCurrentWidget(emptyStatePage);
+                 else stackWidget->setCurrentWidget(notificationList);
+             } else if (idx == 2) { // Done
+                 if (m_doneNotifications.isEmpty()) stackWidget->setCurrentWidget(emptyStatePage);
+                 else stackWidget->setCurrentWidget(notificationList);
+             }
+        }
+        if (statusLabel) statusLabel->setText(tr("Updated"));
         return;
     }
 
@@ -768,24 +779,52 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::onRefreshClicked() {
-    if (client) {
+    if (!client) return;
+
+    if (filterComboBox->currentIndex() == 0) {
         m_isManualRefresh = true;
         client->checkNotifications();
         m_isManualRefresh = false;
-        if (refreshTimer) {
-            refreshTimer->start();  // Restart timer
-            updateStatusBar();      // Force update
-        }
+    } else {
+        // Local refresh for Saved/Done
+        onFilterChanged(filterComboBox->currentIndex());
+        if (statusLabel) statusLabel->setText(tr("Refreshed"));
+    }
+
+    if (refreshTimer) {
+        refreshTimer->start();  // Restart timer
+        updateStatusBar();      // Force update
     }
 }
 
 void MainWindow::onFilterChanged(int index) {
     if (client) {
-        m_isManualRefresh = true;
         if (index == 0) {
-            // Inbox: Show All (Read + Unread)
+            // Inbox
             client->setShowAll(true);
-            client->checkNotifications();
+
+            int interval = SettingsDialog::getInterval();
+            QDateTime now = QDateTime::currentDateTime();
+            bool recent = lastRefreshTime.contains(0) &&
+                          lastRefreshTime[0].secsTo(now) < (interval * 60);
+
+            // If this call came from onRefreshClicked, m_isManualRefresh might be true?
+            // No, onRefreshClicked calls client->checkNotifications() directly for index 0.
+            // onFilterChanged(0) is only called by ComboBox or initial load.
+            // So we can assume it's NOT manual refresh here (unless we want to support calling onFilterChanged(0) manually).
+
+            if (!recent) {
+                 client->checkNotifications();
+                 lastRefreshTime[0] = now;
+            } else {
+                // Ensure list is shown
+                if (stackWidget->currentWidget() != notificationList && notificationList->count() > 0) {
+                    stackWidget->setCurrentWidget(notificationList);
+                } else if (notificationList->count() == 0 && stackWidget->currentWidget() != emptyStatePage) {
+                    stackWidget->setCurrentWidget(emptyStatePage);
+                }
+            }
+
         } else if (index == 1) {
             // Saved view
             if (m_savedNotifications.isEmpty()) {
@@ -1334,6 +1373,10 @@ void MainWindow::setupStatusBar() {
     timerLabel = new QLabel(tr("Next refresh: --:--"), this);
 
     statusBar->addWidget(countLabel);
+
+    statusLabel = new QLabel(this);
+    statusBar->addWidget(statusLabel);
+
     statusBar->addPermanentWidget(timerLabel);
 
     refreshTimer = new QTimer(this);
@@ -1466,7 +1509,10 @@ void MainWindow::addNotificationItem(const Notification &n) {
     item->setData(Qt::UserRole + 2, n.title);
     item->setData(Qt::UserRole + 3, n.repository);
     item->setData(Qt::UserRole + 4, n.toJson());
-    item->setSizeHint(widget->sizeHint());
+
+    QSize hint = widget->sizeHint();
+    if (hint.height() < 60) hint.setHeight(60);
+    item->setSizeHint(hint);
 
     widget->setSaved(isNotificationSaved(n.id));
     widget->setDone(isNotificationDone(n.id));

@@ -18,6 +18,8 @@
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QToolBar>
+#include <QDateTime>
+#include <QMap>
 
 #include "AuthErrorNotification.h"
 #include "GitHubClient.h"
@@ -163,9 +165,12 @@ class MainWindow : public QMainWindow {
     QLabel *timerLabel;
     QTimer *refreshTimer;
     QTimer *countdownTimer;
+    QLabel *statusLabel;
 
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
+
+    QMap<int, QDateTime> lastRefreshTime;
 
     QList<Notification> m_savedNotifications;
     void loadSavedNotifications();

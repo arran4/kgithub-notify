@@ -60,9 +60,14 @@ void GitHubClient::checkNotifications() {
     }
     QNetworkRequest request = createRequest(url);
 
+    if (m_activeNotificationReply) {
+        m_activeNotificationReply->abort();
+    }
+
     QNetworkReply *reply = manager->get(request);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", false);
+    m_activeNotificationReply = reply;
 }
 
 void GitHubClient::loadMore() {
@@ -70,12 +75,17 @@ void GitHubClient::loadMore() {
 
     emit loadingStarted();
 
+    if (m_activeNotificationReply) {
+        m_activeNotificationReply->abort();
+    }
+
     QUrl url(m_nextPageUrl);
     QNetworkRequest request = createRequest(url);
 
     QNetworkReply *reply = manager->get(request);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", true);
+    m_activeNotificationReply = reply;
 }
 
 void GitHubClient::verifyToken() {
@@ -166,6 +176,15 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    if (reply == m_activeNotificationReply) {
+        m_activeNotificationReply = nullptr;
+    }
+
+    if (reply->error() == QNetworkReply::OperationCanceledError) {
+        reply->deleteLater();
+        return;
+    }
+
     QString type = reply->property("type").toString();
 
     if (type == "details") {
@@ -294,7 +313,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
         QJsonObject obj = value.toObject();
         Notification n;
-        n.id = obj["id"].toString();
+        n.id = obj["id"].toVariant().toString();
 
         QJsonObject subject = obj["subject"].toObject();
         n.title = subject["title"].toString();
