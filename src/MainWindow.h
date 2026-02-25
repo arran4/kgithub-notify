@@ -59,7 +59,7 @@ class MainWindow : public QMainWindow {
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
-    void onOpenFirstNClicked();
+    void onSelectTopNClicked();
     void onToggleShowAll();
     void showAboutDialog();
     void openKdeNotificationSettings();
@@ -122,7 +122,7 @@ class MainWindow : public QMainWindow {
     QAction *dismissSelectedAction;
     QAction *openSelectedAction;
     QSpinBox *limitSpinBox;
-    QAction *openFirstNAction;
+    QAction *selectTopNAction;
 
     // New UI components
     QStackedWidget *stackWidget;

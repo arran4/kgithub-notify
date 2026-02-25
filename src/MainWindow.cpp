@@ -654,19 +654,17 @@ void MainWindow::onOpenSelectedClicked() {
     }
 }
 
-void MainWindow::onOpenFirstNClicked() {
+void MainWindow::onSelectTopNClicked() {
     if (!notificationList) return;
 
+    notificationList->clearSelection();
     int n = limitSpinBox->value();
     int count = notificationList->count();
     int limit = qMin(n, count);
 
     for (int i = 0; i < limit; ++i) {
         QListWidgetItem *item = notificationList->item(i);
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+        if (item) item->setSelected(true);
     }
 }
 
@@ -780,7 +778,10 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
 
     connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
 
-    connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
+    connect(notification, &KNotification::defaultActivated, this, [this]() {
+        this->showNormal();
+        this->activateWindow();
+    });
     connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
     notification->sendEvent();
@@ -807,9 +808,29 @@ void MainWindow::showAboutDialog() {
 }
 
 void MainWindow::openKdeNotificationSettings() {
-    bool launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
+    // Try generic systemsettings first (works on Plasma 6 and often 5)
+    bool launched = QProcess::startDetached(QStringLiteral("systemsettings"),
+                                            {QStringLiteral("kcm_notifications")});
+
+    // Try Plasma 6 kcmshell
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 systemsettings
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
+                                            {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 kcmshell
     if (!launched) {
         launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Fallback: Check if generic kcmshell exists
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
     }
 
     if (!launched) {
@@ -942,17 +963,15 @@ void MainWindow::setupToolbar() {
     limitSpinBox = new QSpinBox(this);
     limitSpinBox->setRange(1, 50);
     limitSpinBox->setValue(5);
-    limitSpinBox->setToolTip(tr("Number of notifications to open"));
+    limitSpinBox->setToolTip(tr("Number of notifications to select"));
     toolbar->addWidget(limitSpinBox);
 
-    openFirstNAction = new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")},
-                                              QString(), QStyle::SP_DirOpenIcon),
-                                   tr("Open First %1").arg(limitSpinBox->value()), this);
-    connect(openFirstNAction, &QAction::triggered, this, &MainWindow::onOpenFirstNClicked);
-    toolbar->addAction(openFirstNAction);
+    selectTopNAction = new QAction(tr("Select Top %1").arg(limitSpinBox->value()), this);
+    connect(selectTopNAction, &QAction::triggered, this, &MainWindow::onSelectTopNClicked);
+    toolbar->addAction(selectTopNAction);
 
     connect(limitSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
-            [this](int i) { openFirstNAction->setText(tr("Open First %1").arg(i)); });
+            [this](int i) { selectTopNAction->setText(tr("Select Top %1").arg(i)); });
 }
 
 void MainWindow::setupPages() {
