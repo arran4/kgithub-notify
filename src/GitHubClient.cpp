@@ -43,6 +43,11 @@ void GitHubClient::setApiUrl(const QString &url) { m_apiUrl = url; }
 void GitHubClient::setShowAll(bool all) { m_showAll = all; }
 
 void GitHubClient::checkNotifications() {
+    // Cancel any ongoing notification request
+    if (m_activeNotificationReply && m_activeNotificationReply->isRunning()) {
+        m_activeNotificationReply->abort();
+    }
+
     emit loadingStarted();
 
     m_nextPageUrl.clear();
@@ -61,6 +66,7 @@ void GitHubClient::checkNotifications() {
     QNetworkRequest request = createRequest(url);
 
     QNetworkReply *reply = manager->get(request);
+    m_activeNotificationReply = reply;
     reply->setProperty("type", "notifications");
     reply->setProperty("append", false);
 }
@@ -68,12 +74,18 @@ void GitHubClient::checkNotifications() {
 void GitHubClient::loadMore() {
     if (m_nextPageUrl.isEmpty()) return;
 
+    // Cancel any ongoing notification request
+    if (m_activeNotificationReply && m_activeNotificationReply->isRunning()) {
+        m_activeNotificationReply->abort();
+    }
+
     emit loadingStarted();
 
     QUrl url(m_nextPageUrl);
     QNetworkRequest request = createRequest(url);
 
     QNetworkReply *reply = manager->get(request);
+    m_activeNotificationReply = reply;
     reply->setProperty("type", "notifications");
     reply->setProperty("append", true);
 }
@@ -166,6 +178,12 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+    // If request was cancelled, ignore it
+    if (reply->error() == QNetworkReply::OperationCanceledError) {
+        reply->deleteLater();
+        return;
+    }
+
     QString type = reply->property("type").toString();
 
     if (type == "details") {

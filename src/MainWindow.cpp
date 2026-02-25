@@ -368,6 +368,16 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     pendingAuthError = false;
     lastError.clear();
 
+    if (statusBar) {
+        statusBar->showMessage(tr("Updated"), 2000);
+    }
+
+    if (!append) {
+        m_inboxNotifications.clear();
+        lastInboxRefresh = QDateTime::currentDateTime();
+    }
+    m_inboxNotifications.append(notifications);
+
     int unreadCount = 0;
     int newNotifications = 0;
     QList<Notification> newlyAddedNotifications;
@@ -531,6 +541,9 @@ void MainWindow::showSettings() {
 
 void MainWindow::onLoadingStarted() {
     if (!notificationList) return;
+    if (statusBar) {
+        statusBar->showMessage(tr("Loading..."));
+    }
     if (notificationList->count() == 0 || m_isManualRefresh) {
         if (stackWidget->currentWidget() != loadingPage) {
             stackWidget->setCurrentWidget(loadingPage);
@@ -622,6 +635,10 @@ void MainWindow::showError(const QString &error) {
     if (error == lastError) return;
     lastError = error;
 
+    if (statusBar) {
+        statusBar->showMessage(tr("Error: %1").arg(error));
+    }
+
     // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
     if (trayIcon && trayIcon->isVisible()) {
         trayIcon->showMessage(tr("GitHub Error"), error, QSystemTrayIcon::Warning, 5000);
@@ -656,75 +673,112 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::onRefreshClicked() {
-    if (client) {
+    if (!client || !filterComboBox) return;
+
+    if (filterComboBox->currentIndex() == 0) {
+        // Inbox: Force refresh
         m_isManualRefresh = true;
         client->checkNotifications();
         m_isManualRefresh = false;
-        if (refreshTimer) {
-            refreshTimer->start();  // Restart timer
-            updateStatusBar();      // Force update
-        }
+    } else {
+        // Saved/Done: Reload local
+        onFilterChanged(filterComboBox->currentIndex());
+        if (statusBar) statusBar->showMessage(tr("Refreshed"), 1000);
+    }
+
+    if (refreshTimer) {
+        refreshTimer->start();  // Restart timer
+        updateStatusBar();      // Force update
     }
 }
 
 void MainWindow::onFilterChanged(int index) {
-    if (client) {
-        m_isManualRefresh = true;
-        if (index == 0) {
-            // Inbox: Show All (Read + Unread)
-            client->setShowAll(true);
-            client->checkNotifications();
-            if (loadMoreButton) loadMoreButton->setEnabled(true);
-        } else if (index == 1) {
-            // Saved view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
+    if (!client) return;
 
-            if (m_savedNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
+    // Reset manual refresh flag just in case
+    m_isManualRefresh = false;
+
+    if (index == 0) {
+        // Inbox: Show All (Read + Unread)
+        client->setShowAll(true);
+
+        int intervalMs = SettingsDialog::getInterval() * 60 * 1000;
+        bool isRecent = lastInboxRefresh.isValid() && lastInboxRefresh.msecsTo(QDateTime::currentDateTime()) < intervalMs;
+
+        if (loadMoreButton) loadMoreButton->setEnabled(true);
+
+        if (isRecent && !m_inboxNotifications.isEmpty()) {
+            // Load from cache
+            if (loadMoreButton) loadMoreButton->setVisible(true); // We don't track hasMore in cache simply, but enabling it allows fetching more if needed.
+
+            if (stackWidget->currentWidget() != notificationList->parentWidget()) {
                 stackWidget->setCurrentWidget(notificationList->parentWidget());
             }
 
             notificationList->setUpdatesEnabled(false);
             notificationList->clear();
-
-            for (const Notification &n : m_savedNotifications) {
-                addNotificationItem(n);
-            }
-            notificationList->setUpdatesEnabled(true);
-
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
-            }
-        } else if (index == 2) {
-            // Done view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
-
-            if (m_doneNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
-                stackWidget->setCurrentWidget(notificationList->parentWidget());
-            }
-
-            notificationList->setUpdatesEnabled(false);
-            notificationList->clear();
-
-            for (const Notification &n : m_doneNotifications) {
+            for (const Notification &n : m_inboxNotifications) {
                 addNotificationItem(n);
             }
             notificationList->setUpdatesEnabled(true);
 
             updateSelectionComboBox();
+            if (countLabel) countLabel->setText(tr("Items: %1").arg(m_inboxNotifications.count()));
+        } else {
+            // Fetch fresh
+            notificationList->clear();
+            client->checkNotifications();
+        }
+    } else if (index == 1) {
+        // Saved view
+        if (loadMoreButton) loadMoreButton->setVisible(false);
 
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
-            }
+        if (m_savedNotifications.isEmpty()) {
+            stackWidget->setCurrentWidget(emptyStatePage);
+        } else {
+            stackWidget->setCurrentWidget(notificationList->parentWidget());
         }
-        m_isManualRefresh = false;
-        if (refreshTimer) {
-            refreshTimer->start();
-            updateStatusBar();
+
+        notificationList->setUpdatesEnabled(false);
+        notificationList->clear();
+
+        for (const Notification &n : m_savedNotifications) {
+            addNotificationItem(n);
         }
+        notificationList->setUpdatesEnabled(true);
+        updateSelectionComboBox();
+
+        if (countLabel) {
+            countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
+        }
+    } else if (index == 2) {
+        // Done view
+        if (loadMoreButton) loadMoreButton->setVisible(false);
+
+        if (m_doneNotifications.isEmpty()) {
+            stackWidget->setCurrentWidget(emptyStatePage);
+        } else {
+            stackWidget->setCurrentWidget(notificationList->parentWidget());
+        }
+
+        notificationList->setUpdatesEnabled(false);
+        notificationList->clear();
+
+        for (const Notification &n : m_doneNotifications) {
+            addNotificationItem(n);
+        }
+        notificationList->setUpdatesEnabled(true);
+
+        updateSelectionComboBox();
+
+        if (countLabel) {
+            countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
+        }
+    }
+
+    if (refreshTimer) {
+        refreshTimer->start();
+        updateStatusBar();
     }
 }
 

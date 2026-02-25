@@ -167,6 +167,9 @@ class MainWindow : public QMainWindow {
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
 
+    QList<Notification> m_inboxNotifications;
+    QDateTime lastInboxRefresh;
+
     QList<Notification> m_savedNotifications;
     void loadSavedNotifications();
     void saveSavedNotifications();

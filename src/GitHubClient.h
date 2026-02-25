@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QPointer>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -62,6 +63,7 @@ private:
     bool m_showAll;
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
+    QPointer<QNetworkReply> m_activeNotificationReply;
 
     QNetworkRequest createRequest(const QUrl &url) const;
 
