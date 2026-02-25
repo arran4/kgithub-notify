@@ -168,7 +168,6 @@ class MainWindow : public QMainWindow {
     QWidget *loadingPage;
     QLabel *loadingLabel;
 
-    bool m_isManualRefresh;
     AuthErrorNotification *authNotification;
 
     // Status Bar

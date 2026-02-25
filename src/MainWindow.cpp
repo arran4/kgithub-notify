@@ -51,7 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
       trayIcon(nullptr),
       client(nullptr),
       loadMoreItem(nullptr),
-      m_isManualRefresh(false),
       pendingAuthError(false),
       authNotification(nullptr) {
     setupWindow();
@@ -214,6 +213,10 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     if (countLabel) {
         countLabel->setText(tr("Items: %1").arg(notificationList->count()));
     }
+
+    if (statusLabel) {
+        statusLabel->setText(tr("Updated"));
+    }
 }
 
 void MainWindow::showError(const QString &error) {
@@ -239,6 +242,10 @@ void MainWindow::showError(const QString &error) {
                 loadingLabel->setText(tr("Error: %1").arg(error));
             }
         }
+    }
+
+    if (statusLabel) {
+        statusLabel->setText(tr("Error"));
     }
 
     // Reset load more button if error occurred during loading more
@@ -340,9 +347,7 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
-            m_isManualRefresh = true;
             client->checkNotifications();  // Force check immediately
-            m_isManualRefresh = false;
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
@@ -354,7 +359,12 @@ void MainWindow::showSettings() {
 
 void MainWindow::onLoadingStarted() {
     if (!notificationList) return;
-    if (notificationList->count() == 0 || m_isManualRefresh) {
+
+    if (statusLabel) {
+        statusLabel->setText(tr("Checking..."));
+    }
+
+    if (notificationList->count() == 0) {
         if (stackWidget->currentWidget() != loadingPage) {
             stackWidget->setCurrentWidget(loadingPage);
         }
@@ -476,10 +486,8 @@ void MainWindow::onRefreshClicked() {
     if (!client) return;
 
     if (filterComboBox->currentIndex() == 0) {
-        m_isManualRefresh = true;
         client->checkNotifications();
         lastRefreshTime[0] = QDateTime::currentDateTime();
-        m_isManualRefresh = false;
     } else {
         // Local refresh for Saved/Done
         onFilterChanged(filterComboBox->currentIndex());
@@ -659,7 +667,6 @@ void MainWindow::onFilterChanged(int index) {
                 countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
             }
         }
-        m_isManualRefresh = false;
         if (refreshTimer) {
             refreshTimer->start();
             updateStatusBar();
