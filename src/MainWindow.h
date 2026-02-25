@@ -89,6 +89,7 @@ class MainWindow : public QMainWindow {
     void loadToken();
     QIcon themedIcon(const QStringList &names, const QString &fallbackResource = QString(),
                      QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
+    QIcon loadSvgIcon(const QString &path);
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
