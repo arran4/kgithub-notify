@@ -21,10 +21,12 @@ public:
     QLabel *typeLabel;
     QLabel *dateLabel;
     QLabel *urlLabel;
+    QLabel *errorLabel;
 
     QString getTitle() const { return titleLabel->text(); }
     void setAuthor(const QString &name, const QPixmap &avatar);
     void setHtmlUrl(const QString &url);
+    void setError(const QString &error);
 
 signals:
     // No specific signals yet

@@ -159,6 +159,7 @@ void GitHubClient::handleDetailsReply(QNetworkReply *reply) {
     QString notificationId = reply->property("notificationId").toString();
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Error fetching details:" << reply->errorString();
+        emit detailsError(notificationId, reply->errorString());
         return;
     }
 

@@ -49,6 +49,24 @@ private slots:
         QCOMPARE(args.at(1).toString(), QString("user"));
     }
 
+    void testDetailsErrorDispatch() {
+        GitHubClient client;
+        QSignalSpy spy(&client, &GitHubClient::detailsError);
+
+        MockNetworkReply *reply = new MockNetworkReply("", &client);
+        reply->setProperty("type", "details");
+        reply->setProperty("notificationId", "123");
+        reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 404);
+        reply->setError(QNetworkReply::ContentNotFoundError, "Not Found");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+
+        QCOMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QCOMPARE(args.at(0).toString(), QString("123"));
+        QCOMPARE(args.at(1).toString(), QString("Not Found"));
+    }
+
     void testVerificationDispatch() {
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::tokenVerified);

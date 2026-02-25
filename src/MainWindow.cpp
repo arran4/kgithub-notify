@@ -130,6 +130,13 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
+    connect(client, &GitHubClient::detailsError, this, [this](const QString &id, const QString &error){
+        NotificationItemWidget *widget = findNotificationWidget(id);
+        if (widget) {
+            widget->setError(error);
+        }
+    });
+
     connect(client, &GitHubClient::detailsReceived, this, [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl){
         NotificationDetails &details = detailsCache[id];
         details.author = author;

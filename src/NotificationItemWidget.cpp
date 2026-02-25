@@ -75,6 +75,13 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
         Qt::TextSelectableByMouse);  // Allow selection
     contentLayout->addWidget(urlLabel);
 
+    // Error Label
+    errorLabel = new QLabel(this);
+    errorLabel->setStyleSheet("color: red;");
+    errorLabel->setWordWrap(true);
+    errorLabel->hide();
+    contentLayout->addWidget(errorLabel);
+
     mainLayout->addLayout(contentLayout);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
@@ -89,4 +96,9 @@ void NotificationItemWidget::setAuthor(const QString &name, const QPixmap &avata
 
 void NotificationItemWidget::setHtmlUrl(const QString &url) {
      urlLabel->setText(QString("<a href=\"%1\">Open on GitHub</a>").arg(url.toHtmlEscaped()));
+}
+
+void NotificationItemWidget::setError(const QString &error) {
+    errorLabel->setText(tr("Error: %1").arg(error));
+    errorLabel->show();
 }
