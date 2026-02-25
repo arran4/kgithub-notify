@@ -21,6 +21,9 @@
 #include <QVBoxLayout>
 #include <limits>
 
+#include <QSvgRenderer>
+#include <QPainter>
+
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
 
@@ -205,6 +208,23 @@ QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackRe
     return QApplication::style()->standardIcon(fallbackPixmap);
 }
 
+QIcon MainWindow::loadSvgIcon(const QString &path) {
+    QSvgRenderer renderer(path);
+    if (!renderer.isValid()) {
+        return QIcon(path);
+    }
+
+    QIcon icon;
+    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        renderer.render(&painter);
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
     updateTrayMenu();
@@ -212,8 +232,11 @@ void MainWindow::createTrayIcon() {
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
 
-    trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                               QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+    QIcon icon = QIcon::fromTheme("kgithub-notify");
+    if (icon.isNull()) {
+        icon = loadSvgIcon(":/assets/icon.svg");
+    }
+    trayIcon->setIcon(icon);
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
@@ -329,6 +352,10 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
         } else {
             ensureWindowActive();
         }
+    } else if (reason == QSystemTrayIcon::Context) {
+        if (trayIcon->contextMenu()) {
+            trayIcon->contextMenu()->exec(QCursor::pos());
+        }
     }
 }
 
@@ -409,7 +436,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     notificationList->setUpdatesEnabled(true);
 
     if (unreadCount > 0) {
-        trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
+        trayIcon->setIcon(loadSvgIcon(":/assets/icon-dotted.svg"));
         if (newNotifications > 0) {
             if (newNotifications == 1) {
                 sendNotification(newlyAddedNotifications.first());
@@ -418,8 +445,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
             }
         }
     } else {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
-                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+        QIcon icon = QIcon::fromTheme("kgithub-notify");
+        if (icon.isNull()) {
+            icon = loadSvgIcon(":/assets/icon.svg");
+        }
+        trayIcon->setIcon(icon);
     }
     updateTrayMenu();
 }
