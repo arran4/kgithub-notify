@@ -174,6 +174,14 @@ class MainWindow : public QMainWindow {
     void saveNotification(const Notification &n);
     void unsaveNotification(const QString &id);
     bool isNotificationSaved(const QString &id) const;
+
+    QList<Notification> m_doneNotifications;
+    void loadDoneNotifications();
+    void saveDoneNotifications();
+    void saveDoneNotification(const Notification &n);
+    bool isNotificationDone(const QString &id) const;
+    void addNotificationItem(const Notification &n);
+    static const int MAX_DONE_NOTIFICATIONS = 100;
 };
 
 #endif  // MAINWINDOW_H
