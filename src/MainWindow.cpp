@@ -1640,6 +1640,10 @@ void MainWindow::populateRepoFilter() {
         }
     }
 
+    if (!currentRepo.isEmpty() && currentRepo != tr("All Repositories")) {
+        repos.insert(currentRepo);
+    }
+
     QStringList repoList = repos.values();
     repoList.sort();
     repoFilterComboBox->addItems(repoList);
