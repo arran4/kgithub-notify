@@ -103,6 +103,18 @@ void GitHubClient::markAsRead(const QString &id) {
     reply->setProperty("type", "patch");
 }
 
+void GitHubClient::markAsDone(const QString &id) {
+    if (m_token.isEmpty()) return;
+
+    m_pendingPatchRequests++;
+
+    QUrl url(m_apiUrl + "/notifications/threads/" + id);
+    QNetworkRequest request = createRequest(url);
+
+    QNetworkReply *reply = manager->deleteResource(request);
+    reply->setProperty("type", "delete");
+}
+
 void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
     if (m_token.isEmpty()) return;
     QUrl qUrl(url);
@@ -162,7 +174,7 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         handleImageReply(reply);
     } else if (type == "verification") {
         handleVerificationReply(reply);
-    } else if (type == "patch") {
+    } else if (type == "patch" || type == "delete") {
         handlePatchReply(reply);
     } else if (type == "notifications") {
         handleNotificationsReply(reply);
@@ -313,4 +325,30 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
     bool append = reply->property("append").toBool();
     emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
+}
+
+QJsonObject Notification::toJson() const {
+    QJsonObject obj;
+    obj["id"] = id;
+    obj["title"] = title;
+    obj["type"] = type;
+    obj["repository"] = repository;
+    obj["url"] = url;
+    obj["htmlUrl"] = htmlUrl;
+    obj["updatedAt"] = updatedAt;
+    obj["unread"] = unread;
+    return obj;
+}
+
+Notification Notification::fromJson(const QJsonObject &obj) {
+    Notification n;
+    n.id = obj["id"].toString();
+    n.title = obj["title"].toString();
+    n.type = obj["type"].toString();
+    n.repository = obj["repository"].toString();
+    n.url = obj["url"].toString();
+    n.htmlUrl = obj["htmlUrl"].toString();
+    n.updatedAt = obj["updatedAt"].toString();
+    n.unread = obj["unread"].toBool();
+    return n;
 }

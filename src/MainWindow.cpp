@@ -10,6 +10,9 @@
 #include <QDate>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QProcess>
@@ -54,6 +57,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Initial State Check
     stackWidget->setCurrentWidget(loadingPage);
 
+    loadSavedNotifications();
     loadToken();
 }
 
@@ -363,6 +367,42 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     pendingAuthError = false;
     lastError.clear();
 
+    int unreadCount = 0;
+    int newNotifications = 0;
+    QList<Notification> newlyAddedNotifications;
+
+    for (const Notification &n : notifications) {
+        if (n.unread) {
+            unreadCount++;
+
+            if (!knownNotificationIds.contains(n.id)) {
+                newNotifications++;
+                knownNotificationIds.insert(n.id);
+                newlyAddedNotifications.append(n);
+            }
+        }
+    }
+
+    if (unreadCount > 0) {
+        trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
+        if (newNotifications > 0) {
+            if (newNotifications == 1) {
+                sendNotification(newlyAddedNotifications.first());
+            } else {
+                sendSummaryNotification(newNotifications, newlyAddedNotifications);
+            }
+        }
+    } else {
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")},
+                                   QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+    }
+    updateTrayMenu();
+
+    // If in Saved view, do not update list
+    if (filterComboBox && filterComboBox->currentIndex() == 1) {
+        return;
+    }
+
     if (countLabel) {
         int total = notifications.count();
         if (append) total += notificationList->count();
@@ -396,10 +436,6 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
 
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
 
-    int unreadCount = 0;
-    int newNotifications = 0;
-    QList<Notification> newlyAddedNotifications;
-
     for (const Notification &n : notifications) {
         QListWidgetItem *item = new QListWidgetItem();
         NotificationItemWidget *widget = new NotificationItemWidget(n);
@@ -418,17 +454,8 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
         item->setData(Qt::UserRole + 1, n.id);
         item->setData(Qt::UserRole + 2, n.title);
         item->setData(Qt::UserRole + 3, n.repository);
+        item->setData(Qt::UserRole + 4, n.toJson());
         item->setSizeHint(widget->sizeHint());
-
-        if (n.unread) {
-            unreadCount++;
-
-            if (!knownNotificationIds.contains(n.id)) {
-                newNotifications++;
-                knownNotificationIds.insert(n.id);
-                newlyAddedNotifications.append(n);
-            }
-        }
 
         notificationList->addItem(item);
         notificationList->setItemWidget(item, widget);
@@ -570,6 +597,12 @@ void MainWindow::showContextMenu(const QPoint &pos) {
     QListWidgetItem *item = notificationList->itemAt(pos);
     if (item) {
         notificationList->setCurrentItem(item);  // Ensure item is selected
+
+        QString id = item->data(Qt::UserRole + 1).toString();
+        bool saved = isNotificationSaved(id);
+        if (saveAction) saveAction->setVisible(!saved);
+        if (unsaveAction) unsaveAction->setVisible(saved);
+
         contextMenu->exec(notificationList->mapToGlobal(pos));
     }
 }
@@ -578,7 +611,7 @@ void MainWindow::dismissCurrentItem() {
     QListWidgetItem *item = notificationList->currentItem();
     if (!item) return;
     QString id = item->data(Qt::UserRole + 1).toString();
-    if (client) client->markAsRead(id);
+    if (client) client->markAsDone(id);
 
     knownNotificationIds.remove(id);
 
@@ -644,10 +677,54 @@ void MainWindow::onRefreshClicked() {
 void MainWindow::onFilterChanged(int index) {
     if (client) {
         m_isManualRefresh = true;
-        // Index 0: Inbox (ShowAll = false)
-        // Index 1: Done (ShowAll = true)
-        client->setShowAll(index == 1);
-        client->checkNotifications();
+        if (index == 0) {
+            // Inbox: Show All (Read + Unread)
+            client->setShowAll(true);
+            client->checkNotifications();
+            if (loadMoreButton) loadMoreButton->setEnabled(true);
+        } else {
+            // Saved view
+            if (loadMoreButton) loadMoreButton->setVisible(false);
+
+            if (m_savedNotifications.isEmpty()) {
+                stackWidget->setCurrentWidget(emptyStatePage);
+            } else {
+                stackWidget->setCurrentWidget(notificationList->parentWidget());
+            }
+
+            notificationList->setUpdatesEnabled(false);
+            notificationList->clear();
+
+            for (const Notification &n : m_savedNotifications) {
+                QListWidgetItem *item = new QListWidgetItem();
+                NotificationItemWidget *widget = new NotificationItemWidget(n);
+
+                if (detailsCache.contains(n.id)) {
+                    const NotificationDetails &details = detailsCache[n.id];
+                    if (details.hasDetails) {
+                        widget->setAuthor(details.author, details.avatar);
+                        widget->setHtmlUrl(details.htmlUrl);
+                    }
+                } else {
+                    if (client) client->fetchNotificationDetails(n.url, n.id);
+                }
+
+                item->setData(Qt::UserRole, n.url);
+                item->setData(Qt::UserRole + 1, n.id);
+                item->setData(Qt::UserRole + 2, n.title);
+                item->setData(Qt::UserRole + 3, n.repository);
+                item->setData(Qt::UserRole + 4, n.toJson());
+                item->setSizeHint(widget->sizeHint());
+
+                notificationList->addItem(item);
+                notificationList->setItemWidget(item, widget);
+            }
+            notificationList->setUpdatesEnabled(true);
+
+            if (countLabel) {
+                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
+            }
+        }
         m_isManualRefresh = false;
         if (refreshTimer) {
             refreshTimer->start();
@@ -693,7 +770,7 @@ void MainWindow::onDismissSelectedClicked() {
     QList<QListWidgetItem *> items = notificationList->selectedItems();
     for (auto item : items) {
         QString id = item->data(Qt::UserRole + 1).toString();
-        client->markAsRead(id);
+        client->markAsDone(id);
         knownNotificationIds.remove(id);
         delete notificationList->takeItem(notificationList->row(item));
     }
@@ -965,6 +1042,45 @@ void MainWindow::setupNotificationList() {
     connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
     contextMenu->addAction(copyLinkAction);
 
+    markAsReadAction = new QAction(tr("Mark as Read"), this);
+    connect(markAsReadAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = notificationList->currentItem();
+        if (!item) return;
+        QString id = item->data(Qt::UserRole + 1).toString();
+        if (client) client->markAsRead(id);
+
+        QFont font = item->font();
+        font.setBold(false);
+        item->setFont(font);
+        updateTrayMenu();
+    });
+    contextMenu->addAction(markAsReadAction);
+
+    saveAction = new QAction(tr("Save"), this);
+    connect(saveAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = notificationList->currentItem();
+        if (!item) return;
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        saveNotification(n);
+    });
+    contextMenu->addAction(saveAction);
+
+    unsaveAction = new QAction(tr("Unsave"), this);
+    connect(unsaveAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = notificationList->currentItem();
+        if (!item) return;
+        QString id = item->data(Qt::UserRole + 1).toString();
+        unsaveNotification(id);
+    });
+    contextMenu->addAction(unsaveAction);
+
+    markAsDoneAction = new QAction(tr("Mark as Done"), this);
+    connect(markAsDoneAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
+    contextMenu->addAction(markAsDoneAction);
+
+    contextMenu->addSeparator();
+
     dismissAction = new QAction(tr("Dismiss"), this);
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
@@ -995,8 +1111,7 @@ void MainWindow::setupToolbar() {
 
     filterComboBox = new QComboBox(this);
     filterComboBox->addItem(tr("Inbox"));
-    filterComboBox->addItem(tr("Done"));
-    // "Saved" notifications are not supported by the GitHub Notifications API v3 directly.
+    filterComboBox->addItem(tr("Saved"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 
@@ -1115,4 +1230,60 @@ void MainWindow::loadToken() {
     tokenWatcher = new QFutureWatcher<QString>(this);
     connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
     tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
+}
+
+void MainWindow::loadSavedNotifications() {
+    QSettings settings;
+    QByteArray data = settings.value("savedNotifications").toByteArray();
+    if (!data.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &val : array) {
+                if (val.isObject()) {
+                    m_savedNotifications.append(Notification::fromJson(val.toObject()));
+                }
+            }
+        }
+    }
+}
+
+void MainWindow::saveSavedNotifications() {
+    QJsonArray array;
+    for (const Notification &n : m_savedNotifications) {
+        array.append(n.toJson());
+    }
+    QJsonDocument doc(array);
+    QSettings settings;
+    settings.setValue("savedNotifications", doc.toJson(QJsonDocument::Compact));
+}
+
+void MainWindow::saveNotification(const Notification &n) {
+    if (isNotificationSaved(n.id)) return;
+    m_savedNotifications.append(n);
+    saveSavedNotifications();
+    // If we are currently viewing "Saved", refresh the list
+    if (filterComboBox && filterComboBox->currentIndex() == 1) { // 1 will be Saved
+        onFilterChanged(1);
+    }
+}
+
+void MainWindow::unsaveNotification(const QString &id) {
+    for (int i = 0; i < m_savedNotifications.size(); ++i) {
+        if (m_savedNotifications[i].id == id) {
+            m_savedNotifications.removeAt(i);
+            saveSavedNotifications();
+            if (filterComboBox && filterComboBox->currentIndex() == 1) {
+                onFilterChanged(1);
+            }
+            break;
+        }
+    }
+}
+
+bool MainWindow::isNotificationSaved(const QString &id) const {
+    for (const Notification &n : m_savedNotifications) {
+        if (n.id == id) return true;
+    }
+    return false;
 }
