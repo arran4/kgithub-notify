@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <KNotification>
+#include <QDateTime>
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
@@ -181,6 +182,9 @@ class MainWindow : public QMainWindow {
     bool isNotificationDone(const QString &id) const;
     void addNotificationItem(const Notification &n);
     static const int MAX_DONE_NOTIFICATIONS = 100;
+
+    QDateTime m_lastCheckTime;
+    void updateTrayToolTip();
 };
 
 #endif  // MAINWINDOW_H

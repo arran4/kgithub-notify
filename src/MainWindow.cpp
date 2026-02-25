@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QProcess>
@@ -343,6 +344,47 @@ void MainWindow::updateTrayMenu() {
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
+
+    updateTrayToolTip();
+}
+
+void MainWindow::updateTrayToolTip() {
+    if (!trayIcon) return;
+
+    QStringList parts;
+    parts << tr("KGitHub Notify");
+
+    if (!lastError.isEmpty()) {
+        parts << tr("Status: Error");
+    } else if (stackWidget->currentWidget() == loadingPage) {
+        parts << tr("Status: Checking...");
+    } else {
+        parts << tr("Status: OK");
+    }
+
+    int unreadCount = 0;
+    if (notificationList) {
+        for (int i = 0; i < notificationList->count(); ++i) {
+            QListWidgetItem *item = notificationList->item(i);
+            if (item && item->font().bold()) {
+                unreadCount++;
+            }
+        }
+    }
+    parts << tr("Unread: %1").arg(unreadCount);
+
+    if (m_lastCheckTime.isValid()) {
+        parts << tr("Last Check: %1").arg(QLocale::system().toString(m_lastCheckTime, QLocale::ShortFormat));
+
+        if (refreshTimer && refreshTimer->isActive()) {
+            QDateTime nextCheck = m_lastCheckTime.addMSecs(refreshTimer->interval());
+            parts << tr("Next Check: %1").arg(QLocale::system().toString(nextCheck, QLocale::ShortFormat));
+        }
+    } else {
+        parts << tr("Last Check: Never");
+    }
+
+    trayIcon->setToolTip(parts.join(QStringLiteral("\n")));
 }
 
 void MainWindow::dismissAllNotifications() {
@@ -365,6 +407,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 }
 
 void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
+    m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
 
@@ -539,6 +582,7 @@ void MainWindow::onLoadingStarted() {
             loadingLabel->setText(tr("Loading..."));
         }
     }
+    updateTrayToolTip();
 }
 
 void MainWindow::onAuthError(const QString &message) {
@@ -646,6 +690,7 @@ void MainWindow::showError(const QString &error) {
     // Reset load more button if error occurred during loading more
     loadMoreButton->setEnabled(true);
     loadMoreButton->setText(tr("Load More"));
+    updateTrayToolTip();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
