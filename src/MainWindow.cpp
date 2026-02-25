@@ -812,10 +812,29 @@ void MainWindow::showAboutDialog() {
 }
 
 void MainWindow::openKdeNotificationSettings() {
-    bool launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
+    // Try generic systemsettings first (works on Plasma 6 and often 5)
+    bool launched = QProcess::startDetached(QStringLiteral("systemsettings"),
                                             {QStringLiteral("kcm_notifications")});
+
+    // Try Plasma 6 kcmshell
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 systemsettings
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
+                                            {QStringLiteral("kcm_notifications")});
+    }
+
+    // Try Plasma 5 kcmshell
     if (!launched) {
         launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
+    }
+
+    // Fallback: Check if generic kcmshell exists
+    if (!launched) {
+        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
     }
 
     if (!launched) {
