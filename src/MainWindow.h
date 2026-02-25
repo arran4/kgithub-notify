@@ -23,6 +23,7 @@
 
 class NotificationItemWidget;
 class QSpinBox;
+class QComboBox;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -32,8 +33,8 @@ class MainWindow : public QMainWindow {
     void showTrayMessage(const QString &title, const QString &message);
     void setClient(GitHubClient *client);
 
-   public slots:
-    void updateNotifications(const QList<Notification> &notifications);
+  public slots:
+    void updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
     void showError(const QString &error);
     void onAuthError(const QString &message);
 
@@ -59,6 +60,8 @@ class MainWindow : public QMainWindow {
     void onSelectTop10Clicked();
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
+    void onFilterChanged(int index);
+    void onLoadMoreClicked();
     void onSelectTopNClicked();
     void onToggleShowAll();
     void showAboutDialog();
@@ -91,6 +94,7 @@ class MainWindow : public QMainWindow {
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;
+    QPushButton *loadMoreButton;
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;
@@ -115,7 +119,7 @@ class MainWindow : public QMainWindow {
     // Toolbar
     QToolBar *toolbar;
     QAction *refreshAction;
-    QAction *showAllAction;
+    QComboBox *filterComboBox;
     QAction *selectAllAction;
     QAction *selectNoneAction;
     QAction *selectTop10Action;

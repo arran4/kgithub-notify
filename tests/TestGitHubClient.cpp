@@ -26,9 +26,38 @@ private slots:
         QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
-        QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();
+        QList<QVariant> args = spy.takeFirst();
+        QList<Notification> notifications = args.at(0).value<QList<Notification>>();
+        bool append = args.at(1).toBool();
+        bool hasMore = args.at(2).toBool();
+
         QCOMPARE(notifications.size(), 1);
         QCOMPARE(notifications[0].title, QString("Test"));
+        QCOMPARE(append, false);
+        QCOMPARE(hasMore, false);
+    }
+
+    void testPaginationDispatch() {
+        GitHubClient client;
+        QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
+
+        QByteArray json = "[{\"id\":\"2\", \"subject\":{\"title\":\"Test2\", \"url\":\"url\", \"type\":\"Issue\"}, \"repository\":{\"full_name\":\"repo\"}, \"updated_at\":\"date\", \"unread\":true}]";
+        MockNetworkReply *reply = new MockNetworkReply(json, &client);
+        reply->setProperty("type", "notifications");
+        reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        reply->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\", <https://api.github.com/notifications?page=5>; rel=\"last\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+
+        QCOMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QList<Notification> notifications = args.at(0).value<QList<Notification>>();
+        bool append = args.at(1).toBool();
+        bool hasMore = args.at(2).toBool();
+
+        QCOMPARE(notifications.size(), 1);
+        QCOMPARE(append, false); // Default is false unless property set
+        QCOMPARE(hasMore, true);
     }
 
     void testDetailsDispatch() {

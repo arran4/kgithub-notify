@@ -3,6 +3,8 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QComboBox>
+#include <QCoreApplication>
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDate>
@@ -58,7 +60,7 @@ void MainWindow::onTokenLoaded() {
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
     } else {
-        stackWidget->setCurrentWidget(notificationList);
+        stackWidget->setCurrentWidget(notificationList->parentWidget());
         if (client) {
             client->setToken(m_loadedToken);
             client->checkNotifications();
@@ -324,12 +326,14 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
     }
 }
 
-void MainWindow::updateNotifications(const QList<Notification> &notifications) {
+void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
     pendingAuthError = false;
     lastError.clear();
 
     if (countLabel) {
-        countLabel->setText(tr("Items: %1").arg(notifications.count()));
+        int total = notifications.count();
+        if (append) total += notificationList->count();
+        countLabel->setText(tr("Items: %1").arg(total));
     }
 
     if (authNotification && authNotification->isVisible()) {
@@ -337,18 +341,28 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
     }
 
     // Switch to list view on successful update
-    if (notifications.isEmpty()) {
+    QWidget *container = notificationList->parentWidget();
+    if (!append && notifications.isEmpty()) {
         if (stackWidget->currentWidget() != emptyStatePage) {
             stackWidget->setCurrentWidget(emptyStatePage);
         }
     } else {
-        if (stackWidget->currentWidget() != notificationList) {
-            stackWidget->setCurrentWidget(notificationList);
+        if (stackWidget->currentWidget() != container) {
+            stackWidget->setCurrentWidget(container);
         }
     }
 
     notificationList->setUpdatesEnabled(false);
-    notificationList->clear();
+    if (!append) {
+        notificationList->clear();
+    }
+
+    loadMoreButton->setVisible(hasMore);
+    loadMoreButton->setEnabled(true);
+    loadMoreButton->setText(tr("Load More"));
+
+    if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
+
     int unreadCount = 0;
     int newNotifications = 0;
     QList<Notification> newlyAddedNotifications;
@@ -559,13 +573,17 @@ void MainWindow::showError(const QString &error) {
 
     if (stackWidget->currentWidget() == loadingPage) {
         if (notificationList->count() > 0) {
-            stackWidget->setCurrentWidget(notificationList);
+            stackWidget->setCurrentWidget(notificationList->parentWidget());
         } else {
             if (loadingLabel) {
                 loadingLabel->setText(tr("Error: %1").arg(error));
             }
         }
     }
+
+    // Reset load more button if error occurred during loading more
+    loadMoreButton->setEnabled(true);
+    loadMoreButton->setText(tr("Load More"));
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -587,16 +605,26 @@ void MainWindow::onRefreshClicked() {
     }
 }
 
-void MainWindow::onToggleShowAll() {
+void MainWindow::onFilterChanged(int index) {
     if (client) {
         m_isManualRefresh = true;
-        client->setShowAll(showAllAction->isChecked());
+        // Index 0: Inbox (ShowAll = false)
+        // Index 1: Done (ShowAll = true)
+        client->setShowAll(index == 1);
         client->checkNotifications();
         m_isManualRefresh = false;
         if (refreshTimer) {
             refreshTimer->start();
             updateStatusBar();
         }
+    }
+}
+
+void MainWindow::onLoadMoreClicked() {
+    if (client) {
+        loadMoreButton->setEnabled(false);
+        loadMoreButton->setText(tr("Loading..."));
+        client->loadMore();
     }
 }
 
@@ -905,7 +933,17 @@ void MainWindow::setupNotificationList() {
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
 
-    stackWidget->addWidget(notificationList);
+    QWidget *container = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(notificationList);
+
+    loadMoreButton = new QPushButton(tr("Load More"), this);
+    loadMoreButton->setVisible(false);
+    connect(loadMoreButton, &QPushButton::clicked, this, &MainWindow::onLoadMoreClicked);
+    layout->addWidget(loadMoreButton);
+
+    stackWidget->addWidget(container);
 }
 
 void MainWindow::setupToolbar() {
@@ -919,10 +957,12 @@ void MainWindow::setupToolbar() {
     connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     toolbar->addAction(refreshAction);
 
-    showAllAction = new QAction(tr("Show All"), this);
-    showAllAction->setCheckable(true);
-    connect(showAllAction, &QAction::triggered, this, &MainWindow::onToggleShowAll);
-    toolbar->addAction(showAllAction);
+    filterComboBox = new QComboBox(this);
+    filterComboBox->addItem(tr("Inbox"));
+    filterComboBox->addItem(tr("Done"));
+    // "Saved" notifications are not supported by the GitHub Notifications API v3 directly.
+    connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
+    toolbar->addWidget(filterComboBox);
 
     toolbar->addSeparator();
 
