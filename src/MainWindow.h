@@ -99,6 +99,10 @@ class MainWindow : public QMainWindow {
     QAction *dismissAction;
     QAction *openAction;
     QAction *copyLinkAction;
+    QAction *markAsReadAction;
+    QAction *markAsDoneAction;
+    QAction *saveAction;
+    QAction *unsaveAction;
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
@@ -162,6 +166,13 @@ class MainWindow : public QMainWindow {
 
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
+
+    QList<Notification> m_savedNotifications;
+    void loadSavedNotifications();
+    void saveSavedNotifications();
+    void saveNotification(const Notification &n);
+    void unsaveNotification(const QString &id);
+    bool isNotificationSaved(const QString &id) const;
 };
 
 #endif  // MAINWINDOW_H

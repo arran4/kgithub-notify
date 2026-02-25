@@ -19,6 +19,9 @@ struct Notification {
     QString htmlUrl; // HTML URL (cached)
     QString updatedAt;
     bool unread;
+
+    QJsonObject toJson() const;
+    static Notification fromJson(const QJsonObject &obj);
 };
 
 class GitHubClient : public QObject {
@@ -35,6 +38,7 @@ public:
     void loadMore();
     void verifyToken();
     void markAsRead(const QString &id);
+    void markAsDone(const QString &id);
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
 
