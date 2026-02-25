@@ -57,12 +57,11 @@ class MainWindow : public QMainWindow {
     void updateStatusBar();
     void onSelectAllClicked();
     void onSelectNoneClicked();
-    void onSelectTop10Clicked();
+    void onSelectionComboActivated(int index);
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onFilterChanged(int index);
     void onLoadMoreClicked();
-    void onSelectTopNClicked();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
@@ -72,6 +71,7 @@ class MainWindow : public QMainWindow {
    private:
     void createTrayIcon();
     void updateTrayMenu();
+    void updateSelectionComboBox();
     void positionPopup(QWidget *popup);
     void createErrorPage();
     void createLoginPage();
@@ -121,11 +121,9 @@ class MainWindow : public QMainWindow {
     QComboBox *filterComboBox;
     QAction *selectAllAction;
     QAction *selectNoneAction;
-    QAction *selectTop10Action;
+    QComboBox *selectionComboBox;
     QAction *dismissSelectedAction;
     QAction *openSelectedAction;
-    QSpinBox *limitSpinBox;
-    QAction *selectTopNAction;
 
     // New UI components
     QStackedWidget *stackWidget;
