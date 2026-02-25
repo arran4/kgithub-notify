@@ -15,14 +15,12 @@
 #include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPainter>
 #include <QPointer>
 #include <QProcess>
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
 #include <QStyle>
-#include <QSvgRenderer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <limits>
@@ -382,7 +380,7 @@ void MainWindow::dismissCurrentItem() {
         // Update icon if list is empty
         if (notificationList->count() == 0) {
             trayIcon->setIcon(
-                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
         }
     }
     updateSelectionComboBox();
@@ -523,7 +521,7 @@ void MainWindow::onDismissSelectedClicked() {
     // Update icon if list is empty
     if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
         trayIcon->setIcon(
-            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"), QStyle::SP_ComputerIcon));
+            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateSelectionComboBox();
     updateTrayMenu();
@@ -622,7 +620,7 @@ void MainWindow::showAboutDialog() {
 
     QMessageBox aboutBox(this);
     aboutBox.setWindowTitle(tr("About KGitHub Notify"));
-    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+    aboutBox.setIconPixmap(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                       QStyle::SP_ComputerIcon)
                                .pixmap(64, 64));
     aboutBox.setText(tr("<b>KGitHub Notify</b>"));
@@ -689,10 +687,7 @@ void MainWindow::createTrayIcon() {
 
     updateTrayMenu();
 
-    QIcon icon = QIcon::fromTheme("kgithub-notify");
-    if (icon.isNull()) {
-        icon = loadSvgIcon(":/assets/icon.svg");
-    }
+    QIcon icon = QIcon::fromTheme("kgithub-notify", QIcon(":/assets/icon.png"));
     trayIcon->setIcon(icon);
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
@@ -948,7 +943,7 @@ void MainWindow::ensureWindowActive() {
 
 void MainWindow::setupWindow() {
     setWindowTitle(tr("Kgithub-notify"));
-    setWindowIcon(QIcon(":/assets/icon.svg"));
+    setWindowIcon(QIcon(":/assets/icon.png"));
     resize(800, 600);
 
     QSettings settings;
@@ -1192,22 +1187,6 @@ QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackRe
     return QApplication::style()->standardIcon(fallbackPixmap);
 }
 
-QIcon MainWindow::loadSvgIcon(const QString &path) {
-    QSvgRenderer renderer(path);
-    if (!renderer.isValid()) {
-        return QIcon(path);
-    }
-
-    QIcon icon;
-    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
-        QPixmap pixmap(size, size);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        renderer.render(&painter);
-        icon.addPixmap(pixmap);
-    }
-    return icon;
-}
 
 void MainWindow::sendNotification(const Notification &n) {
     KNotification *notification = new KNotification("NewNotification");
@@ -1396,13 +1375,13 @@ void MainWindow::processNewNotifications(const QList<Notification> &notification
 void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
                                      const QList<Notification> &newlyAddedNotifications) {
     if (unreadCount <= 0) {
-        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.svg"),
+        trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                      QStyle::SP_ComputerIcon));
         updateTrayMenu();
         return;
     }
 
-    trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
+    trayIcon->setIcon(QIcon(":/assets/icon-dotted.png"));
     if (newNotifications > 0) {
         if (newNotifications > 10) {
             sendSummaryNotification(newNotifications, newlyAddedNotifications);
