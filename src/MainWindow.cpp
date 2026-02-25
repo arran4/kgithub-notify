@@ -363,15 +363,27 @@ void MainWindow::updateTrayToolTip() {
     }
 
     int unreadCount = 0;
+    QStringList unreadTitles;
     if (notificationList) {
         for (int i = 0; i < notificationList->count(); ++i) {
             QListWidgetItem *item = notificationList->item(i);
             if (item && item->font().bold()) {
                 unreadCount++;
+                if (unreadTitles.count() < 5) {
+                    QString title = item->data(Qt::UserRole + 2).toString();
+                    QString repo = item->data(Qt::UserRole + 3).toString();
+                    unreadTitles << QStringLiteral("- %1: %2").arg(repo, title);
+                }
             }
         }
     }
     parts << tr("Unread: %1").arg(unreadCount);
+    if (!unreadTitles.isEmpty()) {
+        parts << unreadTitles;
+        if (unreadCount > 5) {
+            parts << tr("... and %1 more").arg(unreadCount - 5);
+        }
+    }
 
     if (m_lastCheckTime.isValid()) {
         parts << tr("Last Check: %1").arg(QLocale::system().toString(m_lastCheckTime, QLocale::ShortFormat));
