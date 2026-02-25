@@ -112,6 +112,63 @@ private slots:
         QCOMPARE(args.at(0).toBool(), true);
         QVERIFY(args.at(1).toString().contains("user"));
     }
+
+    void testUnreadLogic() {
+        GitHubClient client;
+        QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
+
+        // Case 1: last_read_at missing -> unread = true
+        QJsonObject n1;
+        n1["id"] = "1";
+        n1["subject"] = QJsonObject{{"title", "T1"}, {"url", "u1"}, {"type", "Issue"}};
+        n1["repository"] = QJsonObject{{"full_name", "r1"}};
+        n1["updated_at"] = "2023-01-02T00:00:00Z";
+        n1["unread"] = false; // API says false, but we should override if logic dictates (though here logic says true)
+
+        // Case 2: updated_at > last_read_at -> unread = true
+        QJsonObject n2;
+        n2["id"] = "2";
+        n2["subject"] = QJsonObject{{"title", "T2"}, {"url", "u2"}, {"type", "Issue"}};
+        n2["repository"] = QJsonObject{{"full_name", "r2"}};
+        n2["updated_at"] = "2023-01-02T00:00:00Z";
+        n2["last_read_at"] = "2023-01-01T00:00:00Z";
+        n2["unread"] = false;
+
+        // Case 3: updated_at <= last_read_at -> unread = false
+        QJsonObject n3;
+        n3["id"] = "3";
+        n3["subject"] = QJsonObject{{"title", "T3"}, {"url", "u3"}, {"type", "Issue"}};
+        n3["repository"] = QJsonObject{{"full_name", "r3"}};
+        n3["updated_at"] = "2023-01-01T00:00:00Z";
+        n3["last_read_at"] = "2023-01-02T00:00:00Z";
+        n3["unread"] = true; // API says true (weird), but logic says false
+
+        QJsonArray array;
+        array.append(n1);
+        array.append(n2);
+        array.append(n3);
+        QJsonDocument doc(array);
+
+        MockNetworkReply *reply = new MockNetworkReply(doc.toJson(), &client);
+        reply->setProperty("type", "notifications");
+        reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+
+        QCOMPARE(spy.count(), 1);
+        QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();
+
+        QCOMPARE(notifications.size(), 3);
+
+        QCOMPARE(notifications[0].id, QString("1"));
+        QCOMPARE(notifications[0].unread, true); // Missing last_read_at
+
+        QCOMPARE(notifications[1].id, QString("2"));
+        QCOMPARE(notifications[1].unread, true); // Updated > Read
+
+        QCOMPARE(notifications[2].id, QString("3"));
+        QCOMPARE(notifications[2].unread, false); // Updated <= Read
+    }
 };
 
 QTEST_MAIN(TestGitHubClient)

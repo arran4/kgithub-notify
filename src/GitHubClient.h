@@ -19,6 +19,7 @@ struct Notification {
     QString url; // API URL
     QString htmlUrl; // HTML URL (cached)
     QString updatedAt;
+    QString lastReadAt;
     bool unread;
 
     QJsonObject toJson() const;

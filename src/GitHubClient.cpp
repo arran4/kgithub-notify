@@ -356,7 +356,19 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
         n.repository = repo["full_name"].toString();
 
         n.updatedAt = obj["updated_at"].toString();
-        n.unread = obj["unread"].toBool();
+        n.lastReadAt = obj["last_read_at"].toString();
+
+        if (n.lastReadAt.isEmpty()) {
+            n.unread = true;
+        } else {
+            QDateTime updated = QDateTime::fromString(n.updatedAt, Qt::ISODate);
+            QDateTime lastRead = QDateTime::fromString(n.lastReadAt, Qt::ISODate);
+            if (updated > lastRead) {
+                n.unread = true;
+            } else {
+                n.unread = false;
+            }
+        }
 
         notifications.append(n);
     }
@@ -386,6 +398,7 @@ QJsonObject Notification::toJson() const {
     obj["url"] = url;
     obj["htmlUrl"] = htmlUrl;
     obj["updatedAt"] = updatedAt;
+    obj["lastReadAt"] = lastReadAt;
     obj["unread"] = unread;
     return obj;
 }
@@ -399,6 +412,7 @@ Notification Notification::fromJson(const QJsonObject &obj) {
     n.url = obj["url"].toString();
     n.htmlUrl = obj["htmlUrl"].toString();
     n.updatedAt = obj["updatedAt"].toString();
+    n.lastReadAt = obj["lastReadAt"].toString();
     n.unread = obj["unread"].toBool();
     return n;
 }
