@@ -42,6 +42,7 @@ static int calculateSafeInterval(int minutes) {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       client(nullptr),
+      loadMoreItem(nullptr),
       m_isManualRefresh(false),
       pendingAuthError(false),
       authNotification(nullptr) {
@@ -68,7 +69,7 @@ void MainWindow::onTokenLoaded() {
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
     } else {
-        stackWidget->setCurrentWidget(notificationList->parentWidget());
+        stackWidget->setCurrentWidget(notificationList);
         if (client) {
             client->setToken(m_loadedToken);
             client->checkNotifications();
@@ -415,31 +416,53 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     }
 
     // Switch to list view on successful update
-    QWidget *container = notificationList->parentWidget();
     if (!append && notifications.isEmpty()) {
         if (stackWidget->currentWidget() != emptyStatePage) {
             stackWidget->setCurrentWidget(emptyStatePage);
         }
     } else {
-        if (stackWidget->currentWidget() != container) {
-            stackWidget->setCurrentWidget(container);
+        if (stackWidget->currentWidget() != notificationList) {
+            stackWidget->setCurrentWidget(notificationList);
         }
     }
 
     notificationList->setUpdatesEnabled(false);
-    if (!append) {
-        notificationList->clear();
+
+    if (loadMoreItem) {
+        int row = notificationList->row(loadMoreItem);
+        if (row >= 0) {
+            delete notificationList->takeItem(row);
+        }
+        loadMoreItem = nullptr;
     }
 
-    loadMoreButton->setVisible(hasMore);
-    loadMoreButton->setEnabled(true);
-    loadMoreButton->setText(tr("Load More"));
+    if (!append) {
+        notificationList->clear();
+        loadMoreItem = nullptr;
+    }
 
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading...")); // Reset loading text if it was error
 
     for (const Notification &n : notifications) {
         addNotificationItem(n);
     }
+
+    if (hasMore) {
+        loadMoreItem = new QListWidgetItem();
+        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+        connect(loadMoreBtn, &QPushButton::clicked, this, [this, loadMoreBtn]() {
+            loadMoreBtn->setEnabled(false);
+            loadMoreBtn->setText(tr("Loading..."));
+            if (client) client->loadMore();
+        });
+
+        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+        loadMoreItem->setFlags(Qt::NoItemFlags);
+
+        notificationList->addItem(loadMoreItem);
+        notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
+    }
+
     notificationList->setUpdatesEnabled(true);
 
     updateSelectionComboBox();
@@ -635,7 +658,7 @@ void MainWindow::showError(const QString &error) {
 
     if (stackWidget->currentWidget() == loadingPage) {
         if (notificationList->count() > 0) {
-            stackWidget->setCurrentWidget(notificationList->parentWidget());
+            stackWidget->setCurrentWidget(notificationList);
         } else {
             if (loadingLabel) {
                 loadingLabel->setText(tr("Error: %1").arg(error));
@@ -644,8 +667,13 @@ void MainWindow::showError(const QString &error) {
     }
 
     // Reset load more button if error occurred during loading more
-    loadMoreButton->setEnabled(true);
-    loadMoreButton->setText(tr("Load More"));
+    if (loadMoreItem) {
+        QPushButton *btn = qobject_cast<QPushButton*>(notificationList->itemWidget(loadMoreItem));
+        if (btn) {
+            btn->setEnabled(true);
+            btn->setText(tr("Load More"));
+        }
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -674,19 +702,17 @@ void MainWindow::onFilterChanged(int index) {
             // Inbox: Show All (Read + Unread)
             client->setShowAll(true);
             client->checkNotifications();
-            if (loadMoreButton) loadMoreButton->setEnabled(true);
         } else if (index == 1) {
             // Saved view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
-
             if (m_savedNotifications.isEmpty()) {
                 stackWidget->setCurrentWidget(emptyStatePage);
             } else {
-                stackWidget->setCurrentWidget(notificationList->parentWidget());
+                stackWidget->setCurrentWidget(notificationList);
             }
 
             notificationList->setUpdatesEnabled(false);
             notificationList->clear();
+            loadMoreItem = nullptr;
 
             for (const Notification &n : m_savedNotifications) {
                 addNotificationItem(n);
@@ -698,16 +724,15 @@ void MainWindow::onFilterChanged(int index) {
             }
         } else if (index == 2) {
             // Done view
-            if (loadMoreButton) loadMoreButton->setVisible(false);
-
             if (m_doneNotifications.isEmpty()) {
                 stackWidget->setCurrentWidget(emptyStatePage);
             } else {
-                stackWidget->setCurrentWidget(notificationList->parentWidget());
+                stackWidget->setCurrentWidget(notificationList);
             }
 
             notificationList->setUpdatesEnabled(false);
             notificationList->clear();
+            loadMoreItem = nullptr;
 
             for (const Notification &n : m_doneNotifications) {
                 addNotificationItem(n);
@@ -725,14 +750,6 @@ void MainWindow::onFilterChanged(int index) {
             refreshTimer->start();
             updateStatusBar();
         }
-    }
-}
-
-void MainWindow::onLoadMoreClicked() {
-    if (client) {
-        loadMoreButton->setEnabled(false);
-        loadMoreButton->setText(tr("Loading..."));
-        client->loadMore();
     }
 }
 
@@ -1105,17 +1122,7 @@ void MainWindow::setupNotificationList() {
     connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
     contextMenu->addAction(dismissAction);
 
-    QWidget *container = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(container);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(notificationList);
-
-    loadMoreButton = new QPushButton(tr("Load More"), this);
-    loadMoreButton->setVisible(false);
-    connect(loadMoreButton, &QPushButton::clicked, this, &MainWindow::onLoadMoreClicked);
-    layout->addWidget(loadMoreButton);
-
-    stackWidget->addWidget(container);
+    stackWidget->addWidget(notificationList);
 }
 
 void MainWindow::setupToolbar() {
