@@ -369,7 +369,6 @@ void MainWindow::dismissCurrentItem() {
     saveDoneNotification(n);
 
     if (client) {
-        client->markAsRead(id);
         client->markAsDone(id);
     }
 
@@ -510,7 +509,6 @@ void MainWindow::onDismissSelectedClicked() {
         Notification n = Notification::fromJson(json);
 
         saveDoneNotification(n);
-        client->markAsRead(id);
         client->markAsDone(id);
         knownNotificationIds.remove(id);
 
