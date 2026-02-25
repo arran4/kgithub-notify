@@ -3,16 +3,16 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
-#include <QCoreApplication>
 #include <QCloseEvent>
+#include <QCoreApplication>
+#include <QDate>
 #include <QDebug>
 #include <QDesktopServices>
-#include <QDate>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QProcess>
-#include <QSettings>
 #include <QScreen>
+#include <QSettings>
 #include <QSpinBox>
 #include <QStyle>
 #include <QUrl>
@@ -32,7 +32,11 @@ static int calculateSafeInterval(int minutes) {
 }
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), client(nullptr), m_isManualRefresh(false), pendingAuthError(false), authNotification(nullptr) {
+    : QMainWindow(parent),
+      client(nullptr),
+      m_isManualRefresh(false),
+      pendingAuthError(false),
+      authNotification(nullptr) {
     setupWindow();
     setupCentralWidget();
     setupNotificationList();
@@ -90,7 +94,8 @@ void MainWindow::createLoginPage() {
     layout->setAlignment(Qt::AlignCenter);
 
     loginLabel = new QLabel(
-        tr("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started."), loginPage);
+        tr("Welcome to Kgithub-notify!\n\nPlease configure your Personal Access Token (PAT) to get started."),
+        loginPage);
     loginLabel->setWordWrap(true);
     loginLabel->setAlignment(Qt::AlignCenter);
 
@@ -130,25 +135,26 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
-    connect(client, &GitHubClient::detailsReceived, this, [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl){
-        NotificationDetails &details = detailsCache[id];
-        details.author = author;
-        details.avatarUrl = avatarUrl;
-        details.htmlUrl = htmlUrl;
-        details.hasDetails = true;
+    connect(client, &GitHubClient::detailsReceived, this,
+            [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl) {
+                NotificationDetails &details = detailsCache[id];
+                details.author = author;
+                details.avatarUrl = avatarUrl;
+                details.htmlUrl = htmlUrl;
+                details.hasDetails = true;
 
-        NotificationItemWidget *widget = findNotificationWidget(id);
-        if (widget) {
-            widget->setAuthor(author, details.avatar);
-            widget->setHtmlUrl(htmlUrl);
-        }
+                NotificationItemWidget *widget = findNotificationWidget(id);
+                if (widget) {
+                    widget->setAuthor(author, details.avatar);
+                    widget->setHtmlUrl(htmlUrl);
+                }
 
-        if (!details.hasImage && !avatarUrl.isEmpty()) {
-            if (client) client->fetchImage(avatarUrl, id);
-        }
-    });
+                if (!details.hasImage && !avatarUrl.isEmpty()) {
+                    if (client) client->fetchImage(avatarUrl, id);
+                }
+            });
 
-    connect(client, &GitHubClient::imageReceived, this, [this](const QString &id, const QPixmap &pixmap){
+    connect(client, &GitHubClient::imageReceived, this, [this](const QString &id, const QPixmap &pixmap) {
         NotificationDetails &details = detailsCache[id];
         details.avatar = pixmap;
         details.hasImage = true;
@@ -171,7 +177,6 @@ void MainWindow::setClient(GitHubClient *c) {
         client->checkNotifications();
     }
 }
-
 
 QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackResource,
                              QStyle::StandardPixmap fallbackPixmap) const {
@@ -200,7 +205,7 @@ void MainWindow::createTrayIcon() {
     trayIcon->setContextMenu(trayIconMenu);
 
     trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                               QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+                                 QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::onTrayMessageClicked);
@@ -292,9 +297,8 @@ void MainWindow::updateTrayMenu() {
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
 
-    QAction *notificationSettingsAction =
-        new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
-                    tr("Configure Notifications"), trayIconMenu);
+    QAction *notificationSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
+                                                      tr("Configure Notifications"), trayIconMenu);
     connect(notificationSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
     trayIconMenu->addAction(notificationSettingsAction);
 
@@ -396,7 +400,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications) {
         }
     } else {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -534,7 +538,7 @@ void MainWindow::dismissCurrentItem() {
     // Update icon if list is empty
     if (notificationList->count() == 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -634,7 +638,7 @@ void MainWindow::onDismissSelectedClicked() {
     // Update icon if list is empty
     if (notificationList->count() == 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify"), QStringLiteral("notifications")},
-                                   QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+                                     QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateTrayMenu();
 }
@@ -651,19 +655,17 @@ void MainWindow::onOpenSelectedClicked() {
     }
 }
 
-void MainWindow::onOpenFirstNClicked() {
+void MainWindow::onSelectTopNClicked() {
     if (!notificationList) return;
 
+    notificationList->clearSelection();
     int n = limitSpinBox->value();
     int count = notificationList->count();
     int limit = qMin(n, count);
 
     for (int i = 0; i < limit; ++i) {
         QListWidgetItem *item = notificationList->item(i);
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+        if (item) item->setSelected(true);
     }
 }
 
@@ -673,7 +675,8 @@ void MainWindow::updateStatusBar() {
         if (remaining >= 0) {
             int seconds = (remaining / 1000) % 60;
             int minutes = (remaining / 60000);
-            timerLabel->setText(tr("Next refresh: %1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0')));
+            timerLabel->setText(
+                tr("Next refresh: %1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0')));
             return;
         }
     }
@@ -733,7 +736,7 @@ void MainWindow::sendNotification(const Notification &n) {
         QDesktopServices::openUrl(QUrl(htmlUrl));
     });
 
-    connect(notification, &KNotification::defaultActivated, this, [this](){
+    connect(notification, &KNotification::defaultActivated, this, [this]() {
         this->showNormal();
         this->activateWindow();
     });
@@ -767,7 +770,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
         this->activateWindow();
     });
 
-    connect(notification, &KNotification::defaultActivated, this, [this](){
+    connect(notification, &KNotification::defaultActivated, this, [this]() {
         this->showNormal();
         this->activateWindow();
     });
@@ -775,7 +778,6 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
 
     notification->sendEvent();
 }
-
 
 void MainWindow::showAboutDialog() {
     const QString copyright = tr("© %1 Kgithub-notify contributors").arg(QDate::currentDate().year());
@@ -787,18 +789,18 @@ void MainWindow::showAboutDialog() {
                                       QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon)
                                .pixmap(64, 64));
     aboutBox.setText(tr("<b>KGitHub Notify</b>"));
-    aboutBox.setInformativeText(
-        tr("%1\n\nVersion: %2\n%3\n\nUses Qt, KDE Wallet, and KDE Notifications.")
-            .arg(description, QCoreApplication::applicationVersion().isEmpty() ? QStringLiteral("dev")
-                                                                                : QCoreApplication::applicationVersion(),
-                 copyright));
+    aboutBox.setInformativeText(tr("%1\n\nVersion: %2\n%3\n\nUses Qt, KDE Wallet, and KDE Notifications.")
+                                    .arg(description,
+                                         QCoreApplication::applicationVersion().isEmpty()
+                                             ? QStringLiteral("dev")
+                                             : QCoreApplication::applicationVersion(),
+                                         copyright));
     aboutBox.setStandardButtons(QMessageBox::Ok);
     aboutBox.exec();
 }
 
 void MainWindow::openKdeNotificationSettings() {
-    bool launched = QProcess::startDetached(QStringLiteral("systemsettings5"),
-                                            {QStringLiteral("kcm_notifications")});
+    bool launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
     if (!launched) {
         launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
     }
@@ -809,12 +811,12 @@ void MainWindow::openKdeNotificationSettings() {
     }
 }
 
-NotificationItemWidget* MainWindow::findNotificationWidget(const QString &id) {
+NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
     if (!notificationList) return nullptr;
-    for(int i = 0; i < notificationList->count(); ++i) {
+    for (int i = 0; i < notificationList->count(); ++i) {
         QListWidgetItem *item = notificationList->item(i);
         if (item->data(Qt::UserRole + 1).toString() == id) {
-            return qobject_cast<NotificationItemWidget*>(notificationList->itemWidget(item));
+            return qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
         }
     }
     return nullptr;
@@ -900,10 +902,9 @@ void MainWindow::setupToolbar() {
 
     toolbar->addSeparator();
 
-    dismissSelectedAction =
-        new QAction(themedIcon({QStringLiteral("mail-mark-read"), QStringLiteral("edit-delete")}, QString(),
-                               QStyle::SP_DialogDiscardButton),
-                    tr("Dismiss Selected"), this);
+    dismissSelectedAction = new QAction(themedIcon({QStringLiteral("mail-mark-read"), QStringLiteral("edit-delete")},
+                                                   QString(), QStyle::SP_DialogDiscardButton),
+                                        tr("Dismiss Selected"), this);
     dismissSelectedAction->setShortcut(QKeySequence::Delete);
     connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
     toolbar->addAction(dismissSelectedAction);
@@ -921,18 +922,15 @@ void MainWindow::setupToolbar() {
     limitSpinBox = new QSpinBox(this);
     limitSpinBox->setRange(1, 50);
     limitSpinBox->setValue(5);
-    limitSpinBox->setToolTip(tr("Number of notifications to open"));
+    limitSpinBox->setToolTip(tr("Number of notifications to select"));
     toolbar->addWidget(limitSpinBox);
 
-    openFirstNAction = new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")}, QString(),
-                                              QStyle::SP_DirOpenIcon),
-                                   tr("Open First %1").arg(limitSpinBox->value()), this);
-    connect(openFirstNAction, &QAction::triggered, this, &MainWindow::onOpenFirstNClicked);
-    toolbar->addAction(openFirstNAction);
+    selectTopNAction = new QAction(tr("Select Top %1").arg(limitSpinBox->value()), this);
+    connect(selectTopNAction, &QAction::triggered, this, &MainWindow::onSelectTopNClicked);
+    toolbar->addAction(selectTopNAction);
 
-    connect(limitSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int i) {
-        openFirstNAction->setText(tr("Open First %1").arg(i));
-    });
+    connect(limitSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
+            [this](int i) { selectTopNAction->setText(tr("Select Top %1").arg(i)); });
 }
 
 void MainWindow::setupPages() {
@@ -957,9 +955,8 @@ void MainWindow::setupMenus() {
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     fileMenu->addAction(settingsAction);
 
-    QAction *notificationsSettingsAction =
-        new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
-                    tr("Configure &Notifications..."), this);
+    QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
+                                                       tr("Configure &Notifications..."), this);
     connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
     fileMenu->addAction(notificationsSettingsAction);
 
