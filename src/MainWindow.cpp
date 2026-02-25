@@ -158,6 +158,31 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     processNewNotifications(notifications, unreadCount, newNotifications, newlyAddedNotifications);
     updateTrayIconState(unreadCount, newNotifications, newlyAddedNotifications);
 
+    // Update saved notifications with fresh data
+    bool savedChanged = false;
+    for (const Notification &n : notifications) {
+        for (int i = 0; i < m_savedNotifications.size(); ++i) {
+            if (m_savedNotifications[i].id == n.id) {
+                // Only update if changed
+                if (m_savedNotifications[i].updatedAt != n.updatedAt ||
+                    m_savedNotifications[i].title != n.title ||
+                    m_savedNotifications[i].unread != n.unread) {
+                    m_savedNotifications[i] = n;
+                    savedChanged = true;
+                }
+                break;
+            }
+        }
+    }
+
+    if (savedChanged) {
+        saveSavedNotifications();
+        // If we are currently viewing "Saved", refresh the list
+        if (filterComboBox && filterComboBox->currentIndex() == 1) {
+            onFilterChanged(1);
+        }
+    }
+
     // If in Saved/Done view, do not update list content, but ensure UI is not stuck on loading
     if (filterComboBox && filterComboBox->currentIndex() != 0) {
         if (stackWidget->currentWidget() == loadingPage) {
@@ -1392,7 +1417,14 @@ void MainWindow::saveDoneNotifications() {
 }
 
 void MainWindow::saveDoneNotification(const Notification &n) {
-    if (isNotificationDone(n.id)) return;
+    // Remove existing if any (to update timestamp)
+    for (int i = 0; i < m_doneNotifications.size(); ++i) {
+        if (m_doneNotifications[i].id == n.id) {
+            m_doneNotifications.removeAt(i);
+            break;
+        }
+    }
+
     m_doneNotifications.append(n);
     while (m_doneNotifications.size() > MAX_DONE_NOTIFICATIONS) {
         m_doneNotifications.removeFirst();
@@ -1400,9 +1432,18 @@ void MainWindow::saveDoneNotification(const Notification &n) {
     saveDoneNotifications();
 }
 
-bool MainWindow::isNotificationDone(const QString &id) const {
+bool MainWindow::isNotificationDone(const QString &id, const QString &updatedAt) const {
     for (const Notification &n : m_doneNotifications) {
-        if (n.id == id) return true;
+        if (n.id == id) {
+            if (!updatedAt.isEmpty()) {
+                QDateTime savedTime = QDateTime::fromString(n.updatedAt, Qt::ISODate);
+                QDateTime incomingTime = QDateTime::fromString(updatedAt, Qt::ISODate);
+                if (savedTime.isValid() && incomingTime.isValid() && incomingTime > savedTime) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
     return false;
 }
@@ -1477,7 +1518,7 @@ void MainWindow::updateListWidget(const QList<Notification> &notifications, bool
     if (loadingLabel && !append) loadingLabel->setText(tr("Loading..."));
 
     for (const Notification &n : notifications) {
-        if (isNotificationDone(n.id)) continue;
+        if (isNotificationDone(n.id, n.updatedAt)) continue;
         addNotificationItem(n);
     }
 
@@ -1528,7 +1569,7 @@ void MainWindow::addNotificationItem(const Notification &n) {
     item->setSizeHint(hint);
 
     widget->setSaved(isNotificationSaved(n.id));
-    widget->setDone(isNotificationDone(n.id));
+    widget->setDone(isNotificationDone(n.id, n.updatedAt));
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
