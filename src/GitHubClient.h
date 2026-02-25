@@ -32,6 +32,7 @@ public:
     void setApiUrl(const QString &url);
     void setShowAll(bool all);
     void checkNotifications();
+    void loadMore();
     void verifyToken();
     void markAsRead(const QString &id);
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
@@ -39,7 +40,7 @@ public:
 
 signals:
     void loadingStarted();
-    void notificationsReceived(const QList<Notification> &notifications);
+    void notificationsReceived(const QList<Notification> &notifications, bool append, bool hasMore);
     void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl, const QString &htmlUrl);
     void imageReceived(const QString &notificationId, const QPixmap &avatar);
     void errorOccurred(const QString &error);
@@ -55,6 +56,7 @@ private:
     QString m_apiUrl;
     bool m_showAll;
     int m_pendingPatchRequests;
+    QString m_nextPageUrl;
 
     QNetworkRequest createRequest(const QUrl &url) const;
 

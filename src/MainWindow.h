@@ -22,6 +22,7 @@
 
 class NotificationItemWidget;
 class QSpinBox;
+class QComboBox;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -32,7 +33,7 @@ public:
     void setClient(GitHubClient *client);
 
 public slots:
-    void updateNotifications(const QList<Notification> &notifications);
+    void updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
     void showError(const QString &error);
     void onAuthError(const QString &message);
 
@@ -59,7 +60,8 @@ private slots:
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onOpenFirstNClicked();
-    void onToggleShowAll();
+    void onFilterChanged(int index);
+    void onLoadMoreClicked();
     void showAboutDialog();
     void openKdeNotificationSettings();
 
@@ -89,6 +91,7 @@ private:
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;
+    QPushButton *loadMoreButton;
     GitHubClient *client;
     QMenu *contextMenu;
     QAction *dismissAction;
@@ -113,7 +116,7 @@ private:
     // Toolbar
     QToolBar *toolbar;
     QAction *refreshAction;
-    QAction *showAllAction;
+    QComboBox *filterComboBox;
     QAction *selectAllAction;
     QAction *selectNoneAction;
     QAction *selectTop10Action;
