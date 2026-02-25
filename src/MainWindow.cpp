@@ -479,6 +479,17 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     }
 
     // Visual update
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+    if (widget) {
+        widget->setRead(true);
+    }
+
+    // Update internal data
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+    n.unread = false;
+    item->setData(Qt::UserRole + 4, n.toJson());
+
     QFont font = item->font();
     font.setBold(false);
     item->setFont(font);
@@ -582,6 +593,11 @@ void MainWindow::showContextMenu(const QPoint &pos) {
 
         QString id = item->data(Qt::UserRole + 1).toString();
         bool saved = isNotificationSaved(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+
+        if (markAsReadAction) markAsReadAction->setVisible(n.unread);
         if (saveAction) saveAction->setVisible(!saved);
         if (unsaveAction) unsaveAction->setVisible(saved);
 
@@ -599,7 +615,10 @@ void MainWindow::dismissCurrentItem() {
 
     saveDoneNotification(n);
 
-    if (client) client->markAsDone(id);
+    if (client) {
+        client->markAsRead(id);
+        client->markAsDone(id);
+    }
 
     knownNotificationIds.remove(id);
 
@@ -798,6 +817,7 @@ void MainWindow::onDismissSelectedClicked() {
         Notification n = Notification::fromJson(json);
 
         saveDoneNotification(n);
+        client->markAsRead(id);
         client->markAsDone(id);
         knownNotificationIds.remove(id);
 
@@ -1069,6 +1089,16 @@ void MainWindow::setupNotificationList() {
         QString id = item->data(Qt::UserRole + 1).toString();
         if (client) client->markAsRead(id);
 
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) {
+            widget->setRead(true);
+        }
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        n.unread = false;
+        item->setData(Qt::UserRole + 4, n.toJson());
+
         QFont font = item->font();
         font.setBold(false);
         item->setFont(font);
@@ -1083,6 +1113,9 @@ void MainWindow::setupNotificationList() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         saveNotification(n);
+
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) widget->setSaved(true);
     });
     contextMenu->addAction(saveAction);
 
@@ -1092,6 +1125,9 @@ void MainWindow::setupNotificationList() {
         if (!item) return;
         QString id = item->data(Qt::UserRole + 1).toString();
         unsaveNotification(id);
+
+        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
+        if (widget) widget->setSaved(false);
     });
     contextMenu->addAction(unsaveAction);
 
@@ -1359,6 +1395,10 @@ void MainWindow::addNotificationItem(const Notification &n) {
     item->setData(Qt::UserRole + 3, n.repository);
     item->setData(Qt::UserRole + 4, n.toJson());
     item->setSizeHint(widget->sizeHint());
+
+    widget->setSaved(isNotificationSaved(n.id));
+    widget->setDone(isNotificationDone(n.id));
+    widget->setRead(!n.unread);
 
     notificationList->addItem(item);
     notificationList->setItemWidget(item, widget);
