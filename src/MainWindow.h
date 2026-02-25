@@ -104,6 +104,7 @@ class MainWindow : public QMainWindow {
     void saveDoneNotification(const Notification &n);
     bool isNotificationDone(const QString &id) const;
     void addNotificationItem(const Notification &n);
+    void focusNotification(const QString &id);
     void updateSelectionComboBox();
     void processNewNotifications(const QList<Notification> &notifications, int &unreadCount, int &newNotifications,
                                  QList<Notification> &newlyAddedNotifications);

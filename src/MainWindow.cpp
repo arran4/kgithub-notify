@@ -1217,7 +1217,7 @@ void MainWindow::sendNotification(const Notification &n) {
 
     // Actions
     QStringList actions;
-    actions << tr("Open") << tr("Dismiss");
+    actions << tr("Open in GitHub") << tr("Open kgithub-notify");
     notification->setActions(actions);
 
     connect(notification, &KNotification::action1Activated, this, [this, n]() {
@@ -1226,19 +1226,7 @@ void MainWindow::sendNotification(const Notification &n) {
     });
 
     connect(notification, &KNotification::action2Activated, this, [this, n]() {
-        if (client) {
-            client->markAsRead(n.id);
-            // Ideally remove from list immediately too
-            for (int i = 0; i < notificationList->count(); ++i) {
-                QListWidgetItem *item = notificationList->item(i);
-                if (item->data(Qt::UserRole + 1).toString() == n.id) {
-                    delete notificationList->takeItem(i);
-                    break;
-                }
-            }
-            updateSelectionComboBox();
-            updateTrayMenu();
-        }
+        focusNotification(n.id);
     });
 
     connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
@@ -1264,7 +1252,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
 
     // Actions
     QStringList actions;
-    actions << tr("Open Client");
+    actions << tr("Open kgithub-notify");
     notification->setActions(actions);
 
     connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
@@ -1416,10 +1404,12 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
 
     trayIcon->setIcon(QIcon(":/assets/icon-dotted.svg"));
     if (newNotifications > 0) {
-        if (newNotifications == 1) {
-            sendNotification(newlyAddedNotifications.first());
-        } else {
+        if (newNotifications > 10) {
             sendSummaryNotification(newNotifications, newlyAddedNotifications);
+        } else {
+            for (const Notification &n : newlyAddedNotifications) {
+                sendNotification(n);
+            }
         }
     }
     updateTrayMenu();
@@ -1543,6 +1533,26 @@ void MainWindow::addNotificationItem(const Notification &n) {
 
     notificationList->addItem(item);
     notificationList->setItemWidget(item, widget);
+}
+
+void MainWindow::focusNotification(const QString &id) {
+    ensureWindowActive();
+
+    // Switch to Inbox if needed (as new notifications are in Inbox)
+    if (filterComboBox && filterComboBox->currentIndex() != 0) {
+        filterComboBox->setCurrentIndex(0);
+    }
+
+    if (!notificationList) return;
+
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item->data(Qt::UserRole + 1).toString() == id) {
+            notificationList->scrollToItem(item);
+            notificationList->setCurrentItem(item);
+            break;
+        }
+    }
 }
 
 void MainWindow::updateSelectionComboBox() {
