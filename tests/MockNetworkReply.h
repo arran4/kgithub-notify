@@ -31,6 +31,10 @@ public:
         QNetworkReply::setError(code, errorString);
     }
 
+    void setRawHeader(const QByteArray &name, const QByteArray &value) {
+        QNetworkReply::setRawHeader(name, value);
+    }
+
 private:
     QBuffer m_buffer;
 };

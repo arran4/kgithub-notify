@@ -9,6 +9,7 @@
 #include <QPixmap>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QRegularExpression>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -16,6 +17,7 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     m_apiUrl = "https://api.github.com";
     m_pendingPatchRequests = 0;
     m_showAll = false;
+    m_nextPageUrl = "";
 }
 
 QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
@@ -43,6 +45,8 @@ void GitHubClient::setShowAll(bool all) { m_showAll = all; }
 void GitHubClient::checkNotifications() {
     emit loadingStarted();
 
+    m_nextPageUrl.clear();
+
     if (m_token.isEmpty()) {
         emit authError("No token provided");
         return;
@@ -58,6 +62,20 @@ void GitHubClient::checkNotifications() {
 
     QNetworkReply *reply = manager->get(request);
     reply->setProperty("type", "notifications");
+    reply->setProperty("append", false);
+}
+
+void GitHubClient::loadMore() {
+    if (m_nextPageUrl.isEmpty()) return;
+
+    emit loadingStarted();
+
+    QUrl url(m_nextPageUrl);
+    QNetworkRequest request = createRequest(url);
+
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "notifications");
+    reply->setProperty("append", true);
 }
 
 void GitHubClient::verifyToken() {
@@ -281,5 +299,18 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
         notifications.append(n);
     }
 
-    emit notificationsReceived(notifications);
+    // Parse Link header
+    m_nextPageUrl.clear();
+    if (reply->hasRawHeader("Link")) {
+        QString linkHeader = reply->rawHeader("Link");
+        // Example: <https://api.github.com/resource?page=2>; rel="next", <https://api.github.com/resource?page=5>; rel="last"
+        QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
+        QRegularExpressionMatch match = re.match(linkHeader);
+        if (match.hasMatch()) {
+            m_nextPageUrl = match.captured(1);
+        }
+    }
+
+    bool append = reply->property("append").toBool();
+    emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
 }
