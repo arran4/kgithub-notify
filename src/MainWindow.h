@@ -64,7 +64,6 @@ class MainWindow : public QMainWindow {
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onFilterChanged(int index);
-    void onFilterUnreadToggled(bool checked);
     void applyClientFilters();
     void showAboutDialog();
     void openKdeNotificationSettings();
@@ -96,15 +95,6 @@ class MainWindow : public QMainWindow {
     void sendNotification(const Notification &n);
     void sendSummaryNotification(int count, const QList<Notification> &notifications);
     NotificationItemWidget *findNotificationWidget(const QString &id);
-    void loadSavedNotifications();
-    void saveSavedNotifications();
-    void saveNotification(const Notification &n);
-    void unsaveNotification(const QString &id);
-    bool isNotificationSaved(const QString &id) const;
-    void loadDoneNotifications();
-    void saveDoneNotifications();
-    void saveDoneNotification(const Notification &n);
-    bool isNotificationDone(const QString &id, const QString &updatedAt = QString()) const;
     void addNotificationItem(const Notification &n);
     void focusNotification(const QString &id);
     void updateSelectionComboBox();
@@ -126,8 +116,6 @@ class MainWindow : public QMainWindow {
     QAction *copyLinkAction;
     QAction *markAsReadAction;
     QAction *markAsDoneAction;
-    QAction *saveAction;
-    QAction *unsaveAction;
     QSet<QString> knownNotificationIds;
     bool pendingAuthError;
     QString lastError;
@@ -146,7 +134,6 @@ class MainWindow : public QMainWindow {
     QToolBar *toolbar;
     QAction *refreshAction;
     QComboBox *filterComboBox;
-    QAction *filterUnreadAction;
     QComboBox *repoFilterComboBox;
     QLineEdit *searchLineEdit;
     QAction *selectAllAction;
@@ -180,12 +167,8 @@ class MainWindow : public QMainWindow {
 
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
-    QMap<int, QDateTime> lastRefreshTime;
 
-    QList<Notification> m_savedNotifications;
-    QList<Notification> m_doneNotifications;
-
-    static const int MAX_DONE_NOTIFICATIONS = 100;
+    QList<Notification> m_allNotifications;
     QDateTime m_lastCheckTime;
 };
 

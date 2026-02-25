@@ -53,11 +53,11 @@ void GitHubClient::checkNotifications() {
     }
 
     QUrl url(m_apiUrl + "/notifications");
-    if (m_showAll) {
-        QUrlQuery query;
-        query.addQueryItem("all", "true");
-        url.setQuery(query);
-    }
+    // Always fetch all notifications (including read ones) to support client-side filtering
+    QUrlQuery query;
+    query.addQueryItem("all", "true");
+    url.setQuery(query);
+
     QNetworkRequest request = createRequest(url);
 
     if (m_activeNotificationReply) {

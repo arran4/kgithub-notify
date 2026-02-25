@@ -67,23 +67,6 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     titleLabel->setWordWrap(true);
     titleLayout->addWidget(titleLabel, 1);
 
-    // Saved Indicator
-    savedIndicator = new QLabel(this);
-    QIcon savedIcon = QIcon::fromTheme("bookmark-new");
-    if (savedIcon.isNull()) savedIcon = style()->standardIcon(QStyle::SP_MessageBoxQuestion);
-    savedIndicator->setPixmap(savedIcon.pixmap(16, 16));
-    savedIndicator->setToolTip(tr("Saved"));
-    savedIndicator->hide();
-    titleLayout->addWidget(savedIndicator);
-
-    // Done Indicator
-    doneIndicator = new QLabel(this);
-    QIcon doneIcon = QIcon::fromTheme("task-complete");
-    if (doneIcon.isNull()) doneIcon = style()->standardIcon(QStyle::SP_DialogApplyButton);
-    doneIndicator->setPixmap(doneIcon.pixmap(16, 16));
-    doneIndicator->setToolTip(tr("Done"));
-    doneIndicator->hide();
-    titleLayout->addWidget(doneIndicator);
 
     contentLayout->addLayout(titleLayout);
 
@@ -154,13 +137,6 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     connect(openButton, &QToolButton::clicked, this, &NotificationItemWidget::openClicked);
     actionLayout->addWidget(openButton);
 
-    saveButton = new QToolButton(this);
-    saveButton->setAutoRaise(true);
-    saveButton->setIcon(getThemedIcon({QStringLiteral("bookmark-new"), QStringLiteral("document-save")}, style(), QStyle::SP_DialogSaveButton));
-    saveButton->setIconSize(QSize(24, 24));
-    saveButton->setToolTip(tr("Save"));
-    connect(saveButton, &QToolButton::clicked, this, &NotificationItemWidget::saveClicked);
-    actionLayout->addWidget(saveButton);
 
     doneButton = new QToolButton(this);
     doneButton->setAutoRaise(true);
@@ -199,22 +175,8 @@ void NotificationItemWidget::setRead(bool read) {
     titleLabel->setFont(f);
 }
 
-void NotificationItemWidget::setSaved(bool saved) {
-    savedIndicator->setVisible(saved);
-    if (saved) {
-        saveButton->setToolTip(tr("Unsave"));
-    } else {
-        saveButton->setToolTip(tr("Save"));
-    }
-}
-
-void NotificationItemWidget::setDone(bool done) {
-    doneIndicator->setVisible(done);
-}
-
 void NotificationItemWidget::setLoading(bool loading) {
     m_isLoading = loading;
-    saveButton->setEnabled(!loading);
     doneButton->setEnabled(!loading);
 
     if (loading) {

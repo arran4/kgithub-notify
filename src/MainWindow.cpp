@@ -65,8 +65,6 @@ MainWindow::MainWindow(QWidget *parent)
     // Initial State Check
     stackWidget->setCurrentWidget(loadingPage);
 
-    loadSavedNotifications();
-    loadDoneNotifications();
     loadToken();
 }
 
@@ -157,62 +155,19 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     processNewNotifications(notifications, unreadCount, newNotifications, newlyAddedNotifications);
     updateTrayIconState(unreadCount, newNotifications, newlyAddedNotifications);
 
-    // Update saved notifications with fresh data
-    bool savedChanged = false;
-    for (const Notification &n : notifications) {
-        for (int i = 0; i < m_savedNotifications.size(); ++i) {
-            if (m_savedNotifications[i].id == n.id) {
-                // Only update if changed
-                if (m_savedNotifications[i].updatedAt != n.updatedAt ||
-                    m_savedNotifications[i].title != n.title ||
-                    m_savedNotifications[i].unread != n.unread) {
-                    m_savedNotifications[i] = n;
-                    savedChanged = true;
-                }
-                break;
-            }
-        }
-    }
-
-    if (savedChanged) {
-        saveSavedNotifications();
-        // If we are currently viewing "Saved", refresh the list
-        if (filterComboBox && filterComboBox->currentIndex() == 1) {
-            onFilterChanged(1);
-        }
-    }
-
-    // If in Saved/Done view, do not update list content, but ensure UI is not stuck on loading
-    if (filterComboBox && filterComboBox->currentIndex() != 0) {
-        if (stackWidget->currentWidget() == loadingPage) {
-            int idx = filterComboBox->currentIndex();
-            if (idx == 1) {  // Saved
-                if (m_savedNotifications.isEmpty())
-                    stackWidget->setCurrentWidget(emptyStatePage);
-                else
-                    stackWidget->setCurrentWidget(notificationList);
-            } else if (idx == 2) {  // Done
-                if (m_doneNotifications.isEmpty())
-                    stackWidget->setCurrentWidget(emptyStatePage);
-                else
-                    stackWidget->setCurrentWidget(notificationList);
-            }
-        }
-        if (statusLabel) statusLabel->setText(tr("Updated"));
-        return;
-    }
-
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
     }
 
-    updateListWidget(notifications, append, hasMore);
+    if (!append) {
+        m_allNotifications = notifications;
+    } else {
+        m_allNotifications.append(notifications);
+    }
+
+    updateListWidget(m_allNotifications, append, hasMore);
 
     updateSelectionComboBox();
-
-    if (countLabel) {
-        countLabel->setText(tr("Items: %1").arg(notificationList->count()));
-    }
 
     if (statusLabel) {
         statusLabel->setText(tr("Updated"));
@@ -328,7 +283,6 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
     n.unread = false;
-    saveDoneNotification(n);
     item->setData(Qt::UserRole + 4, n.toJson());
 
     QFont font = item->font();
@@ -340,7 +294,7 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
     QDesktopServices::openUrl(QUrl(htmlUrl));
 
-    if (filterComboBox && filterComboBox->currentIndex() == 0) {
+    if (filterComboBox && (filterComboBox->currentIndex() == 0 || filterComboBox->currentIndex() == 1)) {
         delete notificationList->takeItem(notificationList->row(item));
         updateSelectionComboBox();
         if (notificationList->count() == 0) {
@@ -394,14 +348,11 @@ void MainWindow::showContextMenu(const QPoint &pos) {
         notificationList->setCurrentItem(item);  // Ensure item is selected
 
         QString id = item->data(Qt::UserRole + 1).toString();
-        bool saved = isNotificationSaved(id);
 
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
 
         if (markAsReadAction) markAsReadAction->setVisible(n.unread);
-        if (saveAction) saveAction->setVisible(!saved);
-        if (unsaveAction) unsaveAction->setVisible(saved);
 
         contextMenu->exec(notificationList->mapToGlobal(pos));
     }
@@ -420,7 +371,6 @@ void MainWindow::dismissCurrentItem() {
     Notification n = Notification::fromJson(json);
 
     n.unread = false;
-    saveDoneNotification(n);
 
     // Update item data to reflect read status
     item->setData(Qt::UserRole + 4, n.toJson());
@@ -434,15 +384,13 @@ void MainWindow::dismissCurrentItem() {
 
     knownNotificationIds.remove(id);
 
-    // Only remove from list if in Inbox
-    if (filterComboBox && filterComboBox->currentIndex() == 0) {
-        delete notificationList->takeItem(notificationList->row(item));
+    // Remove from list
+    delete notificationList->takeItem(notificationList->row(item));
 
-        // Update icon if list is empty
-        if (notificationList->count() == 0) {
-            trayIcon->setIcon(
-                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
-        }
+    // Update icon if list is empty
+    if (notificationList->count() == 0) {
+        trayIcon->setIcon(
+            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
     updateSelectionComboBox();
 
@@ -495,14 +443,7 @@ void MainWindow::onTokenLoaded() {
 void MainWindow::onRefreshClicked() {
     if (!client) return;
 
-    if (filterComboBox->currentIndex() == 0) {
-        client->checkNotifications();
-        lastRefreshTime[0] = QDateTime::currentDateTime();
-    } else {
-        // Local refresh for Saved/Done
-        onFilterChanged(filterComboBox->currentIndex());
-        if (statusLabel) statusLabel->setText(tr("Refreshed"));
-    }
+    client->checkNotifications();
 
     if (refreshTimer) {
         refreshTimer->start();  // Restart timer
@@ -572,7 +513,6 @@ void MainWindow::onDismissSelectedClicked() {
             Notification n = Notification::fromJson(json);
 
             n.unread = false;
-            saveDoneNotification(n);
 
             // Update item data to reflect read status
             item->setData(Qt::UserRole + 4, n.toJson());
@@ -581,11 +521,14 @@ void MainWindow::onDismissSelectedClicked() {
             item->setFont(font);
 
             client->markAsReadAndDone(id);
+
+            // Remove item from list
+            delete notificationList->takeItem(notificationList->row(item));
         }
     }
 
     // Update icon if list is empty
-    if (notificationList->count() == 0 && filterComboBox && filterComboBox->currentIndex() == 0) {
+    if (notificationList->count() == 0) {
         trayIcon->setIcon(
             themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
     }
@@ -606,81 +549,12 @@ void MainWindow::onOpenSelectedClicked() {
 }
 
 void MainWindow::onFilterChanged(int index) {
-    if (filterUnreadAction) {
-        filterUnreadAction->setEnabled(index == 0);
-    }
-    if (client) {
-        if (index == 0) {
-            // Inbox
-            if (filterUnreadAction) {
-                client->setShowAll(!filterUnreadAction->isChecked());
-            }
+    Q_UNUSED(index);
+    updateListWidget(m_allNotifications, false, false);
 
-            QDateTime now = QDateTime::currentDateTime();
-            bool hasData = notificationList->count() > 0;
-
-            // Check if stale (older than 1 minute)
-            bool stale = !lastRefreshTime.contains(0) || lastRefreshTime[0].secsTo(now) > 60;
-
-            if (!hasData || stale) {
-                client->checkNotifications();
-                lastRefreshTime[0] = now;
-            } else {
-                // Ensure list is shown if we have data and it's fresh enough
-                if (stackWidget->currentWidget() != notificationList && hasData) {
-                    stackWidget->setCurrentWidget(notificationList);
-                } else if (!hasData && stackWidget->currentWidget() != emptyStatePage) {
-                    stackWidget->setCurrentWidget(emptyStatePage);
-                }
-            }
-
-        } else if (index == 1) {
-            // Saved view
-            if (m_savedNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
-                stackWidget->setCurrentWidget(notificationList);
-            }
-
-            notificationList->setUpdatesEnabled(false);
-            notificationList->clear();
-            loadMoreItem = nullptr;
-
-            for (const Notification &n : m_savedNotifications) {
-                addNotificationItem(n);
-            }
-            notificationList->setUpdatesEnabled(true);
-
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_savedNotifications.count()));
-            }
-        } else if (index == 2) {
-            // Done view
-            if (m_doneNotifications.isEmpty()) {
-                stackWidget->setCurrentWidget(emptyStatePage);
-            } else {
-                stackWidget->setCurrentWidget(notificationList);
-            }
-
-            notificationList->setUpdatesEnabled(false);
-            notificationList->clear();
-            loadMoreItem = nullptr;
-
-            for (const Notification &n : m_doneNotifications) {
-                addNotificationItem(n);
-            }
-            notificationList->setUpdatesEnabled(true);
-
-            updateSelectionComboBox();
-
-            if (countLabel) {
-                countLabel->setText(tr("Items: %1").arg(m_doneNotifications.count()));
-            }
-        }
-        if (refreshTimer) {
-            refreshTimer->start();
-            updateStatusBar();
-        }
+    if (refreshTimer) {
+        refreshTimer->start();
+        updateStatusBar();
     }
 }
 
@@ -1068,7 +942,6 @@ void MainWindow::setupNotificationList() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         n.unread = false;
-        saveDoneNotification(n);
         item->setData(Qt::UserRole + 4, n.toJson());
 
         QFont font = item->font();
@@ -1076,7 +949,7 @@ void MainWindow::setupNotificationList() {
         item->setFont(font);
         updateTrayMenu();
 
-        if (filterComboBox && filterComboBox->currentIndex() == 0) {
+        if (filterComboBox && (filterComboBox->currentIndex() == 0 || filterComboBox->currentIndex() == 1)) {
             delete notificationList->takeItem(notificationList->row(item));
             updateSelectionComboBox();
             if (notificationList->count() == 0) {
@@ -1086,31 +959,6 @@ void MainWindow::setupNotificationList() {
         }
     });
     contextMenu->addAction(markAsReadAction);
-
-    saveAction = new QAction(tr("Save"), this);
-    connect(saveAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = notificationList->currentItem();
-        if (!item) return;
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-        saveNotification(n);
-
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        if (widget) widget->setSaved(true);
-    });
-    contextMenu->addAction(saveAction);
-
-    unsaveAction = new QAction(tr("Unsave"), this);
-    connect(unsaveAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = notificationList->currentItem();
-        if (!item) return;
-        QString id = item->data(Qt::UserRole + 1).toString();
-        unsaveNotification(id);
-
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        if (widget) widget->setSaved(false);
-    });
-    contextMenu->addAction(unsaveAction);
 
     markAsDoneAction = new QAction(tr("Mark as Done"), this);
     connect(markAsDoneAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
@@ -1138,17 +986,10 @@ void MainWindow::setupToolbar() {
 
     filterComboBox = new QComboBox(this);
     filterComboBox->addItem(tr("Inbox"));
-    filterComboBox->addItem(tr("Saved"));
-    filterComboBox->addItem(tr("Done"));
+    filterComboBox->addItem(tr("Unread"));
+    filterComboBox->addItem(tr("Read"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
-
-    filterUnreadAction = new QAction(themedIcon({QStringLiteral("view-filter")}, QString(), QStyle::SP_FileDialogContentsView),
-                                     tr("Filter Unread"), this);
-    filterUnreadAction->setCheckable(true);
-    filterUnreadAction->setChecked(false);
-    connect(filterUnreadAction, &QAction::toggled, this, &MainWindow::onFilterUnreadToggled);
-    toolbar->addAction(filterUnreadAction);
 
     toolbar->addSeparator();
 
@@ -1361,121 +1202,6 @@ NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
     return nullptr;
 }
 
-void MainWindow::loadSavedNotifications() {
-    QSettings settings;
-    QByteArray data = settings.value("savedNotifications").toByteArray();
-    if (!data.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (doc.isArray()) {
-            QJsonArray array = doc.array();
-            for (const QJsonValue &val : array) {
-                if (val.isObject()) {
-                    m_savedNotifications.append(Notification::fromJson(val.toObject()));
-                }
-            }
-        }
-    }
-}
-
-void MainWindow::saveSavedNotifications() {
-    QJsonArray array;
-    for (const Notification &n : m_savedNotifications) {
-        array.append(n.toJson());
-    }
-    QJsonDocument doc(array);
-    QSettings settings;
-    settings.setValue("savedNotifications", doc.toJson(QJsonDocument::Compact));
-}
-
-void MainWindow::saveNotification(const Notification &n) {
-    if (isNotificationSaved(n.id)) return;
-    m_savedNotifications.append(n);
-    saveSavedNotifications();
-    // If we are currently viewing "Saved", refresh the list
-    if (filterComboBox && filterComboBox->currentIndex() == 1) {  // 1 will be Saved
-        onFilterChanged(1);
-    }
-}
-
-void MainWindow::unsaveNotification(const QString &id) {
-    for (int i = 0; i < m_savedNotifications.size(); ++i) {
-        if (m_savedNotifications[i].id == id) {
-            m_savedNotifications.removeAt(i);
-            saveSavedNotifications();
-            if (filterComboBox && filterComboBox->currentIndex() == 1) {
-                onFilterChanged(1);
-            }
-            break;
-        }
-    }
-}
-
-bool MainWindow::isNotificationSaved(const QString &id) const {
-    for (const Notification &n : m_savedNotifications) {
-        if (n.id == id) return true;
-    }
-    return false;
-}
-
-void MainWindow::loadDoneNotifications() {
-    QSettings settings;
-    QByteArray data = settings.value("doneNotifications").toByteArray();
-    if (!data.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (doc.isArray()) {
-            QJsonArray array = doc.array();
-            for (const QJsonValue &val : array) {
-                if (val.isObject()) {
-                    m_doneNotifications.append(Notification::fromJson(val.toObject()));
-                }
-            }
-        }
-    }
-}
-
-void MainWindow::saveDoneNotifications() {
-    QJsonArray array;
-    for (const Notification &n : m_doneNotifications) {
-        array.append(n.toJson());
-    }
-    QJsonDocument doc(array);
-    QSettings settings;
-    settings.setValue("doneNotifications", doc.toJson(QJsonDocument::Compact));
-}
-
-void MainWindow::saveDoneNotification(const Notification &n) {
-    // Remove existing if any (to update timestamp)
-    for (int i = 0; i < m_doneNotifications.size(); ++i) {
-        if (m_doneNotifications[i].id == n.id) {
-            m_doneNotifications.removeAt(i);
-            break;
-        }
-    }
-
-    m_doneNotifications.append(n);
-    while (m_doneNotifications.size() > MAX_DONE_NOTIFICATIONS) {
-        m_doneNotifications.removeFirst();
-    }
-    saveDoneNotifications();
-}
-
-bool MainWindow::isNotificationDone(const QString &id, const QString &updatedAt) const {
-    for (const Notification &n : m_doneNotifications) {
-        if (n.id == id) {
-            if (!updatedAt.isEmpty()) {
-                QDateTime savedTime = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-                QDateTime incomingTime = QDateTime::fromString(updatedAt, Qt::ISODate);
-                if (savedTime.isValid() && incomingTime.isValid() && incomingTime > savedTime) {
-                    // Not done, because it has new activity (not ignored)
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
 void MainWindow::processNewNotifications(const QList<Notification> &notifications, int &unreadCount,
                                          int &newNotifications, QList<Notification> &newlyAddedNotifications) {
     unreadCount = 0;
@@ -1516,39 +1242,38 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
     updateTrayMenu();
 }
 
-void MainWindow::updateListWidget(const QList<Notification> &notifications, bool append, bool hasMore) {
-    // Switch to list view on successful update
-    if (!append && notifications.isEmpty()) {
-        if (stackWidget->currentWidget() != emptyStatePage) {
-            stackWidget->setCurrentWidget(emptyStatePage);
-        }
-    } else {
-        if (stackWidget->currentWidget() != notificationList) {
-            stackWidget->setCurrentWidget(notificationList);
-        }
-    }
-
+void MainWindow::updateListWidget(const QList<Notification> & /*notifications*/, bool /*append*/, bool hasMore) {
     notificationList->setUpdatesEnabled(false);
+    notificationList->clear();
+    loadMoreItem = nullptr;
 
-    if (loadMoreItem) {
-        int row = notificationList->row(loadMoreItem);
-        if (row >= 0) {
-            delete notificationList->takeItem(row);
+    if (loadingLabel) loadingLabel->setText(tr("Loading..."));
+
+    int filterIndex = filterComboBox ? filterComboBox->currentIndex() : 0;
+    int count = 0;
+
+    for (const Notification &n : m_allNotifications) {
+        bool show = false;
+        // Inbox (0) / Unread (1)
+        // Logic: Updated > Last Read OR No Last Read
+        // This logic is already captured in n.unread by GitHubClient
+
+        if (filterIndex == 0 || filterIndex == 1) {
+            if (n.unread) show = true;
+        } else if (filterIndex == 2) { // Read
+            if (!n.unread) show = true;
         }
-        loadMoreItem = nullptr;
+
+        if (show) {
+            addNotificationItem(n);
+            count++;
+        }
     }
 
-    if (!append) {
-        notificationList->clear();
-        loadMoreItem = nullptr;
-    }
-
-    if (loadingLabel && !append) loadingLabel->setText(tr("Loading..."));
-
-    for (const Notification &n : notifications) {
-        if (isNotificationDone(n.id, n.updatedAt)) continue;
-        if (filterComboBox && filterComboBox->currentIndex() == 0 && !n.unread) continue;
-        addNotificationItem(n);
+    if (count == 0) {
+        stackWidget->setCurrentWidget(emptyStatePage);
+    } else {
+        stackWidget->setCurrentWidget(notificationList);
     }
 
     if (hasMore) {
@@ -1571,6 +1296,10 @@ void MainWindow::updateListWidget(const QList<Notification> &notifications, bool
     applyClientFilters();
 
     notificationList->setUpdatesEnabled(true);
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(count));
+    }
 }
 
 void MainWindow::addNotificationItem(const Notification &n) {
@@ -1597,8 +1326,6 @@ void MainWindow::addNotificationItem(const Notification &n) {
     if (hint.height() < 60) hint.setHeight(60);
     item->setSizeHint(hint);
 
-    widget->setSaved(isNotificationSaved(n.id));
-    widget->setDone(isNotificationDone(n.id, n.updatedAt));
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
@@ -1610,34 +1337,6 @@ void MainWindow::addNotificationItem(const Notification &n) {
         if (!safeWidget) return;
         notificationList->setCurrentItem(item);
         dismissCurrentItem();
-        // If item still valid (not deleted)
-        if (safeWidget) {
-            safeWidget->setDone(true);
-        }
-    }, Qt::QueuedConnection);
-
-    connect(widget, &NotificationItemWidget::saveClicked, this, [this, item, safeWidget]() {
-        if (!safeWidget) return;
-        notificationList->setCurrentItem(item);
-
-        // Double check validity before access
-        if (!item->listWidget()) return;
-
-        QString id = item->data(Qt::UserRole + 1).toString();
-        bool saved = isNotificationSaved(id);
-
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-
-        if (saved) {
-            bool wasInSavedView = (filterComboBox && filterComboBox->currentIndex() == 1);
-            unsaveNotification(id);
-            // If we were in Saved view, item is likely gone now if unsaveNotification reloaded list
-            if (!wasInSavedView && safeWidget) safeWidget->setSaved(false);
-        } else {
-            saveNotification(n);
-            if (safeWidget) safeWidget->setSaved(true);
-        }
     }, Qt::QueuedConnection);
 
     notificationList->addItem(item);
@@ -1684,12 +1383,6 @@ void MainWindow::updateSelectionComboBox() {
     selectionComboBox->blockSignals(wasBlocked);
 }
 
-void MainWindow::onFilterUnreadToggled(bool checked) {
-    if (client) {
-        client->setShowAll(!checked);
-        onRefreshClicked();
-    }
-}
 
 void MainWindow::populateRepoFilter() {
     if (!notificationList || !repoFilterComboBox) return;
