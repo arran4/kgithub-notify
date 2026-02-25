@@ -25,6 +25,7 @@ public:
     QLabel *dateLabel;
     QLabel *urlLabel;
     QLabel *errorLabel;
+    QLabel *loadingLabel;
     QLabel *unreadIndicator;
     QLabel *savedIndicator;
     QLabel *doneIndicator;
@@ -36,11 +37,16 @@ public:
     void setRead(bool read);
     void setSaved(bool saved);
     void setDone(bool done);
+    void setLoading(bool loading);
+    bool isLoading() const { return m_isLoading; }
 
 signals:
     void doneClicked();
     void saveClicked();
     void openClicked();
+
+private:
+    bool m_isLoading;
 };
 
 #endif // NOTIFICATIONITEMWIDGET_H
