@@ -137,19 +137,25 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
-    connect(client, &GitHubClient::detailsReceived, this,
-            [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl) {
-                NotificationDetails &details = detailsCache[id];
-                details.author = author;
-                details.avatarUrl = avatarUrl;
-                details.htmlUrl = htmlUrl;
-                details.hasDetails = true;
+    connect(client, &GitHubClient::detailsError, this, [this](const QString &id, const QString &error){
+        NotificationItemWidget *widget = findNotificationWidget(id);
+        if (widget) {
+            widget->setError(error);
+        }
+    });
 
-                NotificationItemWidget *widget = findNotificationWidget(id);
-                if (widget) {
-                    widget->setAuthor(author, details.avatar);
-                    widget->setHtmlUrl(htmlUrl);
-                }
+    connect(client, &GitHubClient::detailsReceived, this, [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl){
+        NotificationDetails &details = detailsCache[id];
+        details.author = author;
+        details.avatarUrl = avatarUrl;
+        details.htmlUrl = htmlUrl;
+        details.hasDetails = true;
+
+        NotificationItemWidget *widget = findNotificationWidget(id);
+        if (widget) {
+            widget->setAuthor(author, details.avatar);
+            widget->setHtmlUrl(htmlUrl);
+        }
 
                 if (!details.hasImage && !avatarUrl.isEmpty()) {
                     if (client) client->fetchImage(avatarUrl, id);

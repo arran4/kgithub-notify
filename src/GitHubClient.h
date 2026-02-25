@@ -42,6 +42,7 @@ signals:
     void loadingStarted();
     void notificationsReceived(const QList<Notification> &notifications, bool append, bool hasMore);
     void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl, const QString &htmlUrl);
+    void detailsError(const QString &notificationId, const QString &error);
     void imageReceived(const QString &notificationId, const QPixmap &avatar);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
