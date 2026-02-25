@@ -366,11 +366,11 @@ void MainWindow::dismissCurrentItem() {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
 
+    n.unread = false;
     saveDoneNotification(n);
 
     if (client) {
-        client->markAsRead(id);
-        client->markAsDone(id);
+        client->markAsReadAndDone(id);
     }
 
     knownNotificationIds.remove(id);
@@ -510,9 +510,9 @@ void MainWindow::onDismissSelectedClicked() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
 
+        n.unread = false;
         saveDoneNotification(n);
-        client->markAsRead(id);
-        client->markAsDone(id);
+        client->markAsReadAndDone(id);
         knownNotificationIds.remove(id);
 
         if (filterComboBox && filterComboBox->currentIndex() == 0) {
