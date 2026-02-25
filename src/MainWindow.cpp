@@ -370,7 +370,7 @@ void MainWindow::dismissCurrentItem() {
     saveDoneNotification(n);
 
     if (client) {
-        client->markAsDone(id);
+        client->markAsReadAndDone(id);
     }
 
     knownNotificationIds.remove(id);
@@ -511,7 +511,7 @@ void MainWindow::onDismissSelectedClicked() {
 
         n.unread = false;
         saveDoneNotification(n);
-        client->markAsDone(id);
+        client->markAsReadAndDone(id);
         knownNotificationIds.remove(id);
 
         if (filterComboBox && filterComboBox->currentIndex() == 0) {

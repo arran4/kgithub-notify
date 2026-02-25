@@ -40,6 +40,7 @@ public:
     void verifyToken();
     void markAsRead(const QString &id);
     void markAsDone(const QString &id);
+    void markAsReadAndDone(const QString &id);
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
 

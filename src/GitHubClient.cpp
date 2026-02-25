@@ -125,6 +125,19 @@ void GitHubClient::markAsDone(const QString &id) {
     reply->setProperty("type", "delete");
 }
 
+void GitHubClient::markAsReadAndDone(const QString &id) {
+    if (m_token.isEmpty()) return;
+
+    m_pendingPatchRequests++;
+
+    QUrl url(m_apiUrl + "/notifications/threads/" + id);
+    QNetworkRequest request = createRequest(url);
+
+    QNetworkReply *reply = manager->sendCustomRequest(request, "PATCH");
+    reply->setProperty("type", "read_and_done");
+    reply->setProperty("notificationId", id);
+}
+
 void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
     if (m_token.isEmpty()) return;
     QUrl qUrl(url);
@@ -195,6 +208,24 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         handleVerificationReply(reply);
     } else if (type == "patch" || type == "delete") {
         handlePatchReply(reply);
+    } else if (type == "read_and_done") {
+        QString id = reply->property("notificationId").toString();
+        m_pendingPatchRequests--;
+        if (m_pendingPatchRequests < 0) m_pendingPatchRequests = 0;
+
+        if (reply->error() == QNetworkReply::NoError) {
+            markAsDone(id);
+        } else {
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+                emit authError("Invalid Token");
+            } else {
+                emit errorOccurred(reply->errorString());
+            }
+        }
+
+        if (m_pendingPatchRequests == 0) {
+            checkNotifications();
+        }
     } else if (type == "notifications") {
         handleNotificationsReply(reply);
     } else {
