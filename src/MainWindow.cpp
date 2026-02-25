@@ -328,6 +328,7 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
     n.unread = false;
+    saveDoneNotification(n);
     item->setData(Qt::UserRole + 4, n.toJson());
 
     QFont font = item->font();
@@ -338,6 +339,15 @@ void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
 
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
     QDesktopServices::openUrl(QUrl(htmlUrl));
+
+    if (filterComboBox && filterComboBox->currentIndex() == 0) {
+        delete notificationList->takeItem(notificationList->row(item));
+        updateSelectionComboBox();
+        if (notificationList->count() == 0) {
+            trayIcon->setIcon(
+                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+        }
+    }
 }
 
 void MainWindow::showSettings() {
@@ -1058,12 +1068,22 @@ void MainWindow::setupNotificationList() {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         n.unread = false;
+        saveDoneNotification(n);
         item->setData(Qt::UserRole + 4, n.toJson());
 
         QFont font = item->font();
         font.setBold(false);
         item->setFont(font);
         updateTrayMenu();
+
+        if (filterComboBox && filterComboBox->currentIndex() == 0) {
+            delete notificationList->takeItem(notificationList->row(item));
+            updateSelectionComboBox();
+            if (notificationList->count() == 0) {
+                trayIcon->setIcon(
+                    themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
+            }
+        }
     });
     contextMenu->addAction(markAsReadAction);
 
@@ -1527,6 +1547,7 @@ void MainWindow::updateListWidget(const QList<Notification> &notifications, bool
 
     for (const Notification &n : notifications) {
         if (isNotificationDone(n.id, n.updatedAt)) continue;
+        if (filterComboBox && filterComboBox->currentIndex() == 0 && !n.unread) continue;
         addNotificationItem(n);
     }
 
