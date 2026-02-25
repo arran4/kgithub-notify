@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QProcess>
@@ -344,6 +345,59 @@ void MainWindow::updateTrayMenu() {
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
+
+    updateTrayToolTip();
+}
+
+void MainWindow::updateTrayToolTip() {
+    if (!trayIcon) return;
+
+    QStringList parts;
+    parts << tr("KGitHub Notify");
+
+    if (!lastError.isEmpty()) {
+        parts << tr("Status: Error");
+    } else if (stackWidget->currentWidget() == loadingPage) {
+        parts << tr("Status: Checking...");
+    } else {
+        parts << tr("Status: OK");
+    }
+
+    int unreadCount = 0;
+    QStringList unreadTitles;
+    if (notificationList) {
+        for (int i = 0; i < notificationList->count(); ++i) {
+            QListWidgetItem *item = notificationList->item(i);
+            if (item && item->font().bold()) {
+                unreadCount++;
+                if (unreadTitles.count() < 5) {
+                    QString title = item->data(Qt::UserRole + 2).toString();
+                    QString repo = item->data(Qt::UserRole + 3).toString();
+                    unreadTitles << QStringLiteral("- %1: %2").arg(repo, title);
+                }
+            }
+        }
+    }
+    parts << tr("Unread: %1").arg(unreadCount);
+    if (!unreadTitles.isEmpty()) {
+        parts << unreadTitles;
+        if (unreadCount > 5) {
+            parts << tr("... and %1 more").arg(unreadCount - 5);
+        }
+    }
+
+    if (m_lastCheckTime.isValid()) {
+        parts << tr("Last Check: %1").arg(QLocale::system().toString(m_lastCheckTime, QLocale::ShortFormat));
+
+        if (refreshTimer && refreshTimer->isActive()) {
+            QDateTime nextCheck = m_lastCheckTime.addMSecs(refreshTimer->interval());
+            parts << tr("Next Check: %1").arg(QLocale::system().toString(nextCheck, QLocale::ShortFormat));
+        }
+    } else {
+        parts << tr("Last Check: Never");
+    }
+
+    trayIcon->setToolTip(parts.join(QStringLiteral("\n")));
 }
 
 void MainWindow::dismissAllNotifications() {
@@ -366,6 +420,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 }
 
 void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
+    m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
 
@@ -578,6 +633,7 @@ void MainWindow::onLoadingStarted() {
             loadingLabel->setText(tr("Loading..."));
         }
     }
+    updateTrayToolTip();
 }
 
 void MainWindow::onAuthError(const QString &message) {
@@ -691,6 +747,9 @@ void MainWindow::showError(const QString &error) {
     }
 
     // Reset load more button if error occurred during loading more
+    loadMoreButton->setEnabled(true);
+    loadMoreButton->setText(tr("Load More"));
+    updateTrayToolTip();
     if (loadMoreItem) {
         QPushButton *btn = qobject_cast<QPushButton*>(notificationList->itemWidget(loadMoreItem));
         if (btn) {
