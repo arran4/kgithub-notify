@@ -1439,6 +1439,7 @@ bool MainWindow::isNotificationDone(const QString &id, const QString &updatedAt)
                 QDateTime savedTime = QDateTime::fromString(n.updatedAt, Qt::ISODate);
                 QDateTime incomingTime = QDateTime::fromString(updatedAt, Qt::ISODate);
                 if (savedTime.isValid() && incomingTime.isValid() && incomingTime > savedTime) {
+                    // Not done, because it has new activity (not ignored)
                     return false;
                 }
             }
