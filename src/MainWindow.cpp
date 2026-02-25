@@ -20,6 +20,7 @@
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
+#include <QLineEdit>
 #include <QStyle>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -540,10 +541,15 @@ void MainWindow::onOpenSelectedClicked() {
 }
 
 void MainWindow::onFilterChanged(int index) {
+    if (filterUnreadAction) {
+        filterUnreadAction->setEnabled(index == 0);
+    }
     if (client) {
         if (index == 0) {
             // Inbox
-            client->setShowAll(false);
+            if (filterUnreadAction) {
+                client->setShowAll(!filterUnreadAction->isChecked());
+            }
 
             QDateTime now = QDateTime::currentDateTime();
             bool hasData = notificationList->count() > 0;
@@ -1059,6 +1065,27 @@ void MainWindow::setupToolbar() {
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 
+    filterUnreadAction = new QAction(themedIcon({QStringLiteral("view-filter")}, QString(), QStyle::SP_FileDialogContentsView),
+                                     tr("Filter Unread"), this);
+    filterUnreadAction->setCheckable(true);
+    filterUnreadAction->setChecked(false);
+    connect(filterUnreadAction, &QAction::toggled, this, &MainWindow::onFilterUnreadToggled);
+    toolbar->addAction(filterUnreadAction);
+
+    toolbar->addSeparator();
+
+    repoFilterComboBox = new QComboBox(this);
+    repoFilterComboBox->addItem(tr("All Repositories"));
+    repoFilterComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::applyClientFilters);
+    toolbar->addWidget(repoFilterComboBox);
+
+    searchLineEdit = new QLineEdit(this);
+    searchLineEdit->setPlaceholderText(tr("Search..."));
+    searchLineEdit->setFixedWidth(200);
+    connect(searchLineEdit, &QLineEdit::textChanged, this, &MainWindow::applyClientFilters);
+    toolbar->addWidget(searchLineEdit);
+
     toolbar->addSeparator();
 
     selectAllAction = new QAction(tr("Select All"), this);
@@ -1444,6 +1471,9 @@ void MainWindow::updateListWidget(const QList<Notification> &notifications, bool
         notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
     }
 
+    populateRepoFilter();
+    applyClientFilters();
+
     notificationList->setUpdatesEnabled(true);
 }
 
@@ -1556,4 +1586,84 @@ void MainWindow::updateSelectionComboBox() {
 
     selectionComboBox->setCurrentIndex(0);
     selectionComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::onFilterUnreadToggled(bool checked) {
+    if (client) {
+        client->setShowAll(!checked);
+        onRefreshClicked();
+    }
+}
+
+void MainWindow::populateRepoFilter() {
+    if (!notificationList || !repoFilterComboBox) return;
+
+    QString currentRepo = repoFilterComboBox->currentText();
+    bool wasBlocked = repoFilterComboBox->blockSignals(true);
+
+    repoFilterComboBox->clear();
+    repoFilterComboBox->addItem(tr("All Repositories"));
+
+    QSet<QString> repos;
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item == loadMoreItem) continue;
+        QString repo = item->data(Qt::UserRole + 3).toString();
+        if (!repo.isEmpty()) {
+            repos.insert(repo);
+        }
+    }
+
+    QStringList repoList = repos.values();
+    repoList.sort();
+    repoFilterComboBox->addItems(repoList);
+
+    int index = repoFilterComboBox->findText(currentRepo);
+    if (index >= 0) {
+        repoFilterComboBox->setCurrentIndex(index);
+    } else {
+        repoFilterComboBox->setCurrentIndex(0);
+    }
+
+    repoFilterComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::applyClientFilters() {
+    if (!notificationList || !repoFilterComboBox || !searchLineEdit) return;
+
+    QString repoFilter = repoFilterComboBox->currentText();
+    QString searchText = searchLineEdit->text().trimmed();
+    bool filterRepo = (repoFilter != tr("All Repositories"));
+    bool filterText = !searchText.isEmpty();
+
+    int visibleCount = 0;
+
+    for (int i = 0; i < notificationList->count(); ++i) {
+        QListWidgetItem *item = notificationList->item(i);
+        if (item == loadMoreItem) continue;
+
+        bool matchRepo = true;
+        if (filterRepo) {
+            QString repo = item->data(Qt::UserRole + 3).toString();
+            if (repo != repoFilter) matchRepo = false;
+        }
+
+        bool matchText = true;
+        if (filterText) {
+            QString title = item->data(Qt::UserRole + 2).toString();
+            QString repo = item->data(Qt::UserRole + 3).toString();
+            if (!title.contains(searchText, Qt::CaseInsensitive) &&
+                !repo.contains(searchText, Qt::CaseInsensitive)) {
+                matchText = false;
+            }
+        }
+
+        bool visible = matchRepo && matchText;
+        item->setHidden(!visible);
+        if (visible) visibleCount++;
+    }
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(visibleCount));
+    }
 }
