@@ -8,6 +8,16 @@
 #include <QPainter>
 #include <QIcon>
 #include <QColor>
+#include <QApplication>
+
+static QIcon getThemedIcon(const QStringList &names, QStyle *style, QStyle::StandardPixmap fallback) {
+    for (const QString &name : names) {
+        if (QIcon::hasThemeIcon(name)) {
+            return QIcon::fromTheme(name);
+        }
+    }
+    return style->standardIcon(fallback);
+}
 
 NotificationItemWidget::NotificationItemWidget(const Notification &n,
                                                QWidget *parent)
@@ -130,20 +140,26 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     actionLayout->setContentsMargins(0, 0, 0, 0);
     actionLayout->setAlignment(Qt::AlignTop);
 
+    openButton = new QToolButton(this);
+    openButton->setAutoRaise(true);
+    openButton->setIcon(getThemedIcon({QStringLiteral("internet-web-browser"), QStringLiteral("document-open-remote"), QStringLiteral("text-html")}, style(), QStyle::SP_DirOpenIcon));
+    openButton->setIconSize(QSize(24, 24));
+    openButton->setToolTip(tr("Open in Browser"));
+    connect(openButton, &QToolButton::clicked, this, &NotificationItemWidget::openClicked);
+    actionLayout->addWidget(openButton);
+
     saveButton = new QToolButton(this);
     saveButton->setAutoRaise(true);
-    QIcon saveBtnIcon = QIcon::fromTheme("bookmark-new");
-    if (saveBtnIcon.isNull()) saveBtnIcon = style()->standardIcon(QStyle::SP_MessageBoxQuestion);
-    saveButton->setIcon(saveBtnIcon);
+    saveButton->setIcon(getThemedIcon({QStringLiteral("bookmark-new"), QStringLiteral("document-save")}, style(), QStyle::SP_DialogSaveButton));
+    saveButton->setIconSize(QSize(24, 24));
     saveButton->setToolTip(tr("Save"));
     connect(saveButton, &QToolButton::clicked, this, &NotificationItemWidget::saveClicked);
     actionLayout->addWidget(saveButton);
 
     doneButton = new QToolButton(this);
     doneButton->setAutoRaise(true);
-    QIcon doneBtnIcon = QIcon::fromTheme("task-complete");
-    if (doneBtnIcon.isNull()) doneBtnIcon = style()->standardIcon(QStyle::SP_DialogApplyButton);
-    doneButton->setIcon(doneBtnIcon);
+    doneButton->setIcon(getThemedIcon({QStringLiteral("task-complete"), QStringLiteral("object-select"), QStringLiteral("dialog-ok")}, style(), QStyle::SP_DialogApplyButton));
+    doneButton->setIconSize(QSize(24, 24));
     doneButton->setToolTip(tr("Mark as Done"));
     connect(doneButton, &QToolButton::clicked, this, &NotificationItemWidget::doneClicked);
     actionLayout->addWidget(doneButton);
