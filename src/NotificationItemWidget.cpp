@@ -15,6 +15,8 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
 
+    setMinimumHeight(60);
+
     // Unread Indicator
     unreadIndicator = new QLabel(this);
     unreadIndicator->setFixedSize(10, 10);
