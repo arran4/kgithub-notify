@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QMessageBox>
 #include <QtDBus/QDBusConnection>
 #include <QtDBus/QDBusError>
 #include <QStandardPaths>
@@ -82,7 +83,14 @@ int main(int argc, char *argv[]) {
     if (!desktopFileFound) {
         qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
         qWarning() << "System tray and notifications may not work correctly with portals.";
-        qWarning() << "Ensure" << desktopFileName << "is installed to" << appPaths.first();
+
+        QMessageBox::warning(nullptr,
+            QCoreApplication::translate("main", "Installation Issue Detected"),
+            QCoreApplication::translate("main",
+                "The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
+                "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
+                "Please ensure the application is installed correctly to one of the following locations:<br>"
+                "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>")));
     }
 
     MainWindow window;
