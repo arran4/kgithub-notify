@@ -28,6 +28,7 @@
 
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
+#include "NotificationListWidget.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -49,10 +50,12 @@ static int calculateSafeInterval(int minutes) {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       trayIcon(nullptr),
+      trayIconMenu(nullptr),
+      notificationListWidget(nullptr),
       client(nullptr),
-      loadMoreItem(nullptr),
       pendingAuthError(false),
-      authNotification(nullptr) {
+      authNotification(nullptr),
+      m_lastUnreadCount(0) {
     setupWindow();
     setupCentralWidget();
     setupNotificationList();
@@ -85,42 +88,16 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
     connect(client, &GitHubClient::authError, this, &MainWindow::onAuthError);
 
-    connect(client, &GitHubClient::detailsError, this, [this](const QString &id, const QString &error) {
-        NotificationItemWidget *widget = findNotificationWidget(id);
-        if (widget) {
-            widget->setError(error);
-        }
-    });
+    connect(client, &GitHubClient::detailsError, notificationListWidget, &NotificationListWidget::updateError);
+    connect(client, &GitHubClient::detailsReceived, notificationListWidget, &NotificationListWidget::updateDetails);
+    connect(client, &GitHubClient::imageReceived, notificationListWidget, &NotificationListWidget::updateImage);
 
-    connect(client, &GitHubClient::detailsReceived, this,
-            [this](const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl) {
-                NotificationDetails &details = detailsCache[id];
-                details.author = author;
-                details.avatarUrl = avatarUrl;
-                details.htmlUrl = htmlUrl;
-                details.hasDetails = true;
-
-                NotificationItemWidget *widget = findNotificationWidget(id);
-                if (widget) {
-                    widget->setAuthor(author, details.avatar);
-                    widget->setHtmlUrl(htmlUrl);
-                }
-
-                if (!details.hasImage && !avatarUrl.isEmpty()) {
-                    if (client) client->fetchImage(avatarUrl, id);
-                }
-            });
-
-    connect(client, &GitHubClient::imageReceived, this, [this](const QString &id, const QPixmap &pixmap) {
-        NotificationDetails &details = detailsCache[id];
-        details.avatar = pixmap;
-        details.hasImage = true;
-
-        NotificationItemWidget *widget = findNotificationWidget(id);
-        if (widget) {
-            widget->setAuthor(details.author, pixmap);
-        }
-    });
+    // Wire up ListWidget requests
+    connect(notificationListWidget, &NotificationListWidget::requestDetails, client, &GitHubClient::fetchNotificationDetails);
+    connect(notificationListWidget, &NotificationListWidget::requestImage, client, &GitHubClient::fetchImage);
+    connect(notificationListWidget, &NotificationListWidget::markAsRead, client, &GitHubClient::markAsRead);
+    connect(notificationListWidget, &NotificationListWidget::markAsDone, client, &GitHubClient::markAsDone);
+    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, client, &GitHubClient::loadMore);
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
@@ -148,24 +125,11 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     pendingAuthError = false;
     lastError.clear();
 
-    int unreadCount = 0;
-    int newNotifications = 0;
-    QList<Notification> newlyAddedNotifications;
-
-    processNewNotifications(notifications, unreadCount, newNotifications, newlyAddedNotifications);
-    updateTrayIconState(unreadCount, newNotifications, newlyAddedNotifications);
-
     if (authNotification && authNotification->isVisible()) {
         authNotification->close();
     }
 
-    if (!append) {
-        m_allNotifications = notifications;
-    } else {
-        m_allNotifications.append(notifications);
-    }
-
-    updateListWidget(m_allNotifications, append, hasMore);
+    notificationListWidget->setNotifications(notifications, append, hasMore);
 
     updateSelectionComboBox();
 
@@ -174,24 +138,61 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     }
 }
 
+void MainWindow::onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems) {
+    m_lastUnreadCount = unread;
+    updateTrayIconState(unread, newCount, newItems);
+
+    if (total == 0) {
+        if(stackWidget->currentWidget() != emptyStatePage) {
+           stackWidget->setCurrentWidget(emptyStatePage);
+        }
+    } else {
+        if(stackWidget->currentWidget() != notificationListWidget) {
+            stackWidget->setCurrentWidget(notificationListWidget);
+        }
+    }
+
+    if (countLabel) {
+        countLabel->setText(tr("Items: %1").arg(total));
+    }
+
+    // Update repo filter
+    QString currentRepo = repoFilterComboBox->currentText();
+    bool wasBlocked = repoFilterComboBox->blockSignals(true);
+    repoFilterComboBox->clear();
+    repoFilterComboBox->addItem(tr("All Repositories"));
+    repoFilterComboBox->addItems(notificationListWidget->getAvailableRepos());
+
+    int index = repoFilterComboBox->findText(currentRepo);
+    if (index >= 0) {
+        repoFilterComboBox->setCurrentIndex(index);
+    } else {
+        repoFilterComboBox->setCurrentIndex(0);
+    }
+    repoFilterComboBox->blockSignals(wasBlocked);
+}
+
+void MainWindow::onListStatusMessage(const QString &message) {
+    if (countLabel) {
+        countLabel->setText(message);
+    }
+}
+
 void MainWindow::showError(const QString &error) {
     if (error == lastError) return;
     lastError = error;
 
-    // Only show error via tray if visible, otherwise standard message box (but avoid spamming boxes)
     if (trayIcon && trayIcon->isVisible()) {
         trayIcon->showMessage(tr("GitHub Error"), error, QSystemTrayIcon::Warning, 5000);
     } else {
-        // Maybe don't show message box on every polling error if window is hidden?
-        // But if window is visible, we should show it.
         if (isVisible()) {
             QMessageBox::warning(this, tr("GitHub Error"), error);
         }
     }
 
     if (stackWidget->currentWidget() == loadingPage) {
-        if (notificationList->count() > 0) {
-            stackWidget->setCurrentWidget(notificationList);
+        if (notificationListWidget->count() > 0) {
+            stackWidget->setCurrentWidget(notificationListWidget);
         } else {
             if (loadingLabel) {
                 loadingLabel->setText(tr("Error: %1").arg(error));
@@ -203,21 +204,12 @@ void MainWindow::showError(const QString &error) {
         statusLabel->setText(tr("Error"));
     }
 
-    // Reset load more button if error occurred during loading more
     updateTrayToolTip();
-    if (loadMoreItem) {
-        QPushButton *btn = qobject_cast<QPushButton *>(notificationList->itemWidget(loadMoreItem));
-        if (btn) {
-            btn->setEnabled(true);
-            btn->setText(tr("Load More"));
-        }
-    }
 }
 
 void MainWindow::onAuthError(const QString &message) {
     pendingAuthError = true;
 
-    // Update error page
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
     stackWidget->setCurrentWidget(errorPage);
 
@@ -225,16 +217,13 @@ void MainWindow::onAuthError(const QString &message) {
         authNotification = new AuthErrorNotification(this);
         connect(authNotification, &AuthErrorNotification::settingsClicked, this,
                 &MainWindow::onAuthNotificationSettingsClicked);
-        // dismissed signal is handled by AuthErrorNotification internally closing itself, but we can hook if needed.
     }
 
     authNotification->setMessage(message);
-
     positionPopup(authNotification);
     authNotification->show();
 
     if (!trayIcon || !trayIcon->isVisible()) {
-        // If tray not visible, show settings or ensure window is visible
         if (isVisible()) {
             showSettings();
         }
@@ -259,48 +248,6 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 void MainWindow::onTrayMessageClicked() {
     if (pendingAuthError) {
         showSettings();
-        // Don't clear pendingAuthError here, wait for successful update
-    }
-}
-
-void MainWindow::onNotificationItemActivated(QListWidgetItem *item) {
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-    if (widget && widget->isLoading()) return;
-
-    QString apiUrl = item->data(Qt::UserRole).toString();
-    QString id = item->data(Qt::UserRole + 1).toString();
-
-    if (client) {
-        client->markAsRead(id);
-    }
-
-    // Visual update
-    if (widget) {
-        widget->setRead(true);
-    }
-
-    // Update internal data
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
-    n.unread = false;
-    item->setData(Qt::UserRole + 4, n.toJson());
-
-    QFont font = item->font();
-    font.setBold(false);
-    item->setFont(font);
-
-    updateTrayMenu();
-
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-    QDesktopServices::openUrl(QUrl(htmlUrl));
-
-    if (filterComboBox && (filterComboBox->currentIndex() == 0 || filterComboBox->currentIndex() == 1)) {
-        delete notificationList->takeItem(notificationList->row(item));
-        updateSelectionComboBox();
-        if (notificationList->count() == 0) {
-            trayIcon->setIcon(
-                themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
-        }
     }
 }
 
@@ -311,7 +258,7 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
-            client->checkNotifications();  // Force check immediately
+            client->checkNotifications();
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
@@ -322,13 +269,13 @@ void MainWindow::showSettings() {
 }
 
 void MainWindow::onLoadingStarted() {
-    if (!notificationList) return;
+    if (!notificationListWidget) return;
 
     if (statusLabel) {
         statusLabel->setText(tr("Checking..."));
     }
 
-    if (notificationList->count() == 0) {
+    if (notificationListWidget->count() == 0) {
         if (stackWidget->currentWidget() != loadingPage) {
             stackWidget->setCurrentWidget(loadingPage);
         }
@@ -339,81 +286,6 @@ void MainWindow::onLoadingStarted() {
     updateTrayToolTip();
 }
 
-void MainWindow::showContextMenu(const QPoint &pos) {
-    QListWidgetItem *item = notificationList->itemAt(pos);
-    if (item) {
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        if (widget && widget->isLoading()) return;
-
-        notificationList->setCurrentItem(item);  // Ensure item is selected
-
-        QString id = item->data(Qt::UserRole + 1).toString();
-
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-
-        if (markAsReadAction) markAsReadAction->setVisible(n.unread);
-
-        contextMenu->exec(notificationList->mapToGlobal(pos));
-    }
-}
-
-void MainWindow::dismissCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (!item) return;
-
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-    if (widget && widget->isLoading()) return;
-    if (widget) widget->setLoading(true);
-
-    QString id = item->data(Qt::UserRole + 1).toString();
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
-
-    n.unread = false;
-
-    // Update item data to reflect read status
-    item->setData(Qt::UserRole + 4, n.toJson());
-    QFont font = item->font();
-    font.setBold(false);
-    item->setFont(font);
-
-    if (client) {
-        client->markAsReadAndDone(id);
-    }
-
-    knownNotificationIds.remove(id);
-
-    // Remove from list
-    delete notificationList->takeItem(notificationList->row(item));
-
-    // Update icon if list is empty
-    if (notificationList->count() == 0) {
-        trayIcon->setIcon(
-            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
-    }
-    updateSelectionComboBox();
-
-    updateTrayMenu();
-}
-
-void MainWindow::openCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (item) {
-        onNotificationItemActivated(item);
-    }
-}
-
-void MainWindow::copyLinkCurrentItem() {
-    QListWidgetItem *item = notificationList->currentItem();
-    if (item) {
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        // Don't include notification_referrer_id for copied links
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
-        QApplication::clipboard()->setText(htmlUrl);
-    }
-}
-
 void MainWindow::onAuthNotificationSettingsClicked() {
     if (authNotification) {
         authNotification->close();
@@ -422,8 +294,8 @@ void MainWindow::onAuthNotificationSettingsClicked() {
 }
 
 void MainWindow::dismissAllNotifications() {
-    onSelectAllClicked();
-    onDismissSelectedClicked();
+    notificationListWidget->selectAll();
+    notificationListWidget->dismissSelected();
 }
 
 void MainWindow::onTokenLoaded() {
@@ -432,7 +304,7 @@ void MainWindow::onTokenLoaded() {
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
     } else {
-        stackWidget->setCurrentWidget(notificationList);
+        stackWidget->setCurrentWidget(notificationListWidget);
         if (client) {
             client->setToken(m_loadedToken);
             client->checkNotifications();
@@ -446,8 +318,8 @@ void MainWindow::onRefreshClicked() {
     client->checkNotifications();
 
     if (refreshTimer) {
-        refreshTimer->start();  // Restart timer
-        updateStatusBar();      // Force update
+        refreshTimer->start();
+        updateStatusBar();
     }
 }
 
@@ -468,14 +340,14 @@ void MainWindow::updateStatusBar() {
 }
 
 void MainWindow::onSelectAllClicked() {
-    if (notificationList) {
-        notificationList->selectAll();
+    if (notificationListWidget) {
+        notificationListWidget->selectAll();
     }
 }
 
 void MainWindow::onSelectNoneClicked() {
-    if (notificationList) {
-        notificationList->clearSelection();
+    if (notificationListWidget) {
+        notificationListWidget->selectNone();
     }
 }
 
@@ -485,13 +357,8 @@ void MainWindow::onSelectionChanged(int index) {
     int n = selectionComboBox->currentData().toInt();
     if (n <= 0) return;
 
-    notificationList->clearSelection();
-    int count = notificationList->count();
-    int limit = qMin(n, count);
-
-    for (int i = 0; i < limit; ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item) item->setSelected(true);
+    if (notificationListWidget) {
+        notificationListWidget->selectTop(n);
     }
 
     bool wasBlocked = selectionComboBox->blockSignals(true);
@@ -500,57 +367,21 @@ void MainWindow::onSelectionChanged(int index) {
 }
 
 void MainWindow::onDismissSelectedClicked() {
-    if (!notificationList || !client) return;
-
-    QList<QListWidgetItem *> items = notificationList->selectedItems();
-    for (auto item : items) {
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        if (widget && !widget->isLoading()) {
-            widget->setLoading(true);
-
-            QString id = item->data(Qt::UserRole + 1).toString();
-            QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-            Notification n = Notification::fromJson(json);
-
-            n.unread = false;
-
-            // Update item data to reflect read status
-            item->setData(Qt::UserRole + 4, n.toJson());
-            QFont font = item->font();
-            font.setBold(false);
-            item->setFont(font);
-
-            client->markAsReadAndDone(id);
-
-            // Remove item from list
-            delete notificationList->takeItem(notificationList->row(item));
-        }
+    if (notificationListWidget) {
+        notificationListWidget->dismissSelected();
     }
-
-    // Update icon if list is empty
-    if (notificationList->count() == 0) {
-        trayIcon->setIcon(
-            themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
-    }
-    updateSelectionComboBox();
-    updateTrayMenu();
 }
 
 void MainWindow::onOpenSelectedClicked() {
-    if (!notificationList) return;
-
-    QList<QListWidgetItem *> items = notificationList->selectedItems();
-    for (auto item : items) {
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+    if (notificationListWidget) {
+        notificationListWidget->openSelected();
     }
 }
 
 void MainWindow::onFilterChanged(int index) {
-    Q_UNUSED(index);
-    updateListWidget(m_allNotifications, false, false);
+    if(notificationListWidget) {
+        notificationListWidget->setFilterMode(index);
+    }
 
     if (refreshTimer) {
         refreshTimer->start();
@@ -579,28 +410,11 @@ void MainWindow::showAboutDialog() {
 }
 
 void MainWindow::openKdeNotificationSettings() {
-    // Try generic systemsettings first (works on Plasma 6 and often 5)
     bool launched = QProcess::startDetached(QStringLiteral("systemsettings"), {QStringLiteral("kcm_notifications")});
-
-    // Try Plasma 6 kcmshell
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
-    }
-
-    // Try Plasma 5 systemsettings
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
-    }
-
-    // Try Plasma 5 kcmshell
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
-    }
-
-    // Fallback: Check if generic kcmshell exists
-    if (!launched) {
-        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
-    }
+    if (!launched) launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
+    if (!launched) launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
+    if (!launched) launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
+    if (!launched) launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
 
     if (!launched) {
         showTrayMessage(tr("Notification settings unavailable"),
@@ -608,20 +422,12 @@ void MainWindow::openKdeNotificationSettings() {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Protected
-// -----------------------------------------------------------------------------
-
 void MainWindow::closeEvent(QCloseEvent *event) {
     if (trayIcon->isVisible()) {
         hide();
         event->ignore();
     }
 }
-
-// -----------------------------------------------------------------------------
-// Private Helpers
-// -----------------------------------------------------------------------------
 
 void MainWindow::createTrayIcon() {
     trayIconMenu = new QMenu(this);
@@ -654,48 +460,29 @@ void MainWindow::updateTrayMenu() {
 
     trayIconMenu->addSeparator();
 
-    int unreadCount = 0;
-    QList<QListWidgetItem *> unreadItems;
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item->font().bold()) {
-            unreadCount++;
-            unreadItems.append(item);
-        }
-    }
+    int unreadCount = m_lastUnreadCount;
+    QList<Notification> unreadNotifications = notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
 
     if (unreadCount > 0) {
         QAction *header = new QAction(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
         header->setEnabled(false);
         trayIconMenu->addAction(header);
 
-        int limit = qMin(unreadCount, 5);
+        int limit = qMin(unreadNotifications.size(), 5);
         for (int i = 0; i < limit; ++i) {
-            QListWidgetItem *item = unreadItems[i];
-            QString title = item->data(Qt::UserRole + 2).toString();
-            QString repo = item->data(Qt::UserRole + 3).toString();
-            QString apiUrl = item->data(Qt::UserRole).toString();
-            QString id = item->data(Qt::UserRole + 1).toString();
-
-            QString label = QString("%1: %2").arg(repo, title);
+            const Notification& n = unreadNotifications[i];
+            QString label = QString("%1: %2").arg(n.repository, n.title);
 
             QAction *itemAction = new QAction(label, trayIconMenu);
-            connect(itemAction, &QAction::triggered, [this, apiUrl, id]() {
+            QString id = n.id;
+            QString url = n.url;
+
+            connect(itemAction, &QAction::triggered, [this, url, id]() {
                 if (client) client->markAsRead(id);
-                QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+                QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
                 QDesktopServices::openUrl(QUrl(htmlUrl));
 
-                // Update local state and refresh menu
-                for (int i = 0; i < notificationList->count(); ++i) {
-                    QListWidgetItem *item = notificationList->item(i);
-                    if (item->data(Qt::UserRole + 1).toString() == id) {
-                        QFont font = item->font();
-                        font.setBold(false);
-                        item->setFont(font);
-                        QTimer::singleShot(0, this, &MainWindow::updateTrayMenu);
-                        break;
-                    }
-                }
+                if(notificationListWidget) notificationListWidget->focusNotification(id);
             });
             trayIconMenu->addAction(itemAction);
         }
@@ -751,26 +538,18 @@ void MainWindow::updateTrayToolTip() {
         parts << tr("Status: OK");
     }
 
-    int unreadCount = 0;
-    QStringList unreadTitles;
-    if (notificationList) {
-        for (int i = 0; i < notificationList->count(); ++i) {
-            QListWidgetItem *item = notificationList->item(i);
-            if (item && item->font().bold()) {
-                unreadCount++;
-                if (unreadTitles.count() < 5) {
-                    QString title = item->data(Qt::UserRole + 2).toString();
-                    QString repo = item->data(Qt::UserRole + 3).toString();
-                    unreadTitles << QStringLiteral("- %1: %2").arg(repo, title);
-                }
-            }
+    parts << tr("Unread: %1").arg(m_lastUnreadCount);
+
+    QList<Notification> unreadNotifications = notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
+
+    if(!unreadNotifications.isEmpty()) {
+        int limit = qMin(unreadNotifications.size(), 5);
+        for(int i=0; i<limit; ++i) {
+             const Notification& n = unreadNotifications[i];
+             parts << QStringLiteral("- %1: %2").arg(n.repository, n.title);
         }
-    }
-    parts << tr("Unread: %1").arg(unreadCount);
-    if (!unreadTitles.isEmpty()) {
-        parts << unreadTitles;
-        if (unreadCount > 5) {
-            parts << tr("... and %1 more").arg(unreadCount - 5);
+        if(m_lastUnreadCount > 5) {
+            parts << tr("... and %1 more").arg(m_lastUnreadCount - 5);
         }
     }
 
@@ -802,15 +581,12 @@ void MainWindow::positionPopup(QWidget *popup) {
     int x = trayGeom.center().x() - popup->width() / 2;
     int y;
 
-    // If tray is in top half, show below
     if (trayGeom.center().y() < screenGeom.height() / 2) {
         y = trayGeom.bottom() + 10;
     } else {
-        // Show above
         y = trayGeom.top() - popup->height() - 10;
     }
 
-    // Clamp X
     if (x < screenGeom.left()) x = screenGeom.left() + 10;
     if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
 
@@ -876,9 +652,7 @@ void MainWindow::ensureWindowActive() {
     showNormal();
     raise();
 
-    // Check if running on Wayland
     if (QGuiApplication::platformName().startsWith(QLatin1String("wayland"), Qt::CaseInsensitive)) {
-        // Wayland doesn't support requestActivate(), so we alert the user
         QApplication::alert(this, 0);
     } else {
         activateWindow();
@@ -905,72 +679,14 @@ void MainWindow::setupCentralWidget() {
 }
 
 void MainWindow::setupNotificationList() {
-    notificationList = new QListWidget(this);
-    notificationList->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    connect(notificationList, &QListWidget::itemActivated, this, &MainWindow::onNotificationItemActivated);
-
-    // Context menu for list
-    notificationList->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(notificationList, &QListWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
-
-    contextMenu = new QMenu(this);
-
-    openAction = new QAction(tr("Open"), this);
-    connect(openAction, &QAction::triggered, this, &MainWindow::openCurrentItem);
-    contextMenu->addAction(openAction);
-
-    copyLinkAction = new QAction(tr("Copy Link"), this);
-    connect(copyLinkAction, &QAction::triggered, this, &MainWindow::copyLinkCurrentItem);
-    contextMenu->addAction(copyLinkAction);
-
-    markAsReadAction = new QAction(tr("Mark as Read"), this);
-    connect(markAsReadAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = notificationList->currentItem();
-        if (!item) return;
-
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        if (widget && widget->isLoading()) return;
-        if (widget) widget->setLoading(true);
-
-        QString id = item->data(Qt::UserRole + 1).toString();
-        if (client) client->markAsRead(id);
-
-        if (widget) {
-            widget->setRead(true);
-        }
-
-        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        Notification n = Notification::fromJson(json);
-        n.unread = false;
-        item->setData(Qt::UserRole + 4, n.toJson());
-
-        QFont font = item->font();
-        font.setBold(false);
-        item->setFont(font);
-        updateTrayMenu();
-
-        if (filterComboBox && (filterComboBox->currentIndex() == 0 || filterComboBox->currentIndex() == 1)) {
-            delete notificationList->takeItem(notificationList->row(item));
-            updateSelectionComboBox();
-            if (notificationList->count() == 0) {
-                trayIcon->setIcon(
-                    themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"), QStyle::SP_ComputerIcon));
-            }
-        }
+    notificationListWidget = new NotificationListWidget(this);
+    connect(notificationListWidget, &NotificationListWidget::countsChanged, this, &MainWindow::onListCountsChanged);
+    connect(notificationListWidget, &NotificationListWidget::statusMessage, this, &MainWindow::onListStatusMessage);
+    connect(notificationListWidget, &NotificationListWidget::linkActivated, this, [this](const QUrl &url){
+        // Do nothing specific, link already opened. Maybe update status?
     });
-    contextMenu->addAction(markAsReadAction);
 
-    markAsDoneAction = new QAction(tr("Mark as Done"), this);
-    connect(markAsDoneAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
-    contextMenu->addAction(markAsDoneAction);
-
-    contextMenu->addSeparator();
-
-    dismissAction = new QAction(tr("Dismiss"), this);
-    connect(dismissAction, &QAction::triggered, this, &MainWindow::dismissCurrentItem);
-    contextMenu->addAction(dismissAction);
-
-    stackWidget->addWidget(notificationList);
+    stackWidget->addWidget(notificationListWidget);
 }
 
 void MainWindow::setupToolbar() {
@@ -996,13 +712,21 @@ void MainWindow::setupToolbar() {
     repoFilterComboBox = new QComboBox(this);
     repoFilterComboBox->addItem(tr("All Repositories"));
     repoFilterComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::applyClientFilters);
+    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
+        if(notificationListWidget) {
+            notificationListWidget->setRepoFilter(repoFilterComboBox->itemText(index));
+        }
+    });
     toolbar->addWidget(repoFilterComboBox);
 
     searchLineEdit = new QLineEdit(this);
     searchLineEdit->setPlaceholderText(tr("Search..."));
     searchLineEdit->setFixedWidth(200);
-    connect(searchLineEdit, &QLineEdit::textChanged, this, &MainWindow::applyClientFilters);
+    connect(searchLineEdit, &QLineEdit::textChanged, this, [this](const QString &text){
+        if(notificationListWidget) {
+            notificationListWidget->setSearchFilter(text);
+        }
+    });
     toolbar->addWidget(searchLineEdit);
 
     toolbar->addSeparator();
@@ -1151,7 +875,8 @@ void MainWindow::sendNotification(const Notification &n) {
     });
 
     connect(notification, &KNotification::action2Activated, this, [this, n]() {
-        focusNotification(n.id);
+        if(notificationListWidget) notificationListWidget->focusNotification(n.id);
+        ensureWindowActive();
     });
 
     connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
@@ -1191,37 +916,10 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     notification->sendEvent();
 }
 
-NotificationItemWidget *MainWindow::findNotificationWidget(const QString &id) {
-    if (!notificationList) return nullptr;
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item->data(Qt::UserRole + 1).toString() == id) {
-            return qobject_cast<NotificationItemWidget *>(notificationList->itemWidget(item));
-        }
-    }
-    return nullptr;
-}
-
-void MainWindow::processNewNotifications(const QList<Notification> &notifications, int &unreadCount,
-                                         int &newNotifications, QList<Notification> &newlyAddedNotifications) {
-    unreadCount = 0;
-    newNotifications = 0;
-    newlyAddedNotifications.clear();
-
-    for (const Notification &n : notifications) {
-        if (n.unread) {
-            unreadCount++;
-            if (!knownNotificationIds.contains(n.id)) {
-                newNotifications++;
-                knownNotificationIds.insert(n.id);
-                newlyAddedNotifications.append(n);
-            }
-        }
-    }
-}
 
 void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
                                      const QList<Notification> &newlyAddedNotifications) {
+
     if (unreadCount <= 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                      QStyle::SP_ComputerIcon));
@@ -1242,131 +940,11 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
     updateTrayMenu();
 }
 
-void MainWindow::updateListWidget(const QList<Notification> & /*notifications*/, bool /*append*/, bool hasMore) {
-    notificationList->setUpdatesEnabled(false);
-    notificationList->clear();
-    loadMoreItem = nullptr;
-
-    if (loadingLabel) loadingLabel->setText(tr("Loading..."));
-
-    int filterIndex = filterComboBox ? filterComboBox->currentIndex() : 0;
-    int count = 0;
-
-    for (const Notification &n : m_allNotifications) {
-        bool show = false;
-        // Inbox (0) / Unread (1)
-        // Logic: Updated > Last Read OR No Last Read
-        // This logic is already captured in n.unread by GitHubClient
-
-        if (filterIndex == 0 || filterIndex == 1) {
-            if (n.unread) show = true;
-        } else if (filterIndex == 2) { // Read
-            if (!n.unread) show = true;
-        }
-
-        if (show) {
-            addNotificationItem(n);
-            count++;
-        }
-    }
-
-    if (count == 0) {
-        stackWidget->setCurrentWidget(emptyStatePage);
-    } else {
-        stackWidget->setCurrentWidget(notificationList);
-    }
-
-    if (hasMore) {
-        loadMoreItem = new QListWidgetItem();
-        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
-        connect(loadMoreBtn, &QPushButton::clicked, this, [this, loadMoreBtn]() {
-            loadMoreBtn->setEnabled(false);
-            loadMoreBtn->setText(tr("Loading..."));
-            if (client) client->loadMore();
-        });
-
-        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
-        loadMoreItem->setFlags(Qt::NoItemFlags);
-
-        notificationList->addItem(loadMoreItem);
-        notificationList->setItemWidget(loadMoreItem, loadMoreBtn);
-    }
-
-    populateRepoFilter();
-    applyClientFilters();
-
-    notificationList->setUpdatesEnabled(true);
-
-    if (countLabel) {
-        countLabel->setText(tr("Items: %1").arg(count));
-    }
-}
-
-void MainWindow::addNotificationItem(const Notification &n) {
-    QListWidgetItem *item = new QListWidgetItem();
-    NotificationItemWidget *widget = new NotificationItemWidget(n);
-
-    if (detailsCache.contains(n.id)) {
-        const NotificationDetails &details = detailsCache[n.id];
-        if (details.hasDetails) {
-            widget->setAuthor(details.author, details.avatar);
-            widget->setHtmlUrl(details.htmlUrl);
-        }
-    } else {
-        if (client) client->fetchNotificationDetails(n.url, n.id);
-    }
-
-    item->setData(Qt::UserRole, n.url);
-    item->setData(Qt::UserRole + 1, n.id);
-    item->setData(Qt::UserRole + 2, n.title);
-    item->setData(Qt::UserRole + 3, n.repository);
-    item->setData(Qt::UserRole + 4, n.toJson());
-
-    QSize hint = widget->sizeHint();
-    if (hint.height() < 60) hint.setHeight(60);
-    item->setSizeHint(hint);
-
-    widget->setRead(!n.unread);
-
-    QPointer<NotificationItemWidget> safeWidget(widget);
-    connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() {
-        onNotificationItemActivated(item);
-    });
-
-    connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
-        if (!safeWidget) return;
-        notificationList->setCurrentItem(item);
-        dismissCurrentItem();
-    }, Qt::QueuedConnection);
-
-    notificationList->addItem(item);
-    notificationList->setItemWidget(item, widget);
-}
-
-void MainWindow::focusNotification(const QString &id) {
-    ensureWindowActive();
-
-    // Switch to Inbox if needed (as new notifications are in Inbox)
-    if (filterComboBox && filterComboBox->currentIndex() != 0) {
-        filterComboBox->setCurrentIndex(0);
-    }
-
-    if (!notificationList) return;
-
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item->data(Qt::UserRole + 1).toString() == id) {
-            notificationList->scrollToItem(item);
-            notificationList->setCurrentItem(item);
-            break;
-        }
-    }
-}
 
 void MainWindow::updateSelectionComboBox() {
-    if (!selectionComboBox || !notificationList) return;
+    if (!selectionComboBox || !notificationListWidget) return;
 
-    int count = notificationList->count();
+    int count = notificationListWidget->count();
     bool wasBlocked = selectionComboBox->blockSignals(true);
     selectionComboBox->clear();
     selectionComboBox->addItem(tr("Select..."));
@@ -1381,82 +959,4 @@ void MainWindow::updateSelectionComboBox() {
 
     selectionComboBox->setCurrentIndex(0);
     selectionComboBox->blockSignals(wasBlocked);
-}
-
-
-void MainWindow::populateRepoFilter() {
-    if (!notificationList || !repoFilterComboBox) return;
-
-    QString currentRepo = repoFilterComboBox->currentText();
-    bool wasBlocked = repoFilterComboBox->blockSignals(true);
-
-    repoFilterComboBox->clear();
-    repoFilterComboBox->addItem(tr("All Repositories"));
-
-    QSet<QString> repos;
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item == loadMoreItem) continue;
-        QString repo = item->data(Qt::UserRole + 3).toString();
-        if (!repo.isEmpty()) {
-            repos.insert(repo);
-        }
-    }
-
-    if (!currentRepo.isEmpty() && currentRepo != tr("All Repositories")) {
-        repos.insert(currentRepo);
-    }
-
-    QStringList repoList = repos.values();
-    repoList.sort();
-    repoFilterComboBox->addItems(repoList);
-
-    int index = repoFilterComboBox->findText(currentRepo);
-    if (index >= 0) {
-        repoFilterComboBox->setCurrentIndex(index);
-    } else {
-        repoFilterComboBox->setCurrentIndex(0);
-    }
-
-    repoFilterComboBox->blockSignals(wasBlocked);
-}
-
-void MainWindow::applyClientFilters() {
-    if (!notificationList || !repoFilterComboBox || !searchLineEdit) return;
-
-    QString repoFilter = repoFilterComboBox->currentText();
-    QString searchText = searchLineEdit->text().trimmed();
-    bool filterRepo = (repoFilter != tr("All Repositories"));
-    bool filterText = !searchText.isEmpty();
-
-    int visibleCount = 0;
-
-    for (int i = 0; i < notificationList->count(); ++i) {
-        QListWidgetItem *item = notificationList->item(i);
-        if (item == loadMoreItem) continue;
-
-        bool matchRepo = true;
-        if (filterRepo) {
-            QString repo = item->data(Qt::UserRole + 3).toString();
-            if (repo != repoFilter) matchRepo = false;
-        }
-
-        bool matchText = true;
-        if (filterText) {
-            QString title = item->data(Qt::UserRole + 2).toString();
-            QString repo = item->data(Qt::UserRole + 3).toString();
-            if (!title.contains(searchText, Qt::CaseInsensitive) &&
-                !repo.contains(searchText, Qt::CaseInsensitive)) {
-                matchText = false;
-            }
-        }
-
-        bool visible = matchRepo && matchText;
-        item->setHidden(!visible);
-        if (visible) visibleCount++;
-    }
-
-    if (countLabel) {
-        countLabel->setText(tr("Items: %1").arg(visibleCount));
-    }
 }

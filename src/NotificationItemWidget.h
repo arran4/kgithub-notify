@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include "GitHubClient.h"
+#include "Notification.h"
 
 class NotificationItemWidget : public QWidget {
     Q_OBJECT

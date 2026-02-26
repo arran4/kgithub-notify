@@ -10,21 +10,7 @@
 #include <QJsonObject>
 #include <QList>
 #include "SecureString.h"
-
-struct Notification {
-    QString id;
-    QString title;
-    QString type;
-    QString repository;
-    QString url; // API URL
-    QString htmlUrl; // HTML URL (cached)
-    QString updatedAt;
-    QString lastReadAt;
-    bool unread;
-
-    QJsonObject toJson() const;
-    static Notification fromJson(const QJsonObject &obj);
-};
+#include "Notification.h"
 
 class GitHubClient : public QObject {
     Q_OBJECT
