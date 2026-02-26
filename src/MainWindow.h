@@ -26,6 +26,7 @@ class NotificationItemWidget;
 class QSpinBox;
 class QComboBox;
 class QLineEdit;
+class DebugWindow;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -60,6 +61,7 @@ class MainWindow : public QMainWindow {
     void onFilterChanged(int index);
     void showAboutDialog();
     void openKdeNotificationSettings();
+    void showDebugWindow();
 
     // From ListWidget
     void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
@@ -95,6 +97,7 @@ class MainWindow : public QMainWindow {
     void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification> &newlyAddedNotifications);
 
     // Member Variables
+    DebugWindow *debugWindow;
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     NotificationListWidget *notificationListWidget;

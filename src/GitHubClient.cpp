@@ -159,6 +159,15 @@ void GitHubClient::fetchImage(const QString &imageUrl, const QString &notificati
     reply->setProperty("notificationId", notificationId);
 }
 
+void GitHubClient::requestRaw(const QString &endpoint) {
+    if (m_token.isEmpty()) return;
+    QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
+    QUrl url(urlStr);
+    QNetworkRequest request = createRequest(url);
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "raw");
+}
+
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
@@ -206,6 +215,12 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         handleImageReply(reply);
     } else if (type == "verification") {
         handleVerificationReply(reply);
+    } else if (type == "raw") {
+        if (reply->error() == QNetworkReply::NoError) {
+            emit rawDataReceived(reply->readAll());
+        } else {
+            emit rawDataReceived(reply->errorString().toUtf8());
+        }
     } else if (type == "patch" || type == "delete") {
         handlePatchReply(reply);
     } else if (type == "read_and_done") {
