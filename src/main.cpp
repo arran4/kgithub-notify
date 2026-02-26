@@ -1,7 +1,13 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDebug>
+#include <QFileInfo>
 #include <QGuiApplication>
+#include <QMessageBox>
+#include <QtDBus/QDBusConnection>
+#include <QtDBus/QDBusError>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include "GitHubClient.h"
@@ -15,7 +21,7 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName("Kgithub-notify");
     QCoreApplication::setApplicationName("kgithub-notify");
     QCoreApplication::setApplicationVersion(QStringLiteral(KGHN_APP_VERSION));
-    QGuiApplication::setDesktopFileName("kgithub-notify");
+    QGuiApplication::setDesktopFileName("org.kgithub_notify");
     QApplication::setQuitOnLastWindowClosed(false);
 
     QApplication app(argc, argv);
@@ -30,7 +36,62 @@ int main(int argc, char *argv[]) {
         QCoreApplication::translate("main", "Start in the background (system tray only)."));
     parser.addOption(backgroundOption);
 
+    QCommandLineOption diagnoseOption(
+        QStringList() << "diagnose",
+        QCoreApplication::translate("main", "Run self-diagnostics and exit."));
+    parser.addOption(diagnoseOption);
+
     parser.process(app);
+
+    // Check for desktop file to warn about potential portal issues
+    QString desktopFileName = QGuiApplication::desktopFileName() + ".desktop";
+    bool desktopFileFound = false;
+    QStringList appPaths = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+    for (const QString &path : appPaths) {
+        if (QFileInfo::exists(path + "/" + desktopFileName)) {
+            desktopFileFound = true;
+            break;
+        }
+    }
+
+    if (parser.isSet(diagnoseOption)) {
+        qDebug() << "=== KGitHub Notify Diagnostics ===";
+        qDebug() << "App Name:" << QCoreApplication::applicationName();
+        qDebug() << "Desktop File Name:" << QGuiApplication::desktopFileName();
+        qDebug() << "Looking for Desktop File:" << desktopFileName;
+
+        qDebug() << "Standard Applications Paths:" << appPaths;
+
+        if (desktopFileFound) {
+            qDebug() << "Desktop File Status: [FOUND]";
+        } else {
+            qDebug() << "Desktop File Status: [MISSING]";
+            qDebug() << "  -> Ensure" << desktopFileName << "is installed to one of the above paths.";
+        }
+
+        if (QDBusConnection::sessionBus().isConnected()) {
+            qDebug() << "DBus Session Bus: [CONNECTED]";
+            qDebug() << "DBus Unique Name:" << QDBusConnection::sessionBus().baseService();
+        } else {
+             qDebug() << "DBus Session Bus: [DISCONNECTED]";
+             qDebug() << "  -> Error:" << QDBusConnection::sessionBus().lastError().message();
+        }
+
+        return 0;
+    }
+
+    if (!desktopFileFound) {
+        qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
+        qWarning() << "System tray and notifications may not work correctly with portals.";
+
+        QMessageBox::warning(nullptr,
+            QCoreApplication::translate("main", "Installation Issue Detected"),
+            QCoreApplication::translate("main",
+                "The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
+                "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
+                "Please ensure the application is installed correctly to one of the following locations:<br>"
+                "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>")));
+    }
 
     MainWindow window;
     GitHubClient client;

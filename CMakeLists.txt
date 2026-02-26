@@ -10,7 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Widgets Network Svg Test REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
 find_package(KF5Wallet REQUIRED)
 find_package(KF5Notifications REQUIRED)
 
@@ -64,6 +64,7 @@ target_link_libraries(kgithub-notify
     Qt5::Widgets
     Qt5::Network
     Qt5::Svg
+    Qt5::DBus
     KF5::Wallet
     KF5::Notifications
 )
@@ -79,6 +80,7 @@ install(TARGETS kgithub-notify
 
 install(FILES kgithub-notify.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    RENAME org.kgithub_notify.desktop
 )
 
 install(FILES src/assets/icon.svg
