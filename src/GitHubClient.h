@@ -44,7 +44,7 @@ public:
     void markAsReadAndDone(const QString &id);
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
-    void requestRaw(const QString &endpoint);
+    void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
 
 signals:
     void loadingStarted();

@@ -159,13 +159,34 @@ void GitHubClient::fetchImage(const QString &imageUrl, const QString &notificati
     reply->setProperty("notificationId", notificationId);
 }
 
-void GitHubClient::requestRaw(const QString &endpoint) {
+void GitHubClient::requestRaw(const QString &endpoint, const QString &method, const QByteArray &body) {
     if (m_token.isEmpty()) return;
     QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
     QUrl url(urlStr);
     QNetworkRequest request = createRequest(url);
-    QNetworkReply *reply = manager->get(request);
-    reply->setProperty("type", "raw");
+
+    if (!body.isEmpty()) {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    }
+
+    QNetworkReply *reply = nullptr;
+    QString m = method.toUpper();
+
+    if (m == "GET") {
+        reply = manager->get(request);
+    } else if (m == "POST") {
+        reply = manager->post(request, body);
+    } else if (m == "PUT") {
+        reply = manager->put(request, body);
+    } else if (m == "DELETE") {
+        reply = manager->deleteResource(request);
+    } else {
+        reply = manager->sendCustomRequest(request, method.toUtf8(), body);
+    }
+
+    if (reply) {
+        reply->setProperty("type", "raw");
+    }
 }
 
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
