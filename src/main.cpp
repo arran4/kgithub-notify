@@ -14,14 +14,11 @@
 int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName("Kgithub-notify");
     QCoreApplication::setApplicationName("kgithub-notify");
+    QCoreApplication::setApplicationVersion(QStringLiteral(KGHN_APP_VERSION));
     QGuiApplication::setDesktopFileName("kgithub-notify");
+    QApplication::setQuitOnLastWindowClosed(false);
 
     QApplication app(argc, argv);
-    QApplication::setOrganizationName("Kgithub-notify");
-    QApplication::setApplicationName("kgithub-notify");
-    QApplication::setDesktopFileName("kgithub-notify");
-    QApplication::setApplicationVersion(QStringLiteral(KGHN_APP_VERSION));
-    QApplication::setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
     parser.setApplicationDescription("GitHub Notification System Tray");
