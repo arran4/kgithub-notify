@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName("Kgithub-notify");
     QCoreApplication::setApplicationName("kgithub-notify");
     QCoreApplication::setApplicationVersion(QStringLiteral(KGHN_APP_VERSION));
-    QGuiApplication::setDesktopFileName("kgithub-notify");
+    QGuiApplication::setDesktopFileName("org.kgithub_notify");
     QApplication::setQuitOnLastWindowClosed(false);
 
     QApplication app(argc, argv);

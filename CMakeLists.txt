@@ -69,7 +69,7 @@ install(TARGETS kgithub-notify
     BUNDLE DESTINATION .
 )
 
-install(FILES kgithub-notify.desktop
+install(FILES org.kgithub_notify.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
 )
 
