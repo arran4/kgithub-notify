@@ -4,6 +4,8 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QtDBus/QDBusConnection>
+#include <QtDBus/QDBusError>
 #include <QStandardPaths>
 #include <QTimer>
 
@@ -33,6 +35,11 @@ int main(int argc, char *argv[]) {
         QCoreApplication::translate("main", "Start in the background (system tray only)."));
     parser.addOption(backgroundOption);
 
+    QCommandLineOption diagnoseOption(
+        QStringList() << "diagnose",
+        QCoreApplication::translate("main", "Run self-diagnostics and exit."));
+    parser.addOption(diagnoseOption);
+
     parser.process(app);
 
     // Check for desktop file to warn about potential portal issues
@@ -44,6 +51,32 @@ int main(int argc, char *argv[]) {
             desktopFileFound = true;
             break;
         }
+    }
+
+    if (parser.isSet(diagnoseOption)) {
+        qDebug() << "=== KGitHub Notify Diagnostics ===";
+        qDebug() << "App Name:" << QCoreApplication::applicationName();
+        qDebug() << "Desktop File Name:" << QGuiApplication::desktopFileName();
+        qDebug() << "Looking for Desktop File:" << desktopFileName;
+
+        qDebug() << "Standard Applications Paths:" << appPaths;
+
+        if (desktopFileFound) {
+            qDebug() << "Desktop File Status: [FOUND]";
+        } else {
+            qDebug() << "Desktop File Status: [MISSING]";
+            qDebug() << "  -> Ensure" << desktopFileName << "is installed to one of the above paths.";
+        }
+
+        if (QDBusConnection::sessionBus().isConnected()) {
+            qDebug() << "DBus Session Bus: [CONNECTED]";
+            qDebug() << "DBus Unique Name:" << QDBusConnection::sessionBus().baseService();
+        } else {
+             qDebug() << "DBus Session Bus: [DISCONNECTED]";
+             qDebug() << "  -> Error:" << QDBusConnection::sessionBus().lastError().message();
+        }
+
+        return 0;
     }
 
     if (!desktopFileFound) {
