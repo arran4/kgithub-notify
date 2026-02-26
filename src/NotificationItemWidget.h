@@ -15,7 +15,6 @@ public:
     explicit NotificationItemWidget(const Notification &notification, QWidget *parent = nullptr);
 
     QToolButton *doneButton;
-    QToolButton *saveButton;
     QToolButton *openButton;
     QLabel *avatarLabel;
     QLabel *titleLabel;
@@ -27,22 +26,17 @@ public:
     QLabel *errorLabel;
     QLabel *loadingLabel;
     QLabel *unreadIndicator;
-    QLabel *savedIndicator;
-    QLabel *doneIndicator;
 
     QString getTitle() const { return titleLabel->text(); }
     void setAuthor(const QString &name, const QPixmap &avatar);
     void setHtmlUrl(const QString &url);
     void setError(const QString &error);
     void setRead(bool read);
-    void setSaved(bool saved);
-    void setDone(bool done);
     void setLoading(bool loading);
     bool isLoading() const { return m_isLoading; }
 
 signals:
     void doneClicked();
-    void saveClicked();
     void openClicked();
 
 private:
