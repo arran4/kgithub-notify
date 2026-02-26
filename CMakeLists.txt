@@ -22,6 +22,8 @@ add_executable(TestGitHubClient
     tests/MockNetworkReply.h
     src/GitHubClient.cpp
     src/GitHubClient.h
+    src/Notification.cpp
+    src/Notification.h
     src/SecureString.h
 )
 
@@ -38,6 +40,8 @@ add_executable(kgithub-notify
     src/main.cpp
     src/GitHubClient.cpp
     src/GitHubClient.h
+    src/Notification.cpp
+    src/Notification.h
     src/SecureString.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
@@ -51,6 +55,8 @@ add_executable(kgithub-notify
     src/AuthErrorNotification.h
     src/NotificationItemWidget.cpp
     src/NotificationItemWidget.h
+    src/NotificationListWidget.cpp
+    src/NotificationListWidget.h
     src/resources.qrc
 )
 

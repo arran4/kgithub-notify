@@ -6,12 +6,9 @@
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
-#include <QListWidget>
 #include <QMainWindow>
-#include <QMap>
 #include <QMenu>
 #include <QPushButton>
-#include <QSet>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QStringList>
@@ -22,6 +19,8 @@
 
 #include "AuthErrorNotification.h"
 #include "GitHubClient.h"
+#include "Notification.h"
+#include "NotificationListWidget.h"
 
 class NotificationItemWidget;
 class QSpinBox;
@@ -45,13 +44,8 @@ class MainWindow : public QMainWindow {
    private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayMessageClicked();
-    void onNotificationItemActivated(QListWidgetItem *item);
     void showSettings();
     void onLoadingStarted();
-    void showContextMenu(const QPoint &pos);
-    void dismissCurrentItem();
-    void openCurrentItem();
-    void copyLinkCurrentItem();
     void onAuthNotificationSettingsClicked();
     void dismissAllNotifications();
     void onTokenLoaded();
@@ -65,10 +59,13 @@ class MainWindow : public QMainWindow {
     void onDismissSelectedClicked();
     void onOpenSelectedClicked();
     void onFilterChanged(int index);
-    void applyClientFilters();
     void showAboutDialog();
     void openKdeNotificationSettings();
     void showDebugWindow();
+
+    // From ListWidget
+    void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
+    void onListStatusMessage(const QString &message);
 
    protected:
     void closeEvent(QCloseEvent *event) override;
@@ -96,42 +93,18 @@ class MainWindow : public QMainWindow {
                      QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
     void sendNotification(const Notification &n);
     void sendSummaryNotification(int count, const QList<Notification> &notifications);
-    NotificationItemWidget *findNotificationWidget(const QString &id);
-    void addNotificationItem(const Notification &n);
-    void focusNotification(const QString &id);
     void updateSelectionComboBox();
-    void processNewNotifications(const QList<Notification> &notifications, int &unreadCount, int &newNotifications,
-                                 QList<Notification> &newlyAddedNotifications);
     void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification> &newlyAddedNotifications);
-    void updateListWidget(const QList<Notification> &notifications, bool append, bool hasMore);
-    void populateRepoFilter();
 
     // Member Variables
     DebugWindow *debugWindow;
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
-    QListWidget *notificationList;
-    QListWidgetItem *loadMoreItem;
+    NotificationListWidget *notificationListWidget;
     GitHubClient *client;
-    QMenu *contextMenu;
-    QAction *dismissAction;
-    QAction *openAction;
-    QAction *copyLinkAction;
-    QAction *markAsReadAction;
-    QAction *markAsDoneAction;
-    QSet<QString> knownNotificationIds;
+
     bool pendingAuthError;
     QString lastError;
-
-    struct NotificationDetails {
-        QString author;
-        QString avatarUrl;
-        QString htmlUrl;
-        QPixmap avatar;
-        bool hasDetails = false;
-        bool hasImage = false;
-    };
-    QMap<QString, NotificationDetails> detailsCache;
 
     // Toolbar
     QToolBar *toolbar;
@@ -171,8 +144,11 @@ class MainWindow : public QMainWindow {
     QFutureWatcher<QString> *tokenWatcher;
     QString m_loadedToken;
 
-    QList<Notification> m_allNotifications;
     QDateTime m_lastCheckTime;
+
+    // Cache for tray menu
+    int m_lastUnreadCount;
+    QList<Notification> m_lastUnreadNotifications; // Only for tray menu display if needed, or rely on widget
 };
 
 #endif  // MAINWINDOW_H
