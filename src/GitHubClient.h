@@ -44,6 +44,7 @@ public:
     void markAsReadAndDone(const QString &id);
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
+    void requestRaw(const QString &endpoint);
 
 signals:
     void loadingStarted();
@@ -51,6 +52,7 @@ signals:
     void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl, const QString &htmlUrl);
     void detailsError(const QString &notificationId, const QString &error);
     void imageReceived(const QString &notificationId, const QPixmap &avatar);
+    void rawDataReceived(const QByteArray &data);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
     void tokenVerified(bool valid, const QString &message);

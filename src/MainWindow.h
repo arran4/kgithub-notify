@@ -27,6 +27,7 @@ class NotificationItemWidget;
 class QSpinBox;
 class QComboBox;
 class QLineEdit;
+class DebugWindow;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -67,6 +68,7 @@ class MainWindow : public QMainWindow {
     void applyClientFilters();
     void showAboutDialog();
     void openKdeNotificationSettings();
+    void showDebugWindow();
 
    protected:
     void closeEvent(QCloseEvent *event) override;
@@ -105,6 +107,7 @@ class MainWindow : public QMainWindow {
     void populateRepoFilter();
 
     // Member Variables
+    DebugWindow *debugWindow;
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QListWidget *notificationList;

@@ -28,6 +28,7 @@
 
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
+#include "DebugWindow.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -48,6 +49,7 @@ static int calculateSafeInterval(int minutes) {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
+      debugWindow(nullptr),
       trayIcon(nullptr),
       client(nullptr),
       loadMoreItem(nullptr),
@@ -578,6 +580,15 @@ void MainWindow::showAboutDialog() {
     aboutBox.exec();
 }
 
+void MainWindow::showDebugWindow() {
+    if (!debugWindow) {
+        debugWindow = new DebugWindow(client, this);
+    }
+    debugWindow->show();
+    debugWindow->raise();
+    debugWindow->activateWindow();
+}
+
 void MainWindow::openKdeNotificationSettings() {
     // Try generic systemsettings first (works on Plasma 6 and often 5)
     bool launched = QProcess::startDetached(QStringLiteral("systemsettings"), {QStringLiteral("kcm_notifications")});
@@ -1085,6 +1096,11 @@ void MainWindow::setupMenus() {
     QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
     helpMenu->addAction(aboutQtAction);
+
+    QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
+    connect(debugAction, &QAction::triggered, this, &MainWindow::showDebugWindow);
+    toolsMenu->addAction(debugAction);
 }
 
 void MainWindow::setupStatusBar() {
