@@ -1,7 +1,10 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDebug>
+#include <QFileInfo>
 #include <QGuiApplication>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include "GitHubClient.h"
@@ -31,6 +34,23 @@ int main(int argc, char *argv[]) {
     parser.addOption(backgroundOption);
 
     parser.process(app);
+
+    // Check for desktop file to warn about potential portal issues
+    QString desktopFileName = QGuiApplication::desktopFileName() + ".desktop";
+    bool desktopFileFound = false;
+    QStringList appPaths = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+    for (const QString &path : appPaths) {
+        if (QFileInfo::exists(path + "/" + desktopFileName)) {
+            desktopFileFound = true;
+            break;
+        }
+    }
+
+    if (!desktopFileFound) {
+        qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
+        qWarning() << "System tray and notifications may not work correctly with portals.";
+        qWarning() << "Ensure" << desktopFileName << "is installed to" << appPaths.first();
+    }
 
     MainWindow window;
     GitHubClient client;
