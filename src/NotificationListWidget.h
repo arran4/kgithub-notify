@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QPixmap>
 #include "Notification.h"
+#include "SettingsDialog.h"
 
 class NotificationItemWidget;
 
@@ -35,6 +36,9 @@ public:
     int count() const;
     QList<Notification> getUnreadNotifications(int limit = 5) const;
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 public slots:
     void updateDetails(const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl);
     void updateImage(const QString &id, const QPixmap &pixmap);
@@ -56,8 +60,11 @@ private slots:
     void onListContextMenu(const QPoint &pos);
     void onItemActivated(QListWidgetItem *item);
     void onLoadMoreClicked();
+    void handleLoadMoreStrategy();
 
 private:
+    void triggerLoadMore();
+
     struct NotificationDetails {
         QString author;
         QString avatarUrl;
