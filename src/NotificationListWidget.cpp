@@ -8,6 +8,9 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QPushButton>
+#include <QScrollBar>
+#include <QTimer>
+#include <QResizeEvent>
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
@@ -25,6 +28,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     listWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(listWidget, &QListWidget::customContextMenuRequested, this, &NotificationListWidget::onListContextMenu);
+    connect(listWidget->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](){ checkLoadMoreVisibility(); });
 
     layout->addWidget(listWidget);
 
@@ -116,6 +120,11 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     updateList();
 }
 
+void NotificationListWidget::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    checkLoadMoreVisibility();
+}
+
 void NotificationListWidget::setFilterMode(int mode) {
     if (m_filterMode == mode) return;
     m_filterMode = mode;
@@ -187,6 +196,21 @@ void NotificationListWidget::openSelected() {
         QString id = item->data(Qt::UserRole + 1).toString();
         QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
         QDesktopServices::openUrl(QUrl(htmlUrl));
+    }
+}
+
+void NotificationListWidget::checkLoadMoreVisibility() {
+    if (!loadMoreItem) return;
+
+    // If already loading or not valid, return
+    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    if (!btn || !btn->isEnabled()) return;
+
+    QRect itemRect = listWidget->visualItemRect(loadMoreItem);
+    QRect viewportRect = listWidget->viewport()->rect();
+
+    if (viewportRect.intersects(itemRect)) {
+        triggerLoadMore();
     }
 }
 
@@ -308,13 +332,19 @@ void NotificationListWidget::onItemActivated(QListWidgetItem *item) {
     }
 }
 
-void NotificationListWidget::onLoadMoreClicked() {
-    QPushButton *btn = qobject_cast<QPushButton *>(sender());
-    if(btn) {
+void NotificationListWidget::triggerLoadMore() {
+    if (!loadMoreItem) return;
+
+    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    if (btn && btn->isEnabled()) {
         btn->setEnabled(false);
         btn->setText(tr("Loading..."));
+        emit loadMoreRequested();
     }
-    emit loadMoreRequested();
+}
+
+void NotificationListWidget::onLoadMoreClicked() {
+    triggerLoadMore();
 }
 
 void NotificationListWidget::addNotificationItem(const Notification &n) {
@@ -404,6 +434,8 @@ void NotificationListWidget::updateList() {
 
     listWidget->setUpdatesEnabled(true);
     emit statusMessage(tr("Items: %1").arg(listWidget->count() - (loadMoreItem ? 1 : 0)));
+
+    QTimer::singleShot(0, this, &NotificationListWidget::checkLoadMoreVisibility);
 }
 
 void NotificationListWidget::applyClientFilters() {
