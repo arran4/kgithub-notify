@@ -31,6 +31,7 @@ public:
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
     void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
+    QNetworkRequest createAuthenticatedRequest(const QUrl &url) const;
 
 signals:
     void loadingStarted();
