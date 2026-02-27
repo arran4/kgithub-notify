@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QPixmap>
 #include "Notification.h"
+#include "SettingsDialog.h"
 
 class NotificationItemWidget;
 
@@ -59,7 +60,7 @@ private slots:
     void onListContextMenu(const QPoint &pos);
     void onItemActivated(QListWidgetItem *item);
     void onLoadMoreClicked();
-    void checkLoadMoreVisibility();
+    void handleLoadMoreStrategy();
 
 private:
     void triggerLoadMore();

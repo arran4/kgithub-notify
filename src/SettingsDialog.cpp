@@ -69,6 +69,23 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     }
     layout->addWidget(intervalCombo);
 
+    // Data Loading Strategy
+    QLabel *dataLabel = new QLabel("Data Loading Strategy:", this);
+    layout->addWidget(dataLabel);
+
+    dataOptionCombo = new QComboBox(this);
+    dataOptionCombo->addItem("Incrementally Manual", GetDataOption::Manual);
+    dataOptionCombo->addItem("Incrementally Fill Screen", GetDataOption::FillScreen);
+    dataOptionCombo->addItem("Get All Data", GetDataOption::GetAll);
+    dataOptionCombo->addItem("Infinite Scrolling", GetDataOption::Infinite);
+
+    GetDataOption currentOption = getGetDataOption();
+    index = dataOptionCombo->findData(currentOption);
+    if (index >= 0) {
+        dataOptionCombo->setCurrentIndex(index);
+    }
+    layout->addWidget(dataOptionCombo);
+
     // Startup
     autostartCheckBox = new QCheckBox("Run on startup", this);
     startMinimizedCheckBox = new QCheckBox("Start minimized (tray only)", this);
@@ -114,6 +131,7 @@ void SettingsDialog::saveSettings() {
 
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
+    settings.setValue("dataOption", dataOptionCombo->currentData().toInt());
 
     updateAutostartEntry();
 
@@ -165,6 +183,11 @@ QFuture<QString> SettingsDialog::getTokenAsync() { return WalletManager::loadTok
 int SettingsDialog::getInterval() {
     QSettings settings;
     return settings.value("interval", 5).toInt();
+}
+
+SettingsDialog::GetDataOption SettingsDialog::getGetDataOption() {
+    QSettings settings;
+    return static_cast<GetDataOption>(settings.value("dataOption", GetDataOption::Manual).toInt());
 }
 
 void SettingsDialog::onTestClicked() {

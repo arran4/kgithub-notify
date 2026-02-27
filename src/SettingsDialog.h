@@ -15,9 +15,13 @@ class SettingsDialog : public QDialog {
     Q_OBJECT
    public:
     explicit SettingsDialog(QWidget *parent = nullptr);
+    enum GetDataOption { Manual, FillScreen, GetAll, Infinite };
+    Q_ENUM(GetDataOption)
+
     static QString getToken();
     static QFuture<QString> getTokenAsync();
     static int getInterval();
+    static GetDataOption getGetDataOption();
 
    private slots:
     void saveSettings();
@@ -30,6 +34,7 @@ class SettingsDialog : public QDialog {
 
     QLineEdit *tokenEdit;
     QComboBox *intervalCombo;
+    QComboBox *dataOptionCombo;
     QCheckBox *autostartCheckBox;
     QCheckBox *startMinimizedCheckBox;
     QPushButton *testButton;
