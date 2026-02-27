@@ -206,6 +206,10 @@ void MainWindow::showError(const QString &error) {
         statusLabel->setText(tr("Error"));
     }
 
+    if (notificationListWidget) {
+        notificationListWidget->resetLoadMoreState();
+    }
+
     updateTrayToolTip();
 }
 
