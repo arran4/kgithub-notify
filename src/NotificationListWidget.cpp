@@ -16,6 +16,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
       loadMoreItem(nullptr),
       m_filterMode(0),
+      m_sortMode(SortUpdatedDesc),
       m_hasMore(false) {
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -128,6 +129,13 @@ void NotificationListWidget::resizeEvent(QResizeEvent *event) {
 void NotificationListWidget::setFilterMode(int mode) {
     if (m_filterMode == mode) return;
     m_filterMode = mode;
+    updateList();
+}
+
+void NotificationListWidget::setSortMode(int mode) {
+    SortMode newMode = static_cast<SortMode>(mode);
+    if (m_sortMode == newMode) return;
+    m_sortMode = newMode;
     updateList();
 }
 
@@ -418,6 +426,7 @@ void NotificationListWidget::updateList() {
     emit statusMessage(tr("Updating list..."));
 
     int count = 0;
+    QList<Notification> filteredList;
 
     for (const Notification &n : m_allNotifications) {
         bool show = false;
@@ -435,9 +444,47 @@ void NotificationListWidget::updateList() {
         }
 
         if (show) {
-            addNotificationItem(n);
+            filteredList.append(n);
             count++;
         }
+    }
+
+    // Sort the list
+    std::sort(filteredList.begin(), filteredList.end(), [this](const Notification &a, const Notification &b) {
+        switch (m_sortMode) {
+        case SortUpdatedDesc:
+            return a.updatedAt > b.updatedAt;
+        case SortUpdatedAsc:
+            return a.updatedAt < b.updatedAt;
+        case SortRepoAsc:
+            return a.repository.compare(b.repository, Qt::CaseInsensitive) < 0;
+        case SortRepoDesc:
+            return a.repository.compare(b.repository, Qt::CaseInsensitive) > 0;
+        case SortTitleAsc:
+            return a.title.compare(b.title, Qt::CaseInsensitive) < 0;
+        case SortTitleDesc:
+            return a.title.compare(b.title, Qt::CaseInsensitive) > 0;
+        case SortTypeAsc:
+            return a.type.compare(b.type, Qt::CaseInsensitive) < 0;
+        case SortTypeDesc:
+            return a.type.compare(b.type, Qt::CaseInsensitive) > 0;
+        case SortLastReadDesc:
+            if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return false;
+            if (a.lastReadAt.isEmpty()) return false; // Nulls at end
+            if (b.lastReadAt.isEmpty()) return true;
+            return a.lastReadAt > b.lastReadAt;
+        case SortLastReadAsc:
+            if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return false;
+            if (a.lastReadAt.isEmpty()) return true; // Nulls at beginning
+            if (b.lastReadAt.isEmpty()) return false;
+            return a.lastReadAt < b.lastReadAt;
+        default:
+            return a.updatedAt > b.updatedAt;
+        }
+    });
+
+    for (const Notification &n : filteredList) {
+        addNotificationItem(n);
     }
 
     if (m_hasMore) {
