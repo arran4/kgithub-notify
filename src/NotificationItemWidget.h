@@ -35,6 +35,7 @@ public:
     void setRead(bool read);
     void setLoading(bool loading);
     bool isLoading() const { return m_isLoading; }
+    void updateNotification(const Notification &n);
 
 signals:
     void doneClicked();
