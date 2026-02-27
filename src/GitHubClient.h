@@ -31,6 +31,7 @@ public:
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
     void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
+    void fetchUserRepos(const QString &pageUrl = QString());
 
 signals:
     void loadingStarted();
@@ -39,6 +40,7 @@ signals:
     void detailsError(const QString &notificationId, const QString &error);
     void imageReceived(const QString &notificationId, const QPixmap &avatar);
     void rawDataReceived(const QByteArray &data);
+    void userReposReceived(const QJsonArray &repos, const QString &nextPageUrl);
     void errorOccurred(const QString &error);
     void authError(const QString &message);
     void tokenVerified(bool valid, const QString &message);
@@ -60,6 +62,7 @@ private:
     void handleDetailsReply(QNetworkReply *reply);
     void handleImageReply(QNetworkReply *reply);
     void handleVerificationReply(QNetworkReply *reply);
+    void handleUserReposReply(QNetworkReply *reply);
     void handlePatchReply(QNetworkReply *reply);
     void handleNotificationsReply(QNetworkReply *reply);
 };

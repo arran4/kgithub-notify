@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QRegularExpression>
+#include <QRegularExpressionMatch>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -189,6 +190,25 @@ void GitHubClient::requestRaw(const QString &endpoint, const QString &method, co
     }
 }
 
+void GitHubClient::fetchUserRepos(const QString &pageUrl) {
+    if (m_token.isEmpty()) return;
+
+    QUrl url;
+    if (pageUrl.isEmpty()) {
+        url = QUrl(m_apiUrl + "/user/repos");
+        QUrlQuery query;
+        query.addQueryItem("per_page", "100");
+        query.addQueryItem("sort", "updated");
+        url.setQuery(query);
+    } else {
+        url = QUrl(pageUrl);
+    }
+
+    QNetworkRequest request = createRequest(url);
+    QNetworkReply *reply = manager->get(request);
+    reply->setProperty("type", "repos");
+}
+
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
@@ -236,6 +256,8 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
         handleImageReply(reply);
     } else if (type == "verification") {
         handleVerificationReply(reply);
+    } else if (type == "repos") {
+        handleUserReposReply(reply);
     } else if (type == "raw") {
         if (reply->error() == QNetworkReply::NoError) {
             emit rawDataReceived(reply->readAll());
@@ -332,6 +354,37 @@ void GitHubClient::handleVerificationReply(QNetworkReply *reply) {
     } else {
         emit tokenVerified(false, reply->errorString());
     }
+}
+
+void GitHubClient::handleUserReposReply(QNetworkReply *reply) {
+    if (reply->error() != QNetworkReply::NoError) {
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            emit authError("Invalid Token");
+        } else {
+            emit errorOccurred(reply->errorString());
+        }
+        return;
+    }
+
+    QByteArray data = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+
+    if (!doc.isArray()) {
+        emit errorOccurred("Invalid JSON response (expected array)");
+        return;
+    }
+
+    QString nextPageUrl;
+    if (reply->hasRawHeader("Link")) {
+        QString linkHeader = reply->rawHeader("Link");
+        QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
+        QRegularExpressionMatch match = re.match(linkHeader);
+        if (match.hasMatch()) {
+            nextPageUrl = match.captured(1);
+        }
+    }
+
+    emit userReposReceived(doc.array(), nextPageUrl);
 }
 
 void GitHubClient::handlePatchReply(QNetworkReply *reply) {
