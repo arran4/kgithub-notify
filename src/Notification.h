@@ -14,6 +14,7 @@ struct Notification {
     QString updatedAt;
     QString lastReadAt;
     bool unread;
+    bool inInbox;
 
     QJsonObject toJson() const;
     static Notification fromJson(const QJsonObject &obj);

@@ -58,6 +58,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         n.unread = false;
+        n.inInbox = false;
         item->setData(Qt::UserRole + 4, n.toJson());
 
         QFont font = item->font();
@@ -108,7 +109,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     // Calculate total unread from m_allNotifications
     int totalUnread = 0;
     for(const auto& n : m_allNotifications) {
-        if(n.unread) totalUnread++;
+        if(n.inInbox && n.unread) totalUnread++;
     }
 
     emit countsChanged(m_allNotifications.count(), totalUnread, newNotifications, newlyAddedNotifications);
@@ -164,6 +165,7 @@ void NotificationListWidget::dismissSelected() {
             Notification n = Notification::fromJson(json);
 
             n.unread = false;
+            n.inInbox = false;
             // Update item data
             item->setData(Qt::UserRole + 4, n.toJson());
             QFont font = item->font();
@@ -290,6 +292,7 @@ void NotificationListWidget::onItemActivated(QListWidgetItem *item) {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
     n.unread = false;
+    n.inInbox = false;
     item->setData(Qt::UserRole + 4, n.toJson());
 
     QFont font = item->font();
@@ -366,11 +369,17 @@ void NotificationListWidget::updateList() {
 
     for (const Notification &n : m_allNotifications) {
         bool show = false;
-        // Inbox (0) / Unread (1)
-        if (m_filterMode == 0 || m_filterMode == 1) {
-            if (n.unread) show = true;
-        } else if (m_filterMode == 2) { // Read
-            if (!n.unread) show = true;
+        // Inbox (0)
+        if (m_filterMode == 0) {
+            if (n.inInbox) show = true;
+        }
+        // Unread (1)
+        else if (m_filterMode == 1) {
+            if (n.inInbox && n.unread) show = true;
+        }
+        // Read (2)
+        else if (m_filterMode == 2) {
+            if (!n.inInbox) show = true;
         }
 
         if (show) {
@@ -454,6 +463,7 @@ void NotificationListWidget::dismissCurrentItem() {
     Notification n = Notification::fromJson(json);
 
     n.unread = false;
+    n.inInbox = false;
     item->setData(Qt::UserRole + 4, n.toJson());
     QFont font = item->font();
     font.setBold(false);
