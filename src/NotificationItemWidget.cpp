@@ -186,3 +186,42 @@ void NotificationItemWidget::setLoading(bool loading) {
         loadingLabel->hide();
     }
 }
+
+void NotificationItemWidget::updateNotification(const Notification &n) {
+    if (titleLabel->text() != n.title) {
+        titleLabel->setText(n.title);
+    }
+
+    QString repoText = QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped());
+    if (repoLabel->text() != repoText) {
+        repoLabel->setText(repoText);
+    }
+
+    QString typeText = QString("Type: %1").arg(n.type);
+    if (typeLabel->text() != typeText) {
+        typeLabel->setText(typeText);
+    }
+
+    QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
+    QString dateStr = dt.isValid()
+                          ? QLocale::system().toString(dt, QLocale::ShortFormat)
+                          : n.updatedAt;
+    QString dateLabelText = "Date: " + dateStr;
+    if (dateLabel->text() != dateLabelText) {
+        dateLabel->setText(dateLabelText);
+    }
+
+    // Update read status
+    setRead(!n.unread);
+
+    // Note: Author and Avatar are updated separately via updateDetails/updateImage signals
+    // Note: URL is often updated via details, but we can set the base one here
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url);
+    if (!n.htmlUrl.isEmpty()) {
+        htmlUrl = n.htmlUrl;
+    }
+    QString urlText = QString("<a href=\"%1\">Open on GitHub</a>").arg(htmlUrl.toHtmlEscaped());
+    if (urlLabel->text() != urlText) {
+        urlLabel->setText(urlText);
+    }
+}
