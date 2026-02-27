@@ -741,6 +741,7 @@ void MainWindow::setupToolbar() {
     toolbar->addWidget(searchLineEdit);
 
     QComboBox *sortComboBox = new QComboBox(this);
+    sortComboBox->addItem(tr("Default (API Order)"));
     sortComboBox->addItem(tr("Updated (Newest)"));
     sortComboBox->addItem(tr("Updated (Oldest)"));
     sortComboBox->addItem(tr("Repository (A-Z)"));

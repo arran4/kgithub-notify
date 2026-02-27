@@ -16,7 +16,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
       loadMoreItem(nullptr),
       m_filterMode(0),
-      m_sortMode(SortUpdatedDesc),
+      m_sortMode(SortDefault),
       m_hasMore(false) {
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -450,38 +450,58 @@ void NotificationListWidget::updateList() {
     }
 
     // Sort the list
-    std::sort(filteredList.begin(), filteredList.end(), [this](const Notification &a, const Notification &b) {
-        switch (m_sortMode) {
-        case SortUpdatedDesc:
-            return a.updatedAt > b.updatedAt;
-        case SortUpdatedAsc:
-            return a.updatedAt < b.updatedAt;
-        case SortRepoAsc:
-            return a.repository.compare(b.repository, Qt::CaseInsensitive) < 0;
-        case SortRepoDesc:
-            return a.repository.compare(b.repository, Qt::CaseInsensitive) > 0;
-        case SortTitleAsc:
-            return a.title.compare(b.title, Qt::CaseInsensitive) < 0;
-        case SortTitleDesc:
-            return a.title.compare(b.title, Qt::CaseInsensitive) > 0;
-        case SortTypeAsc:
-            return a.type.compare(b.type, Qt::CaseInsensitive) < 0;
-        case SortTypeDesc:
-            return a.type.compare(b.type, Qt::CaseInsensitive) > 0;
-        case SortLastReadDesc:
-            if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return false;
-            if (a.lastReadAt.isEmpty()) return false; // Nulls at end
-            if (b.lastReadAt.isEmpty()) return true;
-            return a.lastReadAt > b.lastReadAt;
-        case SortLastReadAsc:
-            if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return false;
-            if (a.lastReadAt.isEmpty()) return true; // Nulls at beginning
-            if (b.lastReadAt.isEmpty()) return false;
-            return a.lastReadAt < b.lastReadAt;
-        default:
-            return a.updatedAt > b.updatedAt;
-        }
-    });
+    if (m_sortMode != SortDefault) {
+        std::sort(filteredList.begin(), filteredList.end(), [this](const Notification &a, const Notification &b) {
+            switch (m_sortMode) {
+            case SortUpdatedDesc:
+                return a.updatedAt > b.updatedAt;
+            case SortUpdatedAsc:
+                return a.updatedAt < b.updatedAt;
+            case SortRepoAsc: {
+                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortRepoDesc: {
+                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTitleAsc: {
+                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTitleDesc: {
+                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTypeAsc: {
+                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTypeDesc: {
+                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortLastReadDesc:
+                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                if (a.lastReadAt.isEmpty()) return false; // Nulls at end
+                if (b.lastReadAt.isEmpty()) return true;
+                return a.lastReadAt > b.lastReadAt;
+            case SortLastReadAsc:
+                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                if (a.lastReadAt.isEmpty()) return true; // Nulls at beginning
+                if (b.lastReadAt.isEmpty()) return false;
+                return a.lastReadAt < b.lastReadAt;
+            default:
+                return a.updatedAt > b.updatedAt;
+            }
+        });
+    }
 
     for (const Notification &n : filteredList) {
         addNotificationItem(n);

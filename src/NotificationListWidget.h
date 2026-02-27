@@ -26,7 +26,8 @@ public:
     void setSearchFilter(const QString &text);
 
     enum SortMode {
-        SortUpdatedDesc = 0,
+        SortDefault = 0,
+        SortUpdatedDesc,
         SortUpdatedAsc,
         SortRepoAsc,
         SortRepoDesc,
