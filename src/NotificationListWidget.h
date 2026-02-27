@@ -89,7 +89,7 @@ private:
         bool hasImage = false;
     };
 
-    void addNotificationItem(const Notification &n);
+    void insertNotificationItem(int row, const Notification &n);
     void updateList();
     void applyClientFilters();
     NotificationItemWidget *findNotificationWidget(const QString &id);

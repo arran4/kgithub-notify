@@ -11,6 +11,7 @@
 #include <QScrollBar>
 #include <QTimer>
 #include <QResizeEvent>
+#include <algorithm>
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
@@ -377,7 +378,7 @@ void NotificationListWidget::onLoadMoreClicked() {
     triggerLoadMore();
 }
 
-void NotificationListWidget::addNotificationItem(const Notification &n) {
+void NotificationListWidget::insertNotificationItem(int row, const Notification &n) {
     QListWidgetItem *item = new QListWidgetItem();
     NotificationItemWidget *widget = new NotificationItemWidget(n);
 
@@ -414,44 +415,33 @@ void NotificationListWidget::addNotificationItem(const Notification &n) {
         dismissCurrentItem();
     }, Qt::QueuedConnection);
 
-    listWidget->addItem(item);
+    listWidget->insertItem(row, item);
     listWidget->setItemWidget(item, widget);
 }
 
 void NotificationListWidget::updateList() {
     listWidget->setUpdatesEnabled(false);
-    listWidget->clear();
-    loadMoreItem = nullptr;
-
     emit statusMessage(tr("Updating list..."));
 
-    int count = 0;
-    QList<Notification> filteredList;
-
+    // Prepare Target List
+    QList<Notification> targetNotifications;
     for (const Notification &n : m_allNotifications) {
         bool show = false;
-        // Inbox (0)
-        if (m_filterMode == 0) {
+        if (m_filterMode == 0) { // Inbox
             if (n.inInbox) show = true;
-        }
-        // Unread (1)
-        else if (m_filterMode == 1) {
+        } else if (m_filterMode == 1) { // Unread
             if (n.inInbox && n.unread) show = true;
-        }
-        // Read (2)
-        else if (m_filterMode == 2) {
+        } else if (m_filterMode == 2) { // Read
             if (!n.inInbox) show = true;
         }
-
         if (show) {
-            filteredList.append(n);
-            count++;
+            targetNotifications.append(n);
         }
     }
 
     // Sort the list
     if (m_sortMode != SortDefault) {
-        std::sort(filteredList.begin(), filteredList.end(), [this](const Notification &a, const Notification &b) {
+        std::sort(targetNotifications.begin(), targetNotifications.end(), [this](const Notification &a, const Notification &b) {
             switch (m_sortMode) {
             case SortUpdatedDesc:
                 return a.updatedAt > b.updatedAt;
@@ -503,20 +493,120 @@ void NotificationListWidget::updateList() {
         });
     }
 
-    for (const Notification &n : filteredList) {
-        addNotificationItem(n);
+    // Sync Loop
+    int i = 0;
+    while (i < targetNotifications.size()) {
+        const Notification &n = targetNotifications[i];
+        QListWidgetItem *currentItem = listWidget->item(i);
+
+        // Check if current item matches target
+        QString currentId = currentItem ? currentItem->data(Qt::UserRole + 1).toString() : QString();
+
+        // Skip "Load More" item if encountered during sync (should be at end)
+        if (currentItem == loadMoreItem && loadMoreItem != nullptr) {
+             // If we hit load more item but still have notifications to place,
+             // we need to insert before it.
+             currentId = ""; // Treat as mismatch
+        }
+
+        if (currentItem && currentId == n.id) {
+            // Match: Update existing
+            NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(currentItem));
+            if (widget) {
+                widget->updateNotification(n);
+            }
+            // Update Item Data
+            currentItem->setData(Qt::UserRole + 4, n.toJson());
+            // Font update is handled in updateNotification -> setRead
+            i++;
+        } else {
+            // Mismatch
+            // Check if n.id exists later in the list
+            int foundIndex = -1;
+            for (int k = i + 1; k < listWidget->count(); ++k) {
+                QListWidgetItem *searchItem = listWidget->item(k);
+                if (searchItem == loadMoreItem) continue;
+                if (searchItem->data(Qt::UserRole + 1).toString() == n.id) {
+                    foundIndex = k;
+                    break;
+                }
+            }
+
+            if (foundIndex != -1) {
+                // Found later: Move it to current position 'i'
+                // Safely remove old item and widget
+                QWidget *widget = listWidget->itemWidget(listWidget->item(foundIndex));
+                if (widget) {
+                    widget->deleteLater();
+                }
+                QListWidgetItem *movedItem = listWidget->takeItem(foundIndex);
+                delete movedItem;
+
+                insertNotificationItem(i, n);
+            } else {
+                // Not found: Insert new
+                insertNotificationItem(i, n);
+            }
+            i++;
+        }
     }
 
+    // Cleanup: Remove remaining items starting from i (excluding loadMoreItem if we want to keep it logic clean)
+    // We iterate backwards to avoid index shifting issues
+    for (int k = listWidget->count() - 1; k >= i; --k) {
+        QListWidgetItem *item = listWidget->item(k);
+        if (item == loadMoreItem) {
+            // Handle loadMoreItem logic below, don't delete here unless we reset it
+            continue;
+        }
+        QWidget *w = listWidget->itemWidget(item);
+        if (w) w->deleteLater();
+        delete listWidget->takeItem(k);
+    }
+
+    // Handle Load More Item
+    // It should be at the end if m_hasMore is true.
     if (m_hasMore) {
-        loadMoreItem = new QListWidgetItem();
-        QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
-        connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
+        if (!loadMoreItem) {
+            loadMoreItem = new QListWidgetItem();
+            QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+            connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
 
-        loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
-        loadMoreItem->setFlags(Qt::NoItemFlags);
+            loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+            loadMoreItem->setFlags(Qt::NoItemFlags);
 
-        listWidget->addItem(loadMoreItem);
-        listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
+            listWidget->addItem(loadMoreItem);
+            listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
+        } else {
+             // Ensure it is at the very end
+             int r = listWidget->row(loadMoreItem);
+             if (r != listWidget->count() - 1) {
+                 QWidget *w = listWidget->itemWidget(loadMoreItem);
+                 if(w) w->deleteLater();
+                 listWidget->takeItem(r);
+                 delete loadMoreItem; // Delete old pointer
+
+                 loadMoreItem = new QListWidgetItem();
+                 QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+                 connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
+
+                 loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+                 loadMoreItem->setFlags(Qt::NoItemFlags);
+
+                 listWidget->addItem(loadMoreItem);
+                 listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
+             }
+        }
+    } else {
+        if (loadMoreItem) {
+            int r = listWidget->row(loadMoreItem);
+            if (r >= 0) {
+                 QWidget *w = listWidget->itemWidget(loadMoreItem);
+                 if(w) w->deleteLater();
+                 delete listWidget->takeItem(r);
+            }
+            loadMoreItem = nullptr;
+        }
     }
 
     applyClientFilters();
