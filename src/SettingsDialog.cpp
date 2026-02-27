@@ -75,7 +75,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
 
     dataOptionCombo = new QComboBox(this);
     dataOptionCombo->addItem("Incrementally Manual", GetDataOption::Manual);
-    dataOptionCombo->addItem("Incrementally Fill Screen", GetDataOption::FillScreen);
+    dataOptionCombo->addItem("Incrementally Fill Screen (Then Manual)", GetDataOption::FillScreen);
     dataOptionCombo->addItem("Get All Data", GetDataOption::GetAll);
     dataOptionCombo->addItem("Infinite Scrolling", GetDataOption::Infinite);
 
