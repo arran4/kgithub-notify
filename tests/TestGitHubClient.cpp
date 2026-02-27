@@ -169,6 +169,116 @@ private slots:
         QCOMPARE(notifications[2].id, QString("3"));
         QCOMPARE(notifications[2].unread, false); // Updated <= Read
     }
+
+    void testUserRules() {
+        GitHubClient client;
+        QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
+
+        /*
+        Case 1:
+        "unread": false,
+        "last_read_at": null,
+        "updated_at": "2026-02-27T00:27:04Z",
+        Is to be treated as not in the inbox regardless of the "last read at" setting.
+        It is to be treated as unread as there is no last read at date.
+        */
+        QJsonObject n1;
+        n1["id"] = "1";
+        n1["subject"] = QJsonObject{{"title", "Case 1"}, {"url", "u1"}, {"type", "Issue"}};
+        n1["repository"] = QJsonObject{{"full_name", "r1"}};
+        n1["unread"] = false;
+        n1["last_read_at"] = QJsonValue::Null;
+        n1["updated_at"] = "2026-02-27T00:27:04Z";
+
+        /*
+        Case 2:
+        "unread": true,
+        "last_read_at": "2026-02-27T00:25:53Z",
+        "updated_at": "2026-02-27T00:27:04Z",
+        Is to be treated as unread as updated is newer
+        It is to be listed in the inbox because unread is true
+        */
+        QJsonObject n2;
+        n2["id"] = "2";
+        n2["subject"] = QJsonObject{{"title", "Case 2"}, {"url", "u2"}, {"type", "Issue"}};
+        n2["repository"] = QJsonObject{{"full_name", "r2"}};
+        n2["unread"] = true;
+        n2["last_read_at"] = "2026-02-27T00:25:53Z";
+        n2["updated_at"] = "2026-02-27T00:27:04Z";
+
+        /*
+        Case 3:
+        "unread": false,
+        "last_read_at": "2026-02-27T00:25:53Z",
+        "updated_at": "2026-02-27T00:27:04Z",
+        Is to be treated as unread as updated is newer
+        It is to be listed "done" (not in inbox) as it's unread (false)
+        */
+        QJsonObject n3;
+        n3["id"] = "3";
+        n3["subject"] = QJsonObject{{"title", "Case 3"}, {"url", "u3"}, {"type", "Issue"}};
+        n3["repository"] = QJsonObject{{"full_name", "r3"}};
+        n3["unread"] = false;
+        n3["last_read_at"] = "2026-02-27T00:25:53Z";
+        n3["updated_at"] = "2026-02-27T00:27:04Z";
+
+        /*
+        Case 4:
+        "unread": false,
+        "last_read_at": "2026-02-27T00:28:53Z",
+        "updated_at": "2026-02-27T00:27:04Z",
+        Is to be treated as read as last update (or the same) is older than last read
+        */
+        QJsonObject n4;
+        n4["id"] = "4";
+        n4["subject"] = QJsonObject{{"title", "Case 4"}, {"url", "u4"}, {"type", "Issue"}};
+        n4["repository"] = QJsonObject{{"full_name", "r4"}};
+        n4["unread"] = false;
+        n4["last_read_at"] = "2026-02-27T00:28:53Z";
+        n4["updated_at"] = "2026-02-27T00:27:04Z";
+
+        QJsonArray array;
+        array.append(n1);
+        array.append(n2);
+        array.append(n3);
+        array.append(n4);
+        QJsonDocument doc(array);
+
+        MockNetworkReply *reply = new MockNetworkReply(doc.toJson(), &client);
+        reply->setProperty("type", "notifications");
+        reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+
+        QCOMPARE(spy.count(), 1);
+        QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();
+
+        QCOMPARE(notifications.size(), 4);
+
+        // Case 1 Check
+        // unread: false, last_read_at: null -> inInbox = false, unread = true
+        QCOMPARE(notifications[0].id, QString("1"));
+        QCOMPARE(notifications[0].inInbox, false);
+        QCOMPARE(notifications[0].unread, true);
+
+        // Case 2 Check
+        // unread: true, updated > last_read -> inInbox = true, unread = true
+        QCOMPARE(notifications[1].id, QString("2"));
+        QCOMPARE(notifications[1].inInbox, true);
+        QCOMPARE(notifications[1].unread, true);
+
+        // Case 3 Check
+        // unread: false, updated > last_read -> inInbox = false, unread = true
+        QCOMPARE(notifications[2].id, QString("3"));
+        QCOMPARE(notifications[2].inInbox, false);
+        QCOMPARE(notifications[2].unread, true);
+
+        // Case 4 Check
+        // unread: false, updated < last_read -> inInbox = false, unread = false
+        QCOMPARE(notifications[3].id, QString("4"));
+        QCOMPARE(notifications[3].inInbox, false);
+        QCOMPARE(notifications[3].unread, false);
+    }
 };
 
 QTEST_MAIN(TestGitHubClient)
