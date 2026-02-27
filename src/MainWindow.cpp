@@ -30,6 +30,7 @@
 #include "SettingsDialog.h"
 #include "NotificationListWidget.h"
 #include "DebugWindow.h"
+#include "trending/TrendingWindow.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -51,6 +52,7 @@ static int calculateSafeInterval(int minutes) {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       debugWindow(nullptr),
+      trendingWindow(nullptr),
       trayIcon(nullptr),
       trayIconMenu(nullptr),
       notificationListWidget(nullptr),
@@ -418,6 +420,15 @@ void MainWindow::showDebugWindow() {
     debugWindow->show();
     debugWindow->raise();
     debugWindow->activateWindow();
+}
+
+void MainWindow::showTrendingWindow() {
+    if (!trendingWindow) {
+        trendingWindow = new TrendingWindow(client, this);
+    }
+    trendingWindow->show();
+    trendingWindow->raise();
+    trendingWindow->activateWindow();
 }
 
 void MainWindow::openKdeNotificationSettings() {
@@ -822,6 +833,11 @@ void MainWindow::setupMenus() {
     helpMenu->addAction(aboutQtAction);
 
     QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+
+    QAction *trendingAction = new QAction(tr("Trending Repos & Devs"), this);
+    connect(trendingAction, &QAction::triggered, this, &MainWindow::showTrendingWindow);
+    toolsMenu->addAction(trendingAction);
+
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, &MainWindow::showDebugWindow);
     toolsMenu->addAction(debugAction);
