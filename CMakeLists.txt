@@ -47,6 +47,8 @@ add_executable(kgithub-notify
     src/SettingsDialog.h
     src/DebugWindow.cpp
     src/DebugWindow.h
+    src/RepoListWindow.cpp
+    src/RepoListWindow.h
     src/trending/TrendingWindow.cpp
     src/trending/TrendingWindow.h
     src/WalletManager.cpp

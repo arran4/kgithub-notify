@@ -27,6 +27,7 @@ class QSpinBox;
 class QComboBox;
 class QLineEdit;
 class DebugWindow;
+class RepoListWindow;
 class TrendingWindow;
 
 class MainWindow : public QMainWindow {
@@ -63,6 +64,7 @@ class MainWindow : public QMainWindow {
     void showAboutDialog();
     void openKdeNotificationSettings();
     void showDebugWindow();
+    void showRepoListWindow();
     void showTrendingWindow();
     void showMyIssues();
     void showMyPrs();
@@ -102,6 +104,7 @@ class MainWindow : public QMainWindow {
 
     // Member Variables
     DebugWindow *debugWindow;
+    RepoListWindow *repoListWindow;
     TrendingWindow *trendingWindow;
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;

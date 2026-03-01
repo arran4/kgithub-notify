@@ -30,6 +30,7 @@
 #include "SettingsDialog.h"
 #include "NotificationListWidget.h"
 #include "DebugWindow.h"
+#include "RepoListWindow.h"
 #include "trending/TrendingWindow.h"
 #include "WorkItemWindow.h"
 
@@ -53,6 +54,7 @@ static int calculateSafeInterval(int minutes) {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       debugWindow(nullptr),
+      repoListWindow(nullptr),
       trendingWindow(nullptr),
       trayIcon(nullptr),
       trayIconMenu(nullptr),
@@ -425,6 +427,15 @@ void MainWindow::showDebugWindow() {
     debugWindow->show();
     debugWindow->raise();
     debugWindow->activateWindow();
+}
+
+void MainWindow::showRepoListWindow() {
+    if (!repoListWindow) {
+        repoListWindow = new RepoListWindow(client, this);
+    }
+    repoListWindow->show();
+    repoListWindow->raise();
+    repoListWindow->activateWindow();
 }
 
 void MainWindow::showTrendingWindow() {
@@ -867,6 +878,9 @@ void MainWindow::setupMenus() {
     connect(debugAction, &QAction::triggered, this, &MainWindow::showDebugWindow);
     toolsMenu->addAction(debugAction);
 
+    QAction *repoListAction = new QAction(tr("Repositories List"), this);
+    connect(repoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
+    toolsMenu->addAction(repoListAction);
     toolsMenu->addSeparator();
 
     QAction *issuesAction = new QAction(tr("My Open Issues"), this);
