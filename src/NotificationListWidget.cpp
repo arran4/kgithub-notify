@@ -115,7 +115,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     // Calculate total unread from m_allNotifications
     int totalUnread = 0;
     for(const auto& n : m_allNotifications) {
-        if(n.inInbox && n.unread) totalUnread++;
+        if(n.unread) totalUnread++;
     }
 
     emit countsChanged(m_allNotifications.count(), totalUnread, newNotifications, newlyAddedNotifications);
@@ -428,11 +428,11 @@ void NotificationListWidget::updateList() {
     for (const Notification &n : m_allNotifications) {
         bool show = false;
         if (m_filterMode == 0) { // Inbox
-            if (n.inInbox) show = true;
+            if (n.unread) show = true;
         } else if (m_filterMode == 1) { // Unread
             if (n.inInbox && n.unread) show = true;
         } else if (m_filterMode == 2) { // Read
-            if (!n.inInbox) show = true;
+            if (!n.unread) show = true;
         }
         if (show) {
             targetNotifications.append(n);
