@@ -197,6 +197,10 @@ void GitHubClient::requestRaw(const QString &endpoint, const QString &method, co
     }
 }
 
+QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url) const {
+    return createRequest(url);
+}
+
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
 
