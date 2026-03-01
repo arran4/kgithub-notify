@@ -18,6 +18,10 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     m_pendingPatchRequests = 0;
     m_showAll = false;
     m_nextPageUrl = "";
+
+    m_requestTimeoutTimer = new QTimer(this);
+    m_requestTimeoutTimer->setSingleShot(true);
+    connect(m_requestTimeoutTimer, &QTimer::timeout, this, &GitHubClient::onRequestTimeout);
 }
 
 QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
@@ -68,6 +72,8 @@ void GitHubClient::checkNotifications() {
     reply->setProperty("type", "notifications");
     reply->setProperty("append", false);
     m_activeNotificationReply = reply;
+
+    m_requestTimeoutTimer->start(30000); // 30 seconds timeout
 }
 
 void GitHubClient::loadMore() {
@@ -86,6 +92,8 @@ void GitHubClient::loadMore() {
     reply->setProperty("type", "notifications");
     reply->setProperty("append", true);
     m_activeNotificationReply = reply;
+
+    m_requestTimeoutTimer->start(30000); // 30 seconds timeout
 }
 
 void GitHubClient::verifyToken() {
@@ -220,6 +228,7 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 
 void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     if (reply == m_activeNotificationReply) {
+        m_requestTimeoutTimer->stop();
         m_activeNotificationReply = nullptr;
     }
 
@@ -424,4 +433,11 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
     bool append = reply->property("append").toBool();
     emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
+}
+
+void GitHubClient::onRequestTimeout() {
+    emit errorOccurred("Request timed out");
+    if (m_activeNotificationReply) {
+        m_activeNotificationReply->abort();
+    }
 }

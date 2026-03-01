@@ -58,6 +58,7 @@ public slots:
     void updateDetails(const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl);
     void updateImage(const QString &id, const QPixmap &pixmap);
     void updateError(const QString &id, const QString &error);
+    void resetLoadMoreState();
 
 signals:
     void countsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);

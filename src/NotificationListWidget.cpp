@@ -712,3 +712,13 @@ QList<Notification> NotificationListWidget::getUnreadNotifications(int limit) co
     }
     return unread;
 }
+
+void NotificationListWidget::resetLoadMoreState() {
+    if (!loadMoreItem) return;
+
+    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    if (btn) {
+        btn->setEnabled(true);
+        btn->setText(tr("Load More"));
+    }
+}
