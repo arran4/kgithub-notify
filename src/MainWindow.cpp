@@ -740,6 +740,26 @@ void MainWindow::setupToolbar() {
     });
     toolbar->addWidget(searchLineEdit);
 
+    QComboBox *sortComboBox = new QComboBox(this);
+    sortComboBox->addItem(tr("Default (API Order)"));
+    sortComboBox->addItem(tr("Updated (Newest)"));
+    sortComboBox->addItem(tr("Updated (Oldest)"));
+    sortComboBox->addItem(tr("Repository (A-Z)"));
+    sortComboBox->addItem(tr("Repository (Z-A)"));
+    sortComboBox->addItem(tr("Title (A-Z)"));
+    sortComboBox->addItem(tr("Title (Z-A)"));
+    sortComboBox->addItem(tr("Type (A-Z)"));
+    sortComboBox->addItem(tr("Type (Z-A)"));
+    sortComboBox->addItem(tr("Last Read (Newest)"));
+    sortComboBox->addItem(tr("Last Read (Oldest)"));
+    sortComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
+        if(notificationListWidget) {
+            notificationListWidget->setSortMode(index);
+        }
+    });
+    toolbar->addWidget(sortComboBox);
+
     toolbar->addSeparator();
 
     selectAllAction = new QAction(tr("Select All"), this);

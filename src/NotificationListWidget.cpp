@@ -11,11 +11,13 @@
 #include <QScrollBar>
 #include <QTimer>
 #include <QResizeEvent>
+#include <algorithm>
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
       loadMoreItem(nullptr),
       m_filterMode(0),
+      m_sortMode(SortDefault),
       m_hasMore(false) {
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -128,6 +130,13 @@ void NotificationListWidget::resizeEvent(QResizeEvent *event) {
 void NotificationListWidget::setFilterMode(int mode) {
     if (m_filterMode == mode) return;
     m_filterMode = mode;
+    updateList();
+}
+
+void NotificationListWidget::setSortMode(int mode) {
+    SortMode newMode = static_cast<SortMode>(mode);
+    if (m_sortMode == newMode) return;
+    m_sortMode = newMode;
     updateList();
 }
 
@@ -428,6 +437,60 @@ void NotificationListWidget::updateList() {
         if (show) {
             targetNotifications.append(n);
         }
+    }
+
+    // Sort the list
+    if (m_sortMode != SortDefault) {
+        std::sort(targetNotifications.begin(), targetNotifications.end(), [this](const Notification &a, const Notification &b) {
+            switch (m_sortMode) {
+            case SortUpdatedDesc:
+                return a.updatedAt > b.updatedAt;
+            case SortUpdatedAsc:
+                return a.updatedAt < b.updatedAt;
+            case SortRepoAsc: {
+                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortRepoDesc: {
+                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTitleAsc: {
+                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTitleDesc: {
+                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTypeAsc: {
+                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp < 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortTypeDesc: {
+                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                if (cmp != 0) return cmp > 0;
+                return a.updatedAt > b.updatedAt;
+            }
+            case SortLastReadDesc:
+                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                if (a.lastReadAt.isEmpty()) return false; // Nulls at end
+                if (b.lastReadAt.isEmpty()) return true;
+                return a.lastReadAt > b.lastReadAt;
+            case SortLastReadAsc:
+                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                if (a.lastReadAt.isEmpty()) return true; // Nulls at beginning
+                if (b.lastReadAt.isEmpty()) return false;
+                return a.lastReadAt < b.lastReadAt;
+            default:
+                return a.updatedAt > b.updatedAt;
+            }
+        });
     }
 
     // Sync Loop
