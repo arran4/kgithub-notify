@@ -148,8 +148,9 @@ void GitHubClient::markAsReadAndDone(const QString &id) {
 }
 
 void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
-    if (m_token.isEmpty()) return;
+    if (m_token.isEmpty() || url.isEmpty()) return;
     QUrl qUrl(url);
+    if (!qUrl.isValid()) return;
     QNetworkRequest request = createRequest(qUrl);
     QNetworkReply *reply = manager->get(request);
     reply->setProperty("type", "details");
