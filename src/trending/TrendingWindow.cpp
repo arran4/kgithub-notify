@@ -16,7 +16,7 @@
 #include <QClipboard>
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
-    : QWidget(parent), m_client(client) {
+    : QWidget(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(600, 400);
 
