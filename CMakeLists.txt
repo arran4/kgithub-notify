@@ -55,8 +55,8 @@ add_executable(kgithub-notify
     src/WalletManager.h
     src/MainWindow.cpp
     src/MainWindow.h
-    src/AuthErrorNotification.cpp
-    src/AuthErrorNotification.h
+    src/PopupNotification.cpp
+    src/PopupNotification.h
     src/NotificationItemWidget.cpp
     src/NotificationItemWidget.h
     src/NotificationListWidget.cpp
