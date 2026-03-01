@@ -123,6 +123,22 @@ void MainWindow::showTrayMessage(const QString &title, const QString &message) {
     trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 3000);
 }
 
+void MainWindow::showDesktopFileWarning(const QString &desktopFileName, const QStringList &appPaths) {
+    if (!installWarningNotification) {
+        installWarningNotification = new PopupNotification(this);
+        installWarningNotification->setSettingsVisible(false);
+    }
+
+    QString message = tr("The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
+                         "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
+                         "Please ensure the application is installed correctly to one of the following locations:<br>"
+                         "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>"));
+
+    installWarningNotification->setMessage(message);
+    positionPopup(installWarningNotification);
+    installWarningNotification->show();
+}
+
 // -----------------------------------------------------------------------------
 // Slots
 // -----------------------------------------------------------------------------
@@ -225,8 +241,8 @@ void MainWindow::onAuthError(const QString &message) {
     stackWidget->setCurrentWidget(errorPage);
 
     if (!authNotification) {
-        authNotification = new AuthErrorNotification(this);
-        connect(authNotification, &AuthErrorNotification::settingsClicked, this,
+        authNotification = new PopupNotification(this);
+        connect(authNotification, &PopupNotification::settingsClicked, this,
                 &MainWindow::onAuthNotificationSettingsClicked);
     }
 

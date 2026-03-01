@@ -1,5 +1,5 @@
-#ifndef AUTHERRORNOTIFICATION_H
-#define AUTHERRORNOTIFICATION_H
+#ifndef POPUPNOTIFICATION_H
+#define POPUPNOTIFICATION_H
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -7,12 +7,13 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-class AuthErrorNotification : public QWidget {
+class PopupNotification : public QWidget {
     Q_OBJECT
 
    public:
-    explicit AuthErrorNotification(QWidget *parent = nullptr);
+    explicit PopupNotification(QWidget *parent = nullptr);
     void setMessage(const QString &message);
+    void setSettingsVisible(bool visible);
 
    signals:
     void settingsClicked();
@@ -28,4 +29,4 @@ class AuthErrorNotification : public QWidget {
     QPushButton *dismissButton;
 };
 
-#endif  // AUTHERRORNOTIFICATION_H
+#endif  // POPUPNOTIFICATION_H

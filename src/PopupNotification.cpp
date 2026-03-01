@@ -1,9 +1,9 @@
-#include "AuthErrorNotification.h"
+#include "PopupNotification.h"
 
 #include <QApplication>
 #include <QStyle>
 
-AuthErrorNotification::AuthErrorNotification(QWidget *parent) : QWidget(parent) {
+PopupNotification::PopupNotification(QWidget *parent) : QWidget(parent) {
     // Set window flags for a tooltip-like, topmost, frameless window
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_ShowWithoutActivating);
@@ -27,35 +27,39 @@ AuthErrorNotification::AuthErrorNotification(QWidget *parent) : QWidget(parent) 
     settingsButton = new QPushButton("Settings", this);
     settingsButton->setStyleSheet(
         "background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
-    connect(settingsButton, &QPushButton::clicked, this, &AuthErrorNotification::onSettingsClicked);
+    connect(settingsButton, &QPushButton::clicked, this, &PopupNotification::onSettingsClicked);
     buttonLayout->addWidget(settingsButton);
 
     dismissButton = new QPushButton("Dismiss", this);
     dismissButton->setStyleSheet(
         "background-color: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 3px;");
-    connect(dismissButton, &QPushButton::clicked, this, &AuthErrorNotification::onDismissClicked);
+    connect(dismissButton, &QPushButton::clicked, this, &PopupNotification::onDismissClicked);
     buttonLayout->addWidget(dismissButton);
 
     mainLayout->addLayout(buttonLayout);
 
     // General styling
-    setStyleSheet("AuthErrorNotification { background-color: #333; border: 1px solid #555; border-radius: 5px; }");
+    setStyleSheet("PopupNotification { background-color: #333; border: 1px solid #555; border-radius: 5px; }");
 
     // Set fixed width to avoid being too wide or narrow
     setFixedWidth(300);
 }
 
-void AuthErrorNotification::setMessage(const QString &message) {
+void PopupNotification::setMessage(const QString &message) {
     messageLabel->setText(message);
     adjustSize();
 }
 
-void AuthErrorNotification::onSettingsClicked() {
+void PopupNotification::setSettingsVisible(bool visible) {
+    settingsButton->setVisible(visible);
+}
+
+void PopupNotification::onSettingsClicked() {
     emit settingsClicked();
     close();
 }
 
-void AuthErrorNotification::onDismissClicked() {
+void PopupNotification::onDismissClicked() {
     emit dismissed();
     close();
 }

@@ -80,23 +80,17 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    if (!desktopFileFound) {
-        qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
-        qWarning() << "System tray and notifications may not work correctly with portals.";
-
-        QMessageBox::warning(nullptr,
-            QCoreApplication::translate("main", "Installation Issue Detected"),
-            QCoreApplication::translate("main",
-                "The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
-                "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
-                "Please ensure the application is installed correctly to one of the following locations:<br>"
-                "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>")));
-    }
-
     MainWindow window;
     GitHubClient client;
 
     window.setClient(&client);
+
+    if (!desktopFileFound) {
+        qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
+        qWarning() << "System tray and notifications may not work correctly with portals.";
+
+        window.showDesktopFileWarning(desktopFileName, appPaths);
+    }
 
     if (!parser.isSet(backgroundOption)) {
         window.show();

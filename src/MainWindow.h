@@ -17,7 +17,7 @@
 #include <QTimer>
 #include <QToolBar>
 
-#include "AuthErrorNotification.h"
+#include "PopupNotification.h"
 #include "GitHubClient.h"
 #include "Notification.h"
 #include "NotificationListWidget.h"
@@ -37,6 +37,7 @@ class MainWindow : public QMainWindow {
     ~MainWindow();
     void setClient(GitHubClient *client);
     void showTrayMessage(const QString &title, const QString &message);
+    void showDesktopFileWarning(const QString &desktopFileName, const QStringList &appPaths);
 
    public slots:
     void updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
@@ -139,7 +140,8 @@ class MainWindow : public QMainWindow {
     QWidget *loadingPage;
     QLabel *loadingLabel;
 
-    AuthErrorNotification *authNotification;
+    PopupNotification *authNotification;
+    PopupNotification *installWarningNotification = nullptr;
 
     // Status Bar
     QStatusBar *statusBar;
