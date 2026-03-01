@@ -28,6 +28,7 @@ class QComboBox;
 class QLineEdit;
 class DebugWindow;
 class RepoListWindow;
+class TrendingWindow;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -64,6 +65,9 @@ class MainWindow : public QMainWindow {
     void openKdeNotificationSettings();
     void showDebugWindow();
     void showRepoListWindow();
+    void showTrendingWindow();
+    void showMyIssues();
+    void showMyPrs();
 
     // From ListWidget
     void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
@@ -101,6 +105,7 @@ class MainWindow : public QMainWindow {
     // Member Variables
     DebugWindow *debugWindow;
     RepoListWindow *repoListWindow;
+    TrendingWindow *trendingWindow;
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     NotificationListWidget *notificationListWidget;

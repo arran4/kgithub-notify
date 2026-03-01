@@ -49,6 +49,8 @@ add_executable(kgithub-notify
     src/DebugWindow.h
     src/RepoListWindow.cpp
     src/RepoListWindow.h
+    src/trending/TrendingWindow.cpp
+    src/trending/TrendingWindow.h
     src/WalletManager.cpp
     src/WalletManager.h
     src/MainWindow.cpp
@@ -59,6 +61,8 @@ add_executable(kgithub-notify
     src/NotificationItemWidget.h
     src/NotificationListWidget.cpp
     src/NotificationListWidget.h
+    src/WorkItemWindow.cpp
+    src/WorkItemWindow.h
     src/resources.qrc
 )
 
