@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
+#include <QTimer>
 #include "SecureString.h"
 #include "Notification.h"
 
@@ -31,6 +32,7 @@ public:
     void fetchNotificationDetails(const QString &url, const QString &notificationId);
     void fetchImage(const QString &imageUrl, const QString &notificationId);
     void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
+    QNetworkRequest createAuthenticatedRequest(const QUrl &url) const;
 
 signals:
     void loadingStarted();
@@ -45,6 +47,7 @@ signals:
 
 private slots:
     void onReplyFinished(QNetworkReply *reply);
+    void onRequestTimeout();
 
 private:
     QNetworkAccessManager *manager;
@@ -54,6 +57,7 @@ private:
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
     QPointer<QNetworkReply> m_activeNotificationReply;
+    QTimer *m_requestTimeoutTimer;
 
     QNetworkRequest createRequest(const QUrl &url) const;
 

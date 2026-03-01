@@ -64,6 +64,8 @@ class MainWindow : public QMainWindow {
     void openKdeNotificationSettings();
     void showDebugWindow();
     void showTrendingWindow();
+    void showMyIssues();
+    void showMyPrs();
 
     // From ListWidget
     void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);

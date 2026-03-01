@@ -31,6 +31,7 @@
 #include "NotificationListWidget.h"
 #include "DebugWindow.h"
 #include "trending/TrendingWindow.h"
+#include "WorkItemWindow.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -206,6 +207,10 @@ void MainWindow::showError(const QString &error) {
 
     if (statusLabel) {
         statusLabel->setText(tr("Error"));
+    }
+
+    if (notificationListWidget) {
+        notificationListWidget->resetLoadMoreState();
     }
 
     updateTrayToolTip();
@@ -751,6 +756,26 @@ void MainWindow::setupToolbar() {
     });
     toolbar->addWidget(searchLineEdit);
 
+    QComboBox *sortComboBox = new QComboBox(this);
+    sortComboBox->addItem(tr("Default (API Order)"));
+    sortComboBox->addItem(tr("Updated (Newest)"));
+    sortComboBox->addItem(tr("Updated (Oldest)"));
+    sortComboBox->addItem(tr("Repository (A-Z)"));
+    sortComboBox->addItem(tr("Repository (Z-A)"));
+    sortComboBox->addItem(tr("Title (A-Z)"));
+    sortComboBox->addItem(tr("Title (Z-A)"));
+    sortComboBox->addItem(tr("Type (A-Z)"));
+    sortComboBox->addItem(tr("Type (Z-A)"));
+    sortComboBox->addItem(tr("Last Read (Newest)"));
+    sortComboBox->addItem(tr("Last Read (Oldest)"));
+    sortComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
+        if(notificationListWidget) {
+            notificationListWidget->setSortMode(index);
+        }
+    });
+    toolbar->addWidget(sortComboBox);
+
     toolbar->addSeparator();
 
     selectAllAction = new QAction(tr("Select All"), this);
@@ -841,6 +866,28 @@ void MainWindow::setupMenus() {
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, &MainWindow::showDebugWindow);
     toolsMenu->addAction(debugAction);
+
+    toolsMenu->addSeparator();
+
+    QAction *issuesAction = new QAction(tr("My Open Issues"), this);
+    connect(issuesAction, &QAction::triggered, this, &MainWindow::showMyIssues);
+    toolsMenu->addAction(issuesAction);
+
+    QAction *prsAction = new QAction(tr("My Open Pull Requests"), this);
+    connect(prsAction, &QAction::triggered, this, &MainWindow::showMyPrs);
+    toolsMenu->addAction(prsAction);
+}
+
+void MainWindow::showMyIssues() {
+    WorkItemWindow *window = new WorkItemWindow(client, WorkItemWindow::Issues, this);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->show();
+}
+
+void MainWindow::showMyPrs() {
+    WorkItemWindow *window = new WorkItemWindow(client, WorkItemWindow::PullRequests, this);
+    window->setAttribute(Qt::WA_DeleteOnClose);
+    window->show();
 }
 
 void MainWindow::setupStatusBar() {

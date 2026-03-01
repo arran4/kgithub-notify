@@ -21,8 +21,23 @@ public:
 
     void setNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
     void setFilterMode(int mode); // 0: Inbox, 1: Unread, 2: Read
+    void setSortMode(int mode);
     void setRepoFilter(const QString &repo);
     void setSearchFilter(const QString &text);
+
+    enum SortMode {
+        SortDefault = 0,
+        SortUpdatedDesc,
+        SortUpdatedAsc,
+        SortRepoAsc,
+        SortRepoDesc,
+        SortTitleAsc,
+        SortTitleDesc,
+        SortTypeAsc,
+        SortTypeDesc,
+        SortLastReadDesc,
+        SortLastReadAsc
+    };
 
     void selectAll();
     void selectNone();
@@ -43,6 +58,7 @@ public slots:
     void updateDetails(const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl);
     void updateImage(const QString &id, const QPixmap &pixmap);
     void updateError(const QString &id, const QString &error);
+    void resetLoadMoreState();
 
 signals:
     void countsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
@@ -90,6 +106,7 @@ private:
 
     // Filters
     int m_filterMode;
+    SortMode m_sortMode;
     QString m_repoFilter;
     QString m_searchFilter;
     bool m_hasMore;
