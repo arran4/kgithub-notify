@@ -23,6 +23,7 @@ class DebugWindow : public QDialog {
     Q_OBJECT
 public:
     explicit DebugWindow(GitHubClient *client, QWidget *parent = nullptr);
+    void setEndpoint(const QString &url);
 
 private slots:
     void sendRequest();

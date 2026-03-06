@@ -31,7 +31,7 @@ QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notific
     htmlUrl.replace("/pulls/", "/pull/");
     htmlUrl.replace("/commits/", "/commit/");
 
-    if (!notificationId.isEmpty()) {
+    if (!notificationId.isEmpty() && !htmlUrl.isEmpty()) {
         QUrl url(htmlUrl);
         QUrlQuery query(url.query());
         query.addQueryItem("notification_referrer_id", notificationId);

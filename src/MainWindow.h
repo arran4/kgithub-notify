@@ -66,7 +66,7 @@ class MainWindow : public QMainWindow {
     void onFilterChanged(int index);
     void showAboutDialog();
     void openKdeNotificationSettings();
-    void showDebugWindow();
+    void showDebugWindow(const QString &url = "");
     void showRepoListWindow();
     void showTrendingWindow();
     void showMyIssues();

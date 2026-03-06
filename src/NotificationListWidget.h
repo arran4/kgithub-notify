@@ -71,6 +71,7 @@ signals:
     void notificationActivated(const QString &id);
     void requestDetails(const QString &url, const QString &id);
     void requestImage(const QString &url, const QString &id);
+    void requestDebugApi(const QString &url);
 
 private slots:
     void onListContextMenu(const QPoint &pos);

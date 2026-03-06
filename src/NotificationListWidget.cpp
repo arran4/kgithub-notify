@@ -754,9 +754,38 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
 
     NotificationWindow *win = new NotificationWindow(n, this);
     win->setAttribute(Qt::WA_DeleteOnClose);
-    win->show();
+    connect(win, &NotificationWindow::debugApiRequested, this, [this](const QString &url) { emit requestDebugApi(url); });
 
-    markAsReadAndRemoveItem(item);
+    connect(win, &NotificationWindow::actionRequested, this, [this](const QString &actionName, const QString &id, const QString &url) {
+        // Find item by ID
+        QListWidgetItem *targetItem = nullptr;
+        for (int i = 0; i < listWidget->count(); ++i) {
+            QListWidgetItem *it = listWidget->item(i);
+            if (it->data(Qt::UserRole + 1).toString() == id) {
+                targetItem = it;
+                break;
+            }
+        }
+
+        if (targetItem) {
+            listWidget->setCurrentItem(targetItem);
+            if (actionName == "markAsRead") {
+                markAsReadAndRemoveItem(targetItem);
+            } else if (actionName == "markAsDone") {
+                dismissCurrentItem();
+            }
+        } else {
+             // If not found in the visible list, we can at least emit the signal
+             if (actionName == "markAsRead") {
+                 emit markAsRead(id);
+             } else if (actionName == "markAsDone") {
+                 emit markAsDone(id);
+                 knownNotificationIds.remove(id);
+             }
+        }
+    });
+
+    win->show();
 }
 
 void NotificationListWidget::copyLinkCurrentItem() {

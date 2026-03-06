@@ -103,6 +103,7 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(notificationListWidget, &NotificationListWidget::requestDetails, client, &GitHubClient::fetchNotificationDetails);
     connect(notificationListWidget, &NotificationListWidget::requestImage, client, &GitHubClient::fetchImage);
     connect(notificationListWidget, &NotificationListWidget::markAsRead, client, &GitHubClient::markAsRead);
+    connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this, [this](const QString &url) { showDebugWindow(url); });
     connect(notificationListWidget, &NotificationListWidget::markAsDone, client, &GitHubClient::markAsDone);
     connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, client, &GitHubClient::loadMore);
 
@@ -431,10 +432,11 @@ void MainWindow::showAboutDialog() {
     aboutBox.exec();
 }
 
-void MainWindow::showDebugWindow() {
+void MainWindow::showDebugWindow(const QString &url) {
     if (!debugWindow) {
         debugWindow = new DebugWindow(client, this);
     }
+    if (!url.isEmpty()) debugWindow->setEndpoint(url);
     debugWindow->show();
     debugWindow->raise();
     debugWindow->activateWindow();
@@ -886,7 +888,7 @@ void MainWindow::setupMenus() {
     toolsMenu->addAction(trendingAction);
 
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
-    connect(debugAction, &QAction::triggered, this, &MainWindow::showDebugWindow);
+    connect(debugAction, &QAction::triggered, this, [this]() { showDebugWindow(); });
     toolsMenu->addAction(debugAction);
 
     QAction *repoListAction = new QAction(tr("Repositories List"), this);

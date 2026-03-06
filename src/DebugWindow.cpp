@@ -156,3 +156,7 @@ void DebugWindow::displayResponse(const QByteArray &data) {
         m_responseOutput->setText(QString::fromUtf8(data));
     }
 }
+
+void DebugWindow::setEndpoint(const QString &url) {
+    m_endpointInput->setText(url);
+}

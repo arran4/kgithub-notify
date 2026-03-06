@@ -28,3 +28,4 @@ TestGitHubClient
 TestGitHubClient_autogen/
 kgithub-notify
 kgithub-notify_autogen/
+*.py
