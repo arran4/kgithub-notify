@@ -10,12 +10,14 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QStackedWidget>
+#include <QMessageBox>
 #include <QStatusBar>
 #include <QStringList>
 #include <QStyle>
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 
 #include "PopupNotification.h"
 #include "GitHubClient.h"
@@ -141,10 +143,11 @@ class MainWindow : public QMainWindow {
     QLabel *loadingLabel;
 
     PopupNotification *authNotification;
-    PopupNotification *installWarningNotification = nullptr;
 
     // Status Bar
     QStatusBar *statusBar;
+    QToolButton *desktopWarningButton;
+    QString desktopWarningMessage;
     QLabel *countLabel;
     QLabel *timerLabel;
     QTimer *refreshTimer;

@@ -1,5 +1,6 @@
 #include "NotificationListWidget.h"
 #include "NotificationItemWidget.h"
+#include "NotificationWindow.h"
 #include "GitHubClient.h"
 
 #include <QVBoxLayout>
@@ -44,6 +45,14 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     openAction = new QAction(tr("Open in Browser"), this);
     connect(openAction, &QAction::triggered, this, &NotificationListWidget::openCurrentItem);
     contextMenu->addAction(openAction);
+
+    openWindowAction = new QAction(tr("Open"), this);
+    connect(openWindowAction, &QAction::triggered, this, &NotificationListWidget::openWindowCurrentItem);
+    contextMenu->addAction(openWindowAction);
+
+    openUrlAction = new QAction(tr("Open URL"), this);
+    connect(openUrlAction, &QAction::triggered, this, &NotificationListWidget::openUrlCurrentItem);
+    contextMenu->addAction(openUrlAction);
 
     copyLinkAction = new QAction(tr("Copy Link"), this);
     connect(copyLinkAction, &QAction::triggered, this, &NotificationListWidget::copyLinkCurrentItem);
@@ -225,10 +234,7 @@ void NotificationListWidget::dismissSelected() {
 void NotificationListWidget::openSelected() {
     QList<QListWidgetItem *> items = listWidget->selectedItems();
     for (auto item : items) {
-        QString apiUrl = item->data(Qt::UserRole).toString();
-        QString id = item->data(Qt::UserRole + 1).toString();
-        QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+        openUrlForItem(item);
     }
 }
 
@@ -356,35 +362,7 @@ void NotificationListWidget::onListContextMenu(const QPoint &pos) {
 }
 
 void NotificationListWidget::onItemActivated(QListWidgetItem *item) {
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
-    if (widget && widget->isLoading()) return;
-
-    QString apiUrl = item->data(Qt::UserRole).toString();
-    QString id = item->data(Qt::UserRole + 1).toString();
-
-    emit markAsRead(id);
-
-    if (widget) {
-        widget->setRead(true);
-    }
-
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
-    n.unread = false;
-    n.inInbox = false;
-    item->setData(Qt::UserRole + 4, n.toJson());
-
-    QFont font = item->font();
-    font.setBold(false);
-    item->setFont(font);
-
-    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
-    emit linkActivated(QUrl(htmlUrl));
-    QDesktopServices::openUrl(QUrl(htmlUrl));
-
-    if (m_filterMode == 0 || m_filterMode == 1) {
-        delete listWidget->takeItem(listWidget->row(item));
-    }
+    openWindowForItem(item);
 }
 
 void NotificationListWidget::triggerLoadMore() {
@@ -430,7 +408,7 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification 
 
     QPointer<NotificationItemWidget> safeWidget(widget);
     connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() {
-        onItemActivated(item);
+        openUrlForItem(item);
     });
 
     connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
@@ -710,11 +688,75 @@ void NotificationListWidget::dismissCurrentItem() {
     delete listWidget->takeItem(listWidget->row(item));
 }
 
-void NotificationListWidget::openCurrentItem() {
+void NotificationListWidget::openUrlCurrentItem() {
     QListWidgetItem *item = listWidget->currentItem();
     if (item) {
-        onItemActivated(item);
+        openUrlForItem(item);
     }
+}
+
+void NotificationListWidget::openWindowCurrentItem() {
+    QListWidgetItem *item = listWidget->currentItem();
+    if (item) {
+        openWindowForItem(item);
+    }
+}
+
+void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
+    QString id = item->data(Qt::UserRole + 1).toString();
+
+    emit markAsRead(id);
+
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    if (widget) {
+        widget->setRead(true);
+    }
+
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+    n.unread = false;
+    n.inInbox = false;
+    item->setData(Qt::UserRole + 4, n.toJson());
+
+    QFont font = item->font();
+    font.setBold(false);
+    item->setFont(font);
+
+    if (m_filterMode == 0 || m_filterMode == 1) {
+        delete listWidget->takeItem(listWidget->row(item));
+    }
+}
+
+void NotificationListWidget::openUrlForItem(QListWidgetItem *item) {
+    if (!item) return;
+
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    if (widget && widget->isLoading()) return;
+
+    QString apiUrl = item->data(Qt::UserRole).toString();
+    QString id = item->data(Qt::UserRole + 1).toString();
+
+    QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
+    emit linkActivated(QUrl(htmlUrl));
+    QDesktopServices::openUrl(QUrl(htmlUrl));
+
+    markAsReadAndRemoveItem(item);
+}
+
+void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
+    if (!item) return;
+
+    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    if (widget && widget->isLoading()) return;
+
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    NotificationWindow *win = new NotificationWindow(n, this);
+    win->setAttribute(Qt::WA_DeleteOnClose);
+    win->show();
+
+    markAsReadAndRemoveItem(item);
 }
 
 void NotificationListWidget::copyLinkCurrentItem() {

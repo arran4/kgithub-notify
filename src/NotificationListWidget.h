@@ -95,8 +95,12 @@ private:
     void applyClientFilters();
     NotificationItemWidget *findNotificationWidget(const QString &id);
     void dismissCurrentItem();
-    void openCurrentItem();
+    void openUrlCurrentItem();
+    void openWindowCurrentItem();
+    void openUrlForItem(QListWidgetItem *item);
+    void openWindowForItem(QListWidgetItem *item);
     void copyLinkCurrentItem();
+    void markAsReadAndRemoveItem(QListWidgetItem *item);
 
     QListWidget *listWidget;
     QList<Notification> m_allNotifications;
@@ -113,7 +117,8 @@ private:
 
     // Context Menu
     QMenu *contextMenu;
-    QAction *openAction;
+    QAction *openWindowAction;
+    QAction *openUrlAction;
     QAction *copyLinkAction;
     QAction *markAsReadAction;
     QAction *markAsDoneAction;
