@@ -89,7 +89,7 @@ install(TARGETS kgithub-notify
 
 install(FILES kgithub-notify.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-    RENAME org.kgithub_notify.desktop
+    RENAME com.arran4.kgithub_notify.desktop
 )
 
 install(FILES src/assets/icon.svg
