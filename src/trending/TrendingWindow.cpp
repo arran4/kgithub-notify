@@ -16,6 +16,8 @@
 #include <QClipboard>
 #include <QHeaderView>
 #include <QTableWidget>
+#include <QTextEdit>
+#include <QDialog>
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     : QWidget(parent, Qt::Window), m_client(client) {
@@ -35,12 +37,35 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     timeframeComboBox->addItem(tr("This Week"));
     timeframeComboBox->addItem(tr("This Month"));
 
+    langComboBox = new QComboBox(this);
+    langComboBox->addItem(tr("All Languages"), "");
+    langComboBox->addItem(tr("C++"), "c++");
+    langComboBox->addItem(tr("Python"), "python");
+    langComboBox->addItem(tr("JavaScript"), "javascript");
+    langComboBox->addItem(tr("Java"), "java");
+    langComboBox->addItem(tr("Go"), "go");
+    langComboBox->addItem(tr("Rust"), "rust");
+    langComboBox->addItem(tr("Ruby"), "ruby");
+
+    spokenLangComboBox = new QComboBox(this);
+    spokenLangComboBox->addItem(tr("Any Spoken"), "");
+    spokenLangComboBox->addItem(tr("English"), "en");
+    spokenLangComboBox->addItem(tr("Chinese"), "zh");
+    spokenLangComboBox->addItem(tr("Spanish"), "es");
+    spokenLangComboBox->addItem(tr("French"), "fr");
+    spokenLangComboBox->addItem(tr("German"), "de");
+    spokenLangComboBox->addItem(tr("Japanese"), "ja");
+
     refreshButton = new QPushButton(tr("Refresh"), this);
 
     topLayout->addWidget(new QLabel(tr("Mode:")));
     topLayout->addWidget(modeComboBox);
     topLayout->addWidget(new QLabel(tr("Timeframe:")));
     topLayout->addWidget(timeframeComboBox);
+    topLayout->addWidget(new QLabel(tr("Lang:")));
+    topLayout->addWidget(langComboBox);
+    topLayout->addWidget(new QLabel(tr("Spoken:")));
+    topLayout->addWidget(spokenLangComboBox);
     topLayout->addStretch();
     topLayout->addWidget(refreshButton);
 
@@ -50,6 +75,7 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     tableWidget->setWordWrap(true);
     tableWidget->verticalHeader()->hide();
     tableWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    tableWidget->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
 
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(tableWidget);
@@ -57,6 +83,8 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     connect(refreshButton, &QPushButton::clicked, this, &TrendingWindow::onRefreshClicked);
     connect(modeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onModeChanged);
     connect(timeframeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
+    connect(langComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
+    connect(spokenLangComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
     connect(tableWidget, &QTableWidget::itemActivated, this, &TrendingWindow::onItemActivated);
     connect(tableWidget, &QTableWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
         QTableWidgetItem *item = tableWidget->itemAt(pos);
@@ -65,6 +93,7 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
         QMenu menu(this);
         QAction *openAction = menu.addAction(tr("Open in Browser"));
         QAction *copyAction = menu.addAction(tr("Copy Link"));
+        QAction *viewRawAction = menu.addAction(tr("View Raw JSON"));
 
         QAction *selectedAction = menu.exec(tableWidget->mapToGlobal(pos));
         if (selectedAction == openAction) {
@@ -72,6 +101,21 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
         } else if (selectedAction == copyAction) {
             QString url = item->data(Qt::UserRole).toString();
             QApplication::clipboard()->setText(url);
+        } else if (selectedAction == viewRawAction) {
+            QString rawJson = item->data(Qt::UserRole + 1).toString();
+            // Display raw JSON in a simple widget or dialog
+            if (!rawJson.isEmpty()) {
+                QDialog *dialog = new QDialog(this);
+                dialog->setWindowTitle(tr("Raw JSON"));
+                dialog->resize(400, 300);
+                QVBoxLayout *layout = new QVBoxLayout(dialog);
+                QTextEdit *textEdit = new QTextEdit(dialog);
+                textEdit->setReadOnly(true);
+                textEdit->setPlainText(rawJson);
+                layout->addWidget(textEdit);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                dialog->show();
+            }
         }
     });
 
@@ -106,12 +150,25 @@ void TrendingWindow::onRefreshClicked() {
     QString dateStr = date.toString("yyyy-MM-dd");
 
     QString endpoint;
+    QString langFilter = langComboBox->currentData().toString();
+    QString spokenLangFilter = spokenLangComboBox->currentData().toString();
+
+    QString langQuery = "";
+    if (!langFilter.isEmpty()) {
+        langQuery += "+language:" + langFilter;
+    }
+    if (!spokenLangFilter.isEmpty()) {
+        // spoken language is an undocumented filter for repositories search in some versions, or part of standard string search
+        // e.g., +spoken_language:en. If unsupported it will just do a text match.
+        langQuery += "+spoken_language_code:" + spokenLangFilter;
+    }
+
     if (modeComboBox->currentIndex() == 0) {
         // Repositories
-        endpoint = QString("/search/repositories?q=created:>%1&sort=stars&order=desc").arg(dateStr);
+        endpoint = QString("/search/repositories?q=created:>%1%2&sort=stars&order=desc").arg(dateStr).arg(langQuery);
     } else {
         // Developers
-        endpoint = QString("/search/users?q=created:>%1&sort=followers&order=desc").arg(dateStr);
+        endpoint = QString("/search/users?q=created:>%1%2&sort=followers&order=desc").arg(dateStr).arg(langQuery);
     }
 
     lastRequestedUrl = endpoint;
@@ -152,17 +209,25 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
         // Repositories
         tableWidget->setColumnCount(5);
         tableWidget->setHorizontalHeaderLabels({tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
-        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch); // Description
+        for (int i = 0; i < 5; ++i) {
+            tableWidget->horizontalHeader()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+        }
     } else {
         // Developers
         tableWidget->setColumnCount(2);
         tableWidget->setHorizontalHeaderLabels({tr("Developer"), tr("URL")});
-        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch); // URL
+        for (int i = 0; i < 2; ++i) {
+            tableWidget->horizontalHeader()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+        }
     }
 
     for (int i = 0; i < items.size(); ++i) {
         QJsonObject itemObj = items[i].toObject();
         QString htmlUrl = itemObj["html_url"].toString();
+
+        // Pretty print raw json for debug action
+        QJsonDocument docObj(itemObj);
+        QString rawJson = QString::fromUtf8(docObj.toJson(QJsonDocument::Indented));
 
         tableWidget->insertRow(i);
 
@@ -175,31 +240,46 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
 
             QTableWidgetItem *nameItem = new QTableWidgetItem(name);
             nameItem->setData(Qt::UserRole, htmlUrl);
+            nameItem->setData(Qt::UserRole + 1, rawJson);
             QTableWidgetItem *starsItem = new QTableWidgetItem(stars);
             starsItem->setData(Qt::UserRole, htmlUrl);
+            starsItem->setData(Qt::UserRole + 1, rawJson);
             QTableWidgetItem *langItem = new QTableWidgetItem(lang);
             langItem->setData(Qt::UserRole, htmlUrl);
+            langItem->setData(Qt::UserRole + 1, rawJson);
             QTableWidgetItem *descItem = new QTableWidgetItem(desc);
             descItem->setData(Qt::UserRole, htmlUrl);
-            QTableWidgetItem *urlItem = new QTableWidgetItem(htmlUrl);
+            descItem->setData(Qt::UserRole + 1, rawJson);
+
+            QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
+            linkLabel->setOpenExternalLinks(true);
+            QTableWidgetItem *urlItem = new QTableWidgetItem(); // Empty item to hold the widget's place and data
             urlItem->setData(Qt::UserRole, htmlUrl);
+            urlItem->setData(Qt::UserRole + 1, rawJson);
 
             tableWidget->setItem(i, 0, nameItem);
             tableWidget->setItem(i, 1, starsItem);
             tableWidget->setItem(i, 2, langItem);
             tableWidget->setItem(i, 3, descItem);
             tableWidget->setItem(i, 4, urlItem);
+            tableWidget->setCellWidget(i, 4, linkLabel);
         } else {
             // Developers
             QString login = itemObj["login"].toString();
 
             QTableWidgetItem *loginItem = new QTableWidgetItem(login);
             loginItem->setData(Qt::UserRole, htmlUrl);
-            QTableWidgetItem *urlItem = new QTableWidgetItem(htmlUrl);
+            loginItem->setData(Qt::UserRole + 1, rawJson);
+
+            QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
+            linkLabel->setOpenExternalLinks(true);
+            QTableWidgetItem *urlItem = new QTableWidgetItem();
             urlItem->setData(Qt::UserRole, htmlUrl);
+            urlItem->setData(Qt::UserRole + 1, rawJson);
 
             tableWidget->setItem(i, 0, loginItem);
             tableWidget->setItem(i, 1, urlItem);
+            tableWidget->setCellWidget(i, 1, linkLabel);
         }
     }
 

@@ -27,6 +27,8 @@ private slots:
 private:
     QComboBox *modeComboBox;
     QComboBox *timeframeComboBox;
+    QComboBox *langComboBox;
+    QComboBox *spokenLangComboBox;
     QPushButton *refreshButton;
     QTableWidget *tableWidget;
     GitHubClient *m_client;
