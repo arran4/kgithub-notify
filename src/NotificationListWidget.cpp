@@ -11,6 +11,9 @@
 #include <QScrollBar>
 #include <QTimer>
 #include <QResizeEvent>
+#include <QJsonDocument>
+#include <QDialog>
+#include <QTextEdit>
 #include <algorithm>
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
@@ -25,6 +28,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     listWidget = new QListWidget(this);
     listWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    listWidget->setAlternatingRowColors(true);
 
     connect(listWidget, &QListWidget::itemActivated, this, &NotificationListWidget::onItemActivated);
 
@@ -37,7 +41,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     // Setup Context Menu
     contextMenu = new QMenu(this);
 
-    openAction = new QAction(tr("Open"), this);
+    openAction = new QAction(tr("Open in Browser"), this);
     connect(openAction, &QAction::triggered, this, &NotificationListWidget::openCurrentItem);
     contextMenu->addAction(openAction);
 
@@ -78,15 +82,35 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     });
     contextMenu->addAction(markAsReadAction);
 
-    markAsDoneAction = new QAction(tr("Mark as Done"), this);
+    markAsDoneAction = new QAction(tr("Done"), this);
     connect(markAsDoneAction, &QAction::triggered, this, &NotificationListWidget::dismissCurrentItem);
     contextMenu->addAction(markAsDoneAction);
 
     contextMenu->addSeparator();
 
-    dismissAction = new QAction(tr("Dismiss"), this);
-    connect(dismissAction, &QAction::triggered, this, &NotificationListWidget::dismissCurrentItem);
-    contextMenu->addAction(dismissAction);
+    viewRawAction = new QAction(tr("View Raw JSON"), this);
+    connect(viewRawAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = listWidget->currentItem();
+        if (!item) return;
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        QJsonDocument doc(json);
+        QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+
+        QDialog *dialog = new QDialog(this);
+        dialog->setWindowTitle(tr("Raw JSON"));
+        dialog->resize(600, 400);
+
+        QVBoxLayout *layout = new QVBoxLayout(dialog);
+        QTextEdit *textEdit = new QTextEdit(dialog);
+        textEdit->setReadOnly(true);
+        textEdit->setPlainText(rawJson);
+        layout->addWidget(textEdit);
+
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->show();
+    });
+    contextMenu->addAction(viewRawAction);
 }
 
 void NotificationListWidget::setNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
