@@ -63,6 +63,8 @@ add_executable(kgithub-notify
     src/NotificationListWidget.h
     src/WorkItemWindow.cpp
     src/WorkItemWindow.h
+    src/NotificationWindow.cpp
+    src/NotificationWindow.h
     src/resources.qrc
 )
 
