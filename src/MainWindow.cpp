@@ -124,19 +124,14 @@ void MainWindow::showTrayMessage(const QString &title, const QString &message) {
 }
 
 void MainWindow::showDesktopFileWarning(const QString &desktopFileName, const QStringList &appPaths) {
-    if (!installWarningNotification) {
-        installWarningNotification = new PopupNotification(this);
-        installWarningNotification->setSettingsVisible(false);
+    desktopWarningMessage = tr("The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
+                               "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
+                               "Please ensure the application is installed correctly to one of the following locations:<br>"
+                               "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>"));
+
+    if (desktopWarningButton) {
+        desktopWarningButton->setVisible(true);
     }
-
-    QString message = tr("The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
-                         "This may prevent the system tray icon and notifications from working correctly due to portal restrictions.<br><br>"
-                         "Please ensure the application is installed correctly to one of the following locations:<br>"
-                         "<ul><li>%2</li></ul>").arg(desktopFileName, appPaths.join("</li><li>"));
-
-    installWarningNotification->setMessage(message);
-    positionPopup(installWarningNotification);
-    installWarningNotification->show();
 }
 
 // -----------------------------------------------------------------------------
@@ -932,6 +927,18 @@ void MainWindow::setupStatusBar() {
     statusLabel = new QLabel(this);
     statusBar->addWidget(statusLabel);
 
+    desktopWarningButton = new QToolButton(this);
+    desktopWarningButton->setIcon(QIcon::fromTheme("dialog-warning", style()->standardIcon(QStyle::SP_MessageBoxWarning)));
+    desktopWarningButton->setText(tr("Desktop File Missing"));
+    desktopWarningButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    desktopWarningButton->setAutoRaise(true);
+    desktopWarningButton->setVisible(false);
+
+    connect(desktopWarningButton, &QToolButton::clicked, this, [this]() {
+        QMessageBox::warning(this, tr("Desktop File Missing"), desktopWarningMessage);
+    });
+
+    statusBar->addPermanentWidget(desktopWarningButton);
     statusBar->addPermanentWidget(timerLabel);
 
     refreshTimer = new QTimer(this);
