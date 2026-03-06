@@ -62,9 +62,26 @@ sudo apt install build-essential cmake qtbase5-dev qttools5-dev-tools libqt5svg5
 On the first run, or by selecting "Settings" from the File menu or tray icon context menu, you need to provide a GitHub Personal Access Token (PAT).
 
 1.  Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens).
-2.  Generate a new token (classic).
-3.  Select the `notifications` scope. If you want to receive notifications for private repositories, also select the `repo` scope.
-4.  Copy the token and paste it into the application's settings dialog.
+2.  Generate a new token. You can use either a **Classic Token** or a **Fine-grained Token**.
+
+### Token Scopes
+
+To ensure the application can fetch your notifications and their details (especially for private repositories), your token must have the correct permissions.
+
+**For a Classic Token:**
+*   Select the `notifications` scope to access your inbox.
+*   To receive notifications and fetch details (like pull request status or issue authors) for **private repositories**, you **must** also select the full `repo` scope.
+
+**For a Fine-grained Token:**
+*   **Repository Access:** Select the specific repositories you want to monitor, or "All repositories".
+*   **Permissions:** Under "Repository permissions", grant **Read-only** access to:
+    *   `Pull requests` (Required to fetch pull request details)
+    *   `Issues` (Required to fetch issue details)
+    *   `Metadata` (Usually required automatically)
+*   **User Permissions:** Under "User permissions", grant **Read-only** access to:
+    *   `Notifications` (Required to access your inbox)
+
+3.  Copy the token and paste it into the application's settings dialog.
 
 ## License
 
