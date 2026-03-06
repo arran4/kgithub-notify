@@ -27,6 +27,7 @@ int main(int argc, char *argv[]) {
     QApplication::setQuitOnLastWindowClosed(false);
 
     QApplication app(argc, argv);
+    QApplication::setWindowIcon(QIcon::fromTheme("kgithub-notify", QIcon(":/assets/icon.png")));
 
     KAboutData aboutData(QStringLiteral("kgithub-notify"),
                          QStringLiteral("KGitHub Notify"),
