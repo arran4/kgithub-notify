@@ -66,11 +66,14 @@ add_executable(kgithub-notify
     src/resources.qrc
 )
 
+find_package(KF5CoreAddons REQUIRED)
+
 target_link_libraries(kgithub-notify
     Qt5::Widgets
     Qt5::Network
     Qt5::Svg
     Qt5::DBus
+    KF5::CoreAddons
     KF5::Wallet
     KF5::Notifications
 )
