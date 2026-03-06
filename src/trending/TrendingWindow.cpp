@@ -209,16 +209,18 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
         // Repositories
         tableWidget->setColumnCount(5);
         tableWidget->setHorizontalHeaderLabels({tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
-        for (int i = 0; i < 5; ++i) {
-            tableWidget->horizontalHeader()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-        }
+
+        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents); // Name
+        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // Stars
+        tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents); // Language
+        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);          // Description gets most space
+        tableWidget->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents); // URL
     } else {
         // Developers
         tableWidget->setColumnCount(2);
         tableWidget->setHorizontalHeaderLabels({tr("Developer"), tr("URL")});
-        for (int i = 0; i < 2; ++i) {
-            tableWidget->horizontalHeader()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-        }
+        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);          // Developer gets most space
+        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // URL
     }
 
     for (int i = 0; i < items.size(); ++i) {
@@ -283,6 +285,8 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
         }
     }
 
+    // Force table to wrap words and calculate correct row heights for descriptions
+    tableWidget->setWordWrap(true);
     tableWidget->resizeRowsToContents();
 }
 
