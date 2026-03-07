@@ -80,12 +80,16 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(tableWidget);
 
+    m_netManager = new QNetworkAccessManager(this);
+    connect(m_netManager, &QNetworkAccessManager::finished, this, &TrendingWindow::onRepoStarredCheckFinished);
+
     connect(refreshButton, &QPushButton::clicked, this, &TrendingWindow::onRefreshClicked);
     connect(modeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onModeChanged);
     connect(timeframeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
     connect(langComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
     connect(spokenLangComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
     connect(tableWidget, &QTableWidget::itemActivated, this, &TrendingWindow::onItemActivated);
+    connect(tableWidget, &QTableWidget::itemSelectionChanged, this, &TrendingWindow::onItemSelectionChanged);
     connect(tableWidget, &QTableWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
         QTableWidgetItem *item = tableWidget->itemAt(pos);
         if (!item) return;
@@ -209,14 +213,15 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
 
     if (modeComboBox->currentIndex() == 0) {
         // Repositories
-        tableWidget->setColumnCount(5);
-        tableWidget->setHorizontalHeaderLabels({tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
+        tableWidget->setColumnCount(6);
+        tableWidget->setHorizontalHeaderLabels({tr("★"), tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
 
-        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents); // Name
-        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // Stars
-        tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents); // Language
-        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Interactive);      // Description gets calculated width
-        tableWidget->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents); // URL
+        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents); // Starred
+        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // Name
+        tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents); // Stars
+        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents); // Language
+        tableWidget->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Interactive);      // Description gets calculated width
+        tableWidget->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents); // URL
     } else {
         // Developers
         tableWidget->setColumnCount(2);
@@ -235,6 +240,12 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
 
         tableWidget->insertRow(i);
 
+        bool isNew = !m_selectedUrls.contains(htmlUrl);
+        QFont font;
+        if (isNew) {
+            font.setBold(true);
+        }
+
         if (modeComboBox->currentIndex() == 0) {
             // Repositories
             QString name = itemObj["full_name"].toString();
@@ -242,31 +253,50 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
             QString stars = QString::number(itemObj["stargazers_count"].toInt());
             QString lang = itemObj["language"].toString();
 
+            QTableWidgetItem *starItem = new QTableWidgetItem("");
+            starItem->setTextAlignment(Qt::AlignCenter);
+            starItem->setData(Qt::UserRole, htmlUrl);
+            starItem->setData(Qt::UserRole + 2, name);
+            starItem->setFont(font);
+
             QTableWidgetItem *nameItem = new QTableWidgetItem(name);
             nameItem->setData(Qt::UserRole, htmlUrl);
             nameItem->setData(Qt::UserRole + 1, rawJson);
+            nameItem->setFont(font);
             QTableWidgetItem *starsItem = new QTableWidgetItem(stars);
             starsItem->setData(Qt::UserRole, htmlUrl);
             starsItem->setData(Qt::UserRole + 1, rawJson);
+            starsItem->setFont(font);
             QTableWidgetItem *langItem = new QTableWidgetItem(lang);
             langItem->setData(Qt::UserRole, htmlUrl);
             langItem->setData(Qt::UserRole + 1, rawJson);
+            langItem->setFont(font);
             QTableWidgetItem *descItem = new QTableWidgetItem(desc);
             descItem->setData(Qt::UserRole, htmlUrl);
             descItem->setData(Qt::UserRole + 1, rawJson);
+            descItem->setFont(font);
 
             QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
             linkLabel->setOpenExternalLinks(true);
+            linkLabel->setFont(font);
             QTableWidgetItem *urlItem = new QTableWidgetItem(); // Empty item to hold the widget's place and data
             urlItem->setData(Qt::UserRole, htmlUrl);
             urlItem->setData(Qt::UserRole + 1, rawJson);
 
-            tableWidget->setItem(i, 0, nameItem);
-            tableWidget->setItem(i, 1, starsItem);
-            tableWidget->setItem(i, 2, langItem);
-            tableWidget->setItem(i, 3, descItem);
-            tableWidget->setItem(i, 4, urlItem);
-            tableWidget->setCellWidget(i, 4, linkLabel);
+            tableWidget->setItem(i, 0, starItem);
+            tableWidget->setItem(i, 1, nameItem);
+            tableWidget->setItem(i, 2, starsItem);
+            tableWidget->setItem(i, 3, langItem);
+            tableWidget->setItem(i, 4, descItem);
+            tableWidget->setItem(i, 5, urlItem);
+            tableWidget->setCellWidget(i, 5, linkLabel);
+
+            // Fetch starred status
+            QUrl url("https://api.github.com/user/starred/" + name);
+            QNetworkRequest request = m_client->createAuthenticatedRequest(url);
+            QNetworkReply *reply = m_netManager->get(request);
+            reply->setProperty("fullName", name);
+
         } else {
             // Developers
             QString login = itemObj["login"].toString();
@@ -274,9 +304,11 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
             QTableWidgetItem *loginItem = new QTableWidgetItem(login);
             loginItem->setData(Qt::UserRole, htmlUrl);
             loginItem->setData(Qt::UserRole + 1, rawJson);
+            loginItem->setFont(font);
 
             QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
             linkLabel->setOpenExternalLinks(true);
+            linkLabel->setFont(font);
             QTableWidgetItem *urlItem = new QTableWidgetItem();
             urlItem->setData(Qt::UserRole, htmlUrl);
             urlItem->setData(Qt::UserRole + 1, rawJson);
@@ -298,7 +330,7 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
         int maxDescWidth = viewportWidth > 0 ? viewportWidth : 800;
         // Try to give it 40% of the viewport width initially, bounded by min and max
         int targetWidth = qBound(minDescWidth, (int)(viewportWidth * 0.4), maxDescWidth);
-        tableWidget->setColumnWidth(3, targetWidth);
+        tableWidget->setColumnWidth(4, targetWidth); // Description is now column 4
     }
 
     tableWidget->resizeRowsToContents();
@@ -309,5 +341,46 @@ void TrendingWindow::onItemActivated(QTableWidgetItem *item) {
     QString url = item->data(Qt::UserRole).toString();
     if (!url.isEmpty()) {
         QDesktopServices::openUrl(QUrl(url));
+    }
+}
+
+void TrendingWindow::onRepoStarredCheckFinished(QNetworkReply *reply) {
+    if (!reply) return;
+
+    QString fullName = reply->property("fullName").toString();
+    if (!fullName.isEmpty() && (reply->error() == QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 204)) {
+        for (int r = 0; r < tableWidget->rowCount(); ++r) {
+            QTableWidgetItem *item = tableWidget->item(r, 0);
+            if (item && item->data(Qt::UserRole + 2).toString() == fullName) {
+                item->setText("★");
+                break;
+            }
+        }
+    }
+    reply->deleteLater();
+}
+
+void TrendingWindow::onItemSelectionChanged() {
+    QList<QTableWidgetItem *> selected = tableWidget->selectedItems();
+    for (QTableWidgetItem *item : selected) {
+        QString url = item->data(Qt::UserRole).toString();
+        if (!url.isEmpty() && !m_selectedUrls.contains(url)) {
+            m_selectedUrls.insert(url);
+            int row = item->row();
+            for (int col = 0; col < tableWidget->columnCount(); ++col) {
+                QTableWidgetItem *colItem = tableWidget->item(row, col);
+                if (colItem) {
+                    QFont font = colItem->font();
+                    font.setBold(false);
+                    colItem->setFont(font);
+                }
+            }
+            QWidget *w = tableWidget->cellWidget(row, tableWidget->columnCount() - 1);
+            if (w) {
+                QFont font = w->font();
+                font.setBold(false);
+                w->setFont(font);
+            }
+        }
     }
 }

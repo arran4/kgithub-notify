@@ -9,6 +9,8 @@
 #include <QHBoxLayout>
 #include <QPointer>
 #include <QNetworkReply>
+#include <QSet>
+#include <QNetworkAccessManager>
 
 class GitHubClient;
 
@@ -23,6 +25,8 @@ private slots:
     void onItemActivated(QTableWidgetItem *item);
     void onModeChanged(int index);
     void onRawDataReceived(const QByteArray &data);
+    void onRepoStarredCheckFinished(QNetworkReply *reply);
+    void onItemSelectionChanged();
 
 private:
     QComboBox *modeComboBox;
@@ -35,6 +39,8 @@ private:
 
     // Store the last requested URL to ignore responses from other raw requests
     QString lastRequestedUrl;
+    QSet<QString> m_selectedUrls;
+    QNetworkAccessManager *m_netManager;
 };
 
 #endif // TRENDINGWINDOW_H
