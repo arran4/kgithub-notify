@@ -896,36 +896,30 @@ void MainWindow::setupMenus() {
     toolsMenu->addAction(repoListAction);
     toolsMenu->addSeparator();
 
-    QMenu *issuesMenu = toolsMenu->addMenu(tr("Open Issues"));
-    QMenu *prsMenu = toolsMenu->addMenu(tr("Open Pull Requests"));
+    QMenu *workItemsMenu = toolsMenu->addMenu(tr("Work Items"));
 
     struct Variant {
         QString name;
         QString query;
     };
     QList<Variant> variants = {
-        {tr("Created by me"), "author:@me"},
-        {tr("Assigned to me"), "assignee:@me"},
-        {tr("I was mentioned in them"), "mentions:@me"},
-        {tr("Review was requested"), "review-requested:@me"},
-        {tr("Repos I have contributed to"), "involves:@me"},
-        {tr("My repos"), "user:@me"},
-        {tr("My forks"), "user:@me fork:true"},
-        {tr("Repos I have admin access to"), "user:@me"}
+        {tr("Created by me"), "author:@me archived:false"},
+        {tr("Assigned to me"), "assignee:@me archived:false"},
+        {tr("I was mentioned in them"), "mentions:@me archived:false"},
+        {tr("Review was requested"), "review-requested:@me archived:false"},
+        {tr("Repos I have contributed to"), "involves:@me archived:false"},
+        {tr("My repos"), "user:@me archived:false"},
+        {tr("My forks"), "user:@me fork:true archived:false"},
+        {tr("Repos I have admin access to"), "user:@me archived:false"},
+        {tr("Archived"), "archived:true involves:@me"}
     };
 
     for (const auto& v : variants) {
-        QAction *issueAction = new QAction(v.name, this);
-        connect(issueAction, &QAction::triggered, this, [this, v]() {
-            showWorkItems(QString("Issues - %1").arg(v.name), QString("is:open is:issue %1").arg(v.query));
+        QAction *action = new QAction(v.name, this);
+        connect(action, &QAction::triggered, this, [this, v]() {
+            showWorkItems(QString("Work Items - %1").arg(v.name), QString("is:open %1").arg(v.query));
         });
-        issuesMenu->addAction(issueAction);
-
-        QAction *prAction = new QAction(v.name, this);
-        connect(prAction, &QAction::triggered, this, [this, v]() {
-            showWorkItems(QString("Pull Requests - %1").arg(v.name), QString("is:open is:pr %1").arg(v.query));
-        });
-        prsMenu->addAction(prAction);
+        workItemsMenu->addAction(action);
     }
 }
 
