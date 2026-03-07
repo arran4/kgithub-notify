@@ -16,7 +16,12 @@ class WorkItemWindow : public QDialog {
     Q_OBJECT
 
 public:
-    explicit WorkItemWindow(GitHubClient *client, const QString& windowTitle, const QString& baseQuery, QWidget *parent = nullptr);
+    enum EndpointType {
+        EndpointIssues,
+        EndpointRepositories
+    };
+
+    explicit WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent = nullptr);
     ~WorkItemWindow();
 
 private slots:
@@ -31,6 +36,7 @@ private slots:
 private:
     GitHubClient *m_client;
     QString m_windowTitle;
+    EndpointType m_endpointType;
     QString m_baseQuery;
     int m_currentPage;
     QJsonArray m_allData;
