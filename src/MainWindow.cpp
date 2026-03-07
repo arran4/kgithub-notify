@@ -755,6 +755,7 @@ void MainWindow::setupToolbar() {
     filterComboBox->addItem(tr("Inbox"));
     filterComboBox->addItem(tr("Unread"));
     filterComboBox->addItem(tr("Read"));
+    filterComboBox->addItem(tr("All"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 

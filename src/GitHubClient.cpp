@@ -460,7 +460,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
         n.updatedAt = obj["updated_at"].toString();
         n.lastReadAt = obj["last_read_at"].toString();
-        n.inInbox = true;
+        n.inInbox = obj["unread"].toBool();
 
         if (n.lastReadAt.isEmpty()) {
             n.unread = true;

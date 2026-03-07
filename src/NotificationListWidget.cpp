@@ -77,6 +77,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
         n.unread = false;
+        n.inInbox = false;
         item->setData(Qt::UserRole + 4, n.toJson());
 
         QFont font = item->font();
@@ -84,7 +85,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         item->setFont(font);
 
         // If filtering by unread, remove it
-        if (m_filterMode == 1) {
+        if (m_filterMode == 0 || m_filterMode == 1) {
             delete listWidget->takeItem(listWidget->row(item));
         }
     });
@@ -431,9 +432,11 @@ void NotificationListWidget::updateList() {
         if (m_filterMode == 0) { // Inbox
             if (n.inInbox) show = true;
         } else if (m_filterMode == 1) { // Unread
-            if (n.inInbox && n.unread) show = true;
+            if (n.unread) show = true;
         } else if (m_filterMode == 2) { // Read
-            if (n.inInbox && !n.unread) show = true;
+            if (!n.unread) show = true;
+        } else if (m_filterMode == 3) { // All
+            show = true;
         }
         if (show) {
             targetNotifications.append(n);
@@ -714,13 +717,14 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
     n.unread = false;
+    n.inInbox = false;
     item->setData(Qt::UserRole + 4, n.toJson());
 
     QFont font = item->font();
     font.setBold(false);
     item->setFont(font);
 
-    if (m_filterMode == 1) {
+    if (m_filterMode == 0 || m_filterMode == 1) {
         delete listWidget->takeItem(listWidget->row(item));
     }
 }

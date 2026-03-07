@@ -256,9 +256,9 @@ private slots:
         QCOMPARE(notifications.size(), 4);
 
         // Case 1 Check
-        // unread: false, last_read_at: null -> inInbox = true, unread = true
+        // unread: false, last_read_at: null -> inInbox = false, unread = true
         QCOMPARE(notifications[0].id, QString("1"));
-        QCOMPARE(notifications[0].inInbox, true);
+        QCOMPARE(notifications[0].inInbox, false);
         QCOMPARE(notifications[0].unread, true);
 
         // Case 2 Check
@@ -270,13 +270,13 @@ private slots:
         // Case 3 Check
         // unread: false, updated > last_read -> inInbox = false, unread = true
         QCOMPARE(notifications[2].id, QString("3"));
-        QCOMPARE(notifications[2].inInbox, true);
+        QCOMPARE(notifications[2].inInbox, false);
         QCOMPARE(notifications[2].unread, true);
 
         // Case 4 Check
-        // unread: false, updated < last_read -> inInbox = true, unread = false
+        // unread: false, updated < last_read -> inInbox = false, unread = false
         QCOMPARE(notifications[3].id, QString("4"));
-        QCOMPARE(notifications[3].inInbox, true);
+        QCOMPARE(notifications[3].inInbox, false);
         QCOMPARE(notifications[3].unread, false);
     }
 };
