@@ -69,8 +69,7 @@ class MainWindow : public QMainWindow {
     void showDebugWindow(const QString &url = "");
     void showRepoListWindow();
     void showTrendingWindow();
-    void showMyIssues();
-    void showMyPrs();
+    void showWorkItems(const QString &title, const QString &query);
 
     // From ListWidget
     void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);

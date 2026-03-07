@@ -8,18 +8,15 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QAction>
+#include <QLabel>
+#include <QJsonArray>
 #include "GitHubClient.h"
 
 class WorkItemWindow : public QDialog {
     Q_OBJECT
 
 public:
-    enum Type {
-        Issues,
-        PullRequests
-    };
-
-    explicit WorkItemWindow(GitHubClient *client, Type type, QWidget *parent = nullptr);
+    explicit WorkItemWindow(GitHubClient *client, const QString& windowTitle, const QString& baseQuery, QWidget *parent = nullptr);
     ~WorkItemWindow();
 
 private slots:
@@ -33,18 +30,25 @@ private slots:
 
 private:
     GitHubClient *m_client;
-    Type m_type;
+    QString m_windowTitle;
+    QString m_baseQuery;
+    int m_currentPage;
+    QJsonArray m_allData;
     QTableWidget *m_table;
     QPushButton *m_exportCsvBtn;
     QPushButton *m_exportJsonBtn;
+    QLabel *m_statusLabel;
     QAction *m_openAction;
     QAction *m_copyAction;
     QNetworkAccessManager *m_manager;
 
     void setupUi();
-    void loadData();
-    void populateTable(const QByteArray &data);
+    void loadData(int page = 1);
+    void appendRow(const QJsonObject &item);
     QString getHtmlUrlForRow(int row) const;
+    QString getCacheFilePath() const;
+    void loadCache();
+    void saveCache();
 };
 
 #endif // WORKITEMWINDOW_H

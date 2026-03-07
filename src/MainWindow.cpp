@@ -896,23 +896,41 @@ void MainWindow::setupMenus() {
     toolsMenu->addAction(repoListAction);
     toolsMenu->addSeparator();
 
-    QAction *issuesAction = new QAction(tr("My Open Issues"), this);
-    connect(issuesAction, &QAction::triggered, this, &MainWindow::showMyIssues);
-    toolsMenu->addAction(issuesAction);
+    QMenu *issuesMenu = toolsMenu->addMenu(tr("Open Issues"));
+    QMenu *prsMenu = toolsMenu->addMenu(tr("Open Pull Requests"));
 
-    QAction *prsAction = new QAction(tr("My Open Pull Requests"), this);
-    connect(prsAction, &QAction::triggered, this, &MainWindow::showMyPrs);
-    toolsMenu->addAction(prsAction);
+    struct Variant {
+        QString name;
+        QString query;
+    };
+    QList<Variant> variants = {
+        {tr("Created by me"), "author:@me"},
+        {tr("Assigned to me"), "assignee:@me"},
+        {tr("I was mentioned in them"), "mentions:@me"},
+        {tr("Review was requested"), "review-requested:@me"},
+        {tr("Repos I have contributed to"), "involves:@me"},
+        {tr("My repos"), "user:@me"},
+        {tr("My forks"), "user:@me fork:true"},
+        {tr("Repos I have admin access to"), "user:@me"}
+    };
+
+    for (const auto& v : variants) {
+        QAction *issueAction = new QAction(v.name, this);
+        connect(issueAction, &QAction::triggered, this, [this, v]() {
+            showWorkItems(QString("Issues - %1").arg(v.name), QString("is:open is:issue %1").arg(v.query));
+        });
+        issuesMenu->addAction(issueAction);
+
+        QAction *prAction = new QAction(v.name, this);
+        connect(prAction, &QAction::triggered, this, [this, v]() {
+            showWorkItems(QString("Pull Requests - %1").arg(v.name), QString("is:open is:pr %1").arg(v.query));
+        });
+        prsMenu->addAction(prAction);
+    }
 }
 
-void MainWindow::showMyIssues() {
-    WorkItemWindow *window = new WorkItemWindow(client, WorkItemWindow::Issues, this);
-    window->setAttribute(Qt::WA_DeleteOnClose);
-    window->show();
-}
-
-void MainWindow::showMyPrs() {
-    WorkItemWindow *window = new WorkItemWindow(client, WorkItemWindow::PullRequests, this);
+void MainWindow::showWorkItems(const QString &title, const QString &query) {
+    WorkItemWindow *window = new WorkItemWindow(client, title, query, this);
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
 }
