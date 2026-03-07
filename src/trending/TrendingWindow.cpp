@@ -155,12 +155,12 @@ void TrendingWindow::onRefreshClicked() {
 
     QString langQuery = "";
     if (!langFilter.isEmpty()) {
-        langQuery += "+language:" + langFilter;
+        langQuery += "+language:" + QUrl::toPercentEncoding(langFilter);
     }
     if (!spokenLangFilter.isEmpty()) {
         // spoken language is an undocumented filter for repositories search in some versions, or part of standard string search
         // e.g., +spoken_language:en. If unsupported it will just do a text match.
-        langQuery += "+spoken_language_code:" + spokenLangFilter;
+        langQuery += "+spoken_language_code:" + QUrl::toPercentEncoding(spokenLangFilter);
     }
 
     if (modeComboBox->currentIndex() == 0) {
