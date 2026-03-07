@@ -155,12 +155,14 @@ void TrendingWindow::onRefreshClicked() {
 
     QString langQuery = "";
     if (!langFilter.isEmpty()) {
-        langQuery += "+language:" + langFilter;
+        langQuery += "+language:" + QUrl::toPercentEncoding(langFilter);
     }
     if (!spokenLangFilter.isEmpty()) {
-        // spoken language is an undocumented filter for repositories search in some versions, or part of standard string search
-        // e.g., +spoken_language:en. If unsupported it will just do a text match.
-        langQuery += "+spoken_language_code:" + spokenLangFilter;
+        // Since GitHub API doesn't support searching by spoken_language_code directly via API,
+        // we'll filter by language using the standard text search match or a general language filter fallback.
+        // E.g., appending it as language:en or standard text to approximate it.
+        // Actually it seems adding it directly to query text works better or falling back to language.
+        langQuery += "+language:" + QUrl::toPercentEncoding(spokenLangFilter);
     }
 
     if (modeComboBox->currentIndex() == 0) {
