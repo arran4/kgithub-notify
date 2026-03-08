@@ -1,7 +1,7 @@
 #ifndef WORKITEMWINDOW_H
 #define WORKITEMWINDOW_H
 
-#include <QDialog>
+#include <QMainWindow>
 #include <QTableWidget>
 #include <QPushButton>
 #include <QNetworkReply>
@@ -12,7 +12,7 @@
 #include <QJsonArray>
 #include "GitHubClient.h"
 
-class WorkItemWindow : public QDialog {
+class WorkItemWindow : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -41,8 +41,6 @@ private:
     int m_currentPage;
     QJsonArray m_allData;
     QTableWidget *m_table;
-    QPushButton *m_exportCsvBtn;
-    QPushButton *m_exportJsonBtn;
     QLabel *m_statusLabel;
     QAction *m_openAction;
     QAction *m_copyAction;

@@ -4,6 +4,9 @@
 #include <QJsonArray>
 #include <QHeaderView>
 #include <QMenu>
+#include <QMenuBar>
+#include <QToolBar>
+#include <QStatusBar>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -17,7 +20,7 @@
 #include <QDateTime>
 
 WorkItemWindow::WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent)
-    : QDialog(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
+    : QMainWindow(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
 {
     setupUi();
     connect(m_manager, &QNetworkAccessManager::finished, this, &WorkItemWindow::onReplyFinished);
@@ -34,8 +37,6 @@ void WorkItemWindow::setupUi()
     setWindowTitle(m_windowTitle);
     resize(800, 600);
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-
     // Table
     m_table = new QTableWidget(this);
     m_table->setColumnCount(5);
@@ -51,24 +52,37 @@ void WorkItemWindow::setupUi()
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &WorkItemWindow::onCustomContextMenuRequested);
     connect(m_table, &QTableWidget::itemDoubleClicked, this, &WorkItemWindow::onItemDoubleClicked);
 
-    mainLayout->addWidget(m_table);
+    setCentralWidget(m_table);
 
-    // Buttons Layout
-    QHBoxLayout *buttonsLayout = new QHBoxLayout();
-    buttonsLayout->addStretch();
+    // Actions
+    QAction *exportCsvAction = new QAction(tr("Export to CSV"), this);
+    connect(exportCsvAction, &QAction::triggered, this, &WorkItemWindow::exportToCsv);
+    QAction *exportJsonAction = new QAction(tr("Export to JSON"), this);
+    connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
+    QAction *refreshAction = new QAction(tr("Refresh"), this);
+    connect(refreshAction, &QAction::triggered, this, [this]() {
+        loadData(1);
+    });
 
-    m_exportCsvBtn = new QPushButton(tr("Export to CSV"), this);
-    connect(m_exportCsvBtn, &QPushButton::clicked, this, &WorkItemWindow::exportToCsv);
-    buttonsLayout->addWidget(m_exportCsvBtn);
+    // Menu Bar
+    QMenuBar *menuBarWidget = menuBar();
+    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
+    fileMenu->addAction(exportCsvAction);
+    fileMenu->addAction(exportJsonAction);
 
-    m_exportJsonBtn = new QPushButton(tr("Export to JSON"), this);
-    connect(m_exportJsonBtn, &QPushButton::clicked, this, &WorkItemWindow::exportToJson);
-    buttonsLayout->addWidget(m_exportJsonBtn);
+    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    viewMenu->addAction(refreshAction);
 
-    mainLayout->addLayout(buttonsLayout);
+    // Tool Bar
+    QToolBar *toolBar = addToolBar(tr("Main Toolbar"));
+    toolBar->addAction(refreshAction);
+    toolBar->addSeparator();
+    toolBar->addAction(exportCsvAction);
+    toolBar->addAction(exportJsonAction);
 
+    // Status Bar
     m_statusLabel = new QLabel(this);
-    mainLayout->addWidget(m_statusLabel);
+    statusBar()->addWidget(m_statusLabel);
 
     // Context Menu Actions
     m_openAction = new QAction(tr("Open in Browser"), this);
@@ -143,12 +157,19 @@ void WorkItemWindow::onReplyFinished(QNetworkReply *reply)
         }
 
         if (items.size() > 0 && m_allData.size() < totalCount && m_allData.size() < 1000) {
-            m_statusLabel->setText(tr("Loading page %1... (Total: %2)").arg(m_currentPage + 1).arg(totalCount));
+            int maxPages = (qMin(totalCount, 1000) + 99) / 100;
+            m_statusLabel->setText(tr("Loading page %1 / %2... (Total: %3)").arg(m_currentPage + 1).arg(maxPages).arg(totalCount));
             loadData(m_currentPage + 1);
         } else {
             saveCache();
+            int maxPages = (qMin(totalCount, 1000) + 99) / 100;
             QString limitMsg = (totalCount > 1000) ? tr(" (GitHub Search Limit Reached)") : "";
-            m_statusLabel->setText(tr("Items: %1%2 | Last refresh: %3").arg(m_allData.size()).arg(limitMsg).arg(QDateTime::currentDateTime().toString()));
+            m_statusLabel->setText(tr("Items: %1%2 | Pages loaded: %3 / %4 | Last refresh: %5")
+                .arg(m_allData.size())
+                .arg(limitMsg)
+                .arg(m_currentPage)
+                .arg(maxPages)
+                .arg(QDateTime::currentDateTime().toString()));
         }
     } else {
         QMessageBox::warning(this, tr("Error"), tr("Failed to fetch data: %1").arg(reply->errorString()));
