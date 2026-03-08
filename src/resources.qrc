@@ -3,5 +3,6 @@
     <qresource prefix="/">
         <file>assets/icon.png</file>
         <file>assets/icon-dotted.png</file>
+        <file>kgithub-notify.notifyrc</file>
     </qresource>
 </RCC>
