@@ -430,11 +430,13 @@ void NotificationListWidget::updateList() {
     for (const Notification &n : m_allNotifications) {
         bool show = false;
         if (m_filterMode == 0) { // Inbox
-            if (n.unread) show = true;
+            if (n.inInbox) show = true;
         } else if (m_filterMode == 1) { // Unread
-            if (n.inInbox && n.unread) show = true;
+            if (n.unread) show = true;
         } else if (m_filterMode == 2) { // Read
             if (!n.unread) show = true;
+        } else if (m_filterMode == 3) { // All
+            show = true;
         }
         if (show) {
             targetNotifications.append(n);
