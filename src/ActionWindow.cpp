@@ -20,7 +20,6 @@ void ActionWindow::setupUi()
 {
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
-    setupGUI();
 
     QVBoxLayout *layout = new QVBoxLayout(centralWidget);
 

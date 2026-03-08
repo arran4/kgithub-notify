@@ -69,8 +69,8 @@ MainWindow::MainWindow(QWidget *parent)
     setupToolbar();
     setupPages();
     createTrayIcon();
-    setupMenus();
     setupGUI();
+    setupMenus();
     setupStatusBar();
 
     // Initial State Check

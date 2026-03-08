@@ -59,7 +59,6 @@ void RepoListWindow::setupUI() {
     header->setStretchLastSection(true);
 
     setCentralWidget(m_table);
-    setupGUI();
 
     // Toolbar
     m_toolbar = addToolBar(tr("Main Toolbar"));

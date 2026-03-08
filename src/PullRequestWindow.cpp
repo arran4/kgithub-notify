@@ -21,7 +21,6 @@ void PullRequestWindow::setupUi()
 {
     m_tabWidget = new QTabWidget(this);
     setCentralWidget(m_tabWidget);
-    setupGUI();
 
     // 1. Conversation Tab
     m_conversationTab = new QWidget();

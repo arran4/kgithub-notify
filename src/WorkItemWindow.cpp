@@ -53,7 +53,6 @@ void WorkItemWindow::setupUi()
     connect(m_table, &QTableWidget::itemDoubleClicked, this, &WorkItemWindow::onItemDoubleClicked);
 
     setCentralWidget(m_table);
-    setupGUI();
 
     // Actions
     QAction *exportCsvAction = new QAction(tr("Export to CSV"), this);

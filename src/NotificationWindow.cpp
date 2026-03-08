@@ -173,7 +173,6 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     layout->addLayout(bottomLayout);
 
     setCentralWidget(centralWidget);
-    setupGUI();
 
     // Status Bar
     QString statusText = tr("Status: %1 | Inbox: %2")

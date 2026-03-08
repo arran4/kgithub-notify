@@ -28,7 +28,6 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
 
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
-    setupGUI();
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 
     QHBoxLayout *topLayout = new QHBoxLayout();
