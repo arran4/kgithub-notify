@@ -22,12 +22,11 @@
 WorkItemWindow::WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent)
     : KXmlGuiWindow(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
 {
+    setupGUI();
     setupUi();
     connect(m_manager, &QNetworkAccessManager::finished, this, &WorkItemWindow::onReplyFinished);
     loadCache();
     loadData(1);
-
-    setupGUI();
 }
 
 WorkItemWindow::~WorkItemWindow()

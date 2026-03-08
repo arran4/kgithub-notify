@@ -26,6 +26,8 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(800, 600); // make it a bit larger to fit columns
 
+    setupGUI();
+
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
@@ -167,8 +169,6 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
 
     // Initial fetch
     onRefreshClicked();
-
-    setupGUI();
 }
 
 void TrendingWindow::onModeChanged(int) {

@@ -12,11 +12,11 @@ PullRequestWindow::PullRequestWindow(const Notification &n, GitHubClient *client
     setWindowTitle(tr("Pull Request - %1").arg(n.title));
     resize(800, 600);
 
+    setupGUI();
+
     setupUi();
 
     fetchPrDetails();
-
-    setupGUI();
 }
 
 void PullRequestWindow::setupUi()

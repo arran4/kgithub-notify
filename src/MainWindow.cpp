@@ -65,14 +65,13 @@ MainWindow::MainWindow(QWidget *parent)
       m_lastUnreadCount(0) {
     setupWindow();
     setupCentralWidget();
+    setupGUI();
     setupNotificationList();
     setupToolbar();
     setupPages();
     createTrayIcon();
     setupMenus();
     setupStatusBar();
-
-    setupGUI();
 
     // Initial State Check
     stackWidget->setCurrentWidget(loadingPage);

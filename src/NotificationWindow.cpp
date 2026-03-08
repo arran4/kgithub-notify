@@ -19,6 +19,8 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     setWindowTitle(tr("Notification Details - %1").arg(n.repository));
     resize(500, 400);
 
+    setupGUI();
+
     // Menu Bar
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
     QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
@@ -179,8 +181,6 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
         .arg(n.unread ? tr("Unread") : tr("Read"))
         .arg(n.inInbox ? tr("Yes") : tr("No"));
     statusBar()->showMessage(statusText);
-
-    setupGUI();
 }
 
 void NotificationWindow::onOpenUrl() {

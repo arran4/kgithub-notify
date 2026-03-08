@@ -11,11 +11,11 @@ ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget 
     setWindowTitle(tr("Action Run - %1").arg(n.title));
     resize(700, 500);
 
+    setupGUI();
+
     setupUi();
 
     fetchRunDetails();
-
-    setupGUI();
 }
 
 void ActionWindow::setupUi()
