@@ -1,6 +1,6 @@
 #include "RepoListWindow.h"
 
-#include <QAction>
+#include <QtGui/QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>

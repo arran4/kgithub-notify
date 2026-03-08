@@ -9,7 +9,7 @@
 #include <QtDBus/QDBusError>
 #include <QStandardPaths>
 #include <QTimer>
-#include <KCoreAddons/KAboutData>
+#include <KAboutData>
 
 #include "GitHubClient.h"
 #include "MainWindow.h"

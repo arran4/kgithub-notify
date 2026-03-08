@@ -2,7 +2,7 @@
 #define NOTIFICATIONWINDOW_H
 
 #include <QMainWindow>
-#include <QAction>
+#include <QtGui/QAction>
 #include <QMenu>
 #include <QMenuBar>
 #include <QToolBar>

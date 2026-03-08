@@ -7,7 +7,7 @@
 #include <QNetworkReply>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QAction>
+#include <QtGui/QAction>
 #include <QLabel>
 #include <QJsonArray>
 #include "GitHubClient.h"

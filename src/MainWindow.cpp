@@ -1,6 +1,6 @@
 #include "MainWindow.h"
 
-#include <QAction>
+#include <QtGui/QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
@@ -1069,21 +1069,20 @@ void MainWindow::sendNotification(const Notification &n) {
     notification->setText(n.title);
 
     // Actions
-    QStringList actions;
-    actions << tr("Open in GitHub") << tr("Open kgithub-notify");
-    notification->setActions(actions);
-
-    connect(notification, &KNotification::action1Activated, this, [this, n]() {
+    auto action1 = notification->addAction(tr("Open in GitHub"));
+    connect(action1, &KNotificationAction::activated, this, [this, n]() {
         QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
         QDesktopServices::openUrl(QUrl(htmlUrl));
     });
 
-    connect(notification, &KNotification::action2Activated, this, [this, n]() {
+    auto action2 = notification->addAction(tr("Open kgithub-notify"));
+    connect(action2, &KNotificationAction::activated, this, [this, n]() {
         if(notificationListWidget) notificationListWidget->focusNotification(n.id);
         ensureWindowActive();
     });
 
-    connect(notification, &KNotification::defaultActivated, this, [this]() { this->ensureWindowActive(); });
+    auto defaultAction = notification->addDefaultAction(tr("Open"));
+    connect(defaultAction, &KNotificationAction::activated, this, [this]() { this->ensureWindowActive(); });
     connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
     notification->sendEvent();
@@ -1105,13 +1104,11 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
     notification->setText(summary.trimmed());
 
     // Actions
-    QStringList actions;
-    actions << tr("Open kgithub-notify");
-    notification->setActions(actions);
+    auto action1 = notification->addAction(tr("Open kgithub-notify"));
+    connect(action1, &KNotificationAction::activated, this, [this]() { this->ensureWindowActive(); });
 
-    connect(notification, &KNotification::action1Activated, this, [this]() { this->ensureWindowActive(); });
-
-    connect(notification, &KNotification::defaultActivated, this, [this]() {
+    auto defaultAction = notification->addDefaultAction(tr("Open"));
+    connect(defaultAction, &KNotificationAction::activated, this, [this]() {
         this->showNormal();
         this->activateWindow();
     });

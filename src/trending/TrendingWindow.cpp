@@ -8,7 +8,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QMenu>
-#include <QAction>
+#include <QtGui/QAction>
 #include <QLabel>
 #include <QIcon>
 #include <QStyle>
