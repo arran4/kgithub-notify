@@ -599,6 +599,12 @@ void NotificationListWidget::updateList() {
 
                  listWidget->addItem(loadMoreItem);
                  listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
+             } else {
+                 QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+                 if (btn) {
+                     btn->setEnabled(true);
+                     btn->setText(tr("Load More"));
+                 }
              }
         }
     } else {
@@ -816,6 +822,6 @@ void NotificationListWidget::resetLoadMoreState() {
     QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
     if (btn) {
         btn->setEnabled(true);
-        btn->setText(tr("Load More"));
+        btn->setText(tr("Retry Load More"));
     }
 }

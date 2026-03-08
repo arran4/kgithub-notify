@@ -236,6 +236,10 @@ void MainWindow::onAuthError(const QString &message) {
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
     stackWidget->setCurrentWidget(errorPage);
 
+    if (notificationListWidget) {
+        notificationListWidget->resetLoadMoreState();
+    }
+
     if (!authNotification) {
         authNotification = new PopupNotification(this);
         connect(authNotification, &PopupNotification::settingsClicked, this,
