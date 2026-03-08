@@ -4,6 +4,9 @@
 #include <QJsonArray>
 #include <QHeaderView>
 #include <QMenu>
+#include <QMenuBar>
+#include <QToolBar>
+#include <QStatusBar>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -13,13 +16,16 @@
 #include <QFile>
 #include <QTextStream>
 #include <QRegularExpression>
+#include <QStandardPaths>
+#include <QDateTime>
 
-WorkItemWindow::WorkItemWindow(GitHubClient *client, Type type, QWidget *parent)
-    : QDialog(parent), m_client(client), m_type(type), m_manager(new QNetworkAccessManager(this))
+WorkItemWindow::WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent)
+    : QMainWindow(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
 {
     setupUi();
     connect(m_manager, &QNetworkAccessManager::finished, this, &WorkItemWindow::onReplyFinished);
-    loadData();
+    loadCache();
+    loadData(1);
 }
 
 WorkItemWindow::~WorkItemWindow()
@@ -28,19 +34,17 @@ WorkItemWindow::~WorkItemWindow()
 
 void WorkItemWindow::setupUi()
 {
-    if (m_type == Issues) {
-        setWindowTitle(tr("My Open Issues"));
-    } else {
-        setWindowTitle(tr("My Open Pull Requests"));
-    }
+    setWindowTitle(m_windowTitle);
     resize(800, 600);
-
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
     // Table
     m_table = new QTableWidget(this);
     m_table->setColumnCount(5);
-    m_table->setHorizontalHeaderLabels({tr("Repository"), tr("Title"), tr("State"), tr("Author"), tr("Created At")});
+    if (m_endpointType == EndpointIssues) {
+        m_table->setHorizontalHeaderLabels({tr("Repository"), tr("Title"), tr("State"), tr("Author"), tr("Created At")});
+    } else {
+        m_table->setHorizontalHeaderLabels({tr("Repository Name"), tr("Description"), tr("Language"), tr("Owner"), tr("Created At")});
+    }
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -48,34 +52,101 @@ void WorkItemWindow::setupUi()
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &WorkItemWindow::onCustomContextMenuRequested);
     connect(m_table, &QTableWidget::itemDoubleClicked, this, &WorkItemWindow::onItemDoubleClicked);
 
-    mainLayout->addWidget(m_table);
+    setCentralWidget(m_table);
 
-    // Buttons Layout
-    QHBoxLayout *buttonsLayout = new QHBoxLayout();
-    buttonsLayout->addStretch();
+    // Actions
+    QAction *exportCsvAction = new QAction(tr("Export to CSV"), this);
+    connect(exportCsvAction, &QAction::triggered, this, &WorkItemWindow::exportToCsv);
+    QAction *exportJsonAction = new QAction(tr("Export to JSON"), this);
+    connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
+    QAction *refreshAction = new QAction(tr("Refresh"), this);
+    connect(refreshAction, &QAction::triggered, this, [this]() {
+        m_table->setRowCount(0); // Give immediate visual feedback of refresh
+        loadData(1);
+    });
+    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    closeAction->setShortcut(QKeySequence::Close);
+    connect(closeAction, &QAction::triggered, this, &WorkItemWindow::close);
 
-    m_exportCsvBtn = new QPushButton(tr("Export to CSV"), this);
-    connect(m_exportCsvBtn, &QPushButton::clicked, this, &WorkItemWindow::exportToCsv);
-    buttonsLayout->addWidget(m_exportCsvBtn);
+    // Menu Bar
+    QMenuBar *menuBarWidget = menuBar();
+    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
+    fileMenu->addAction(exportCsvAction);
+    fileMenu->addAction(exportJsonAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(closeAction);
 
-    m_exportJsonBtn = new QPushButton(tr("Export to JSON"), this);
-    connect(m_exportJsonBtn, &QPushButton::clicked, this, &WorkItemWindow::exportToJson);
-    buttonsLayout->addWidget(m_exportJsonBtn);
+    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    m_copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    m_copyAction->setShortcut(QKeySequence::Copy);
+    connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
+    editMenu->addAction(m_copyAction);
 
-    mainLayout->addLayout(buttonsLayout);
+    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    refreshAction->setShortcut(QKeySequence::Refresh);
+    viewMenu->addAction(refreshAction);
+
+    // Tool Bar
+    QToolBar *toolBar = addToolBar(tr("Main Toolbar"));
+    toolBar->addAction(refreshAction);
+    toolBar->addSeparator();
+    toolBar->addAction(exportCsvAction);
+    toolBar->addAction(exportJsonAction);
+
+    // Status Bar
+    m_statusLabel = new QLabel(this);
+    statusBar()->addWidget(m_statusLabel);
 
     // Context Menu Actions
-    m_openAction = new QAction(tr("Open in Browser"), this);
+    m_openAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open in Browser"), this);
     connect(m_openAction, &QAction::triggered, this, &WorkItemWindow::openInBrowser);
 
-    m_copyAction = new QAction(tr("Copy Link"), this);
-    connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
 }
 
-void WorkItemWindow::loadData()
+QString WorkItemWindow::getCacheFilePath() const
 {
-    QString query = (m_type == Issues) ? "is:open is:issue assignee:@me" : "is:open is:pr assignee:@me";
-    QUrl url("https://api.github.com/search/issues?q=" + QUrl::toPercentEncoding(query));
+    QString hash = QString::number(qHash(m_baseQuery), 16);
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/workitems_" + hash + ".json";
+}
+
+void WorkItemWindow::loadCache()
+{
+    QFile file(getCacheFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        QJsonObject obj = doc.object();
+        m_allData = obj["items"].toArray();
+        QString lastRefresh = obj["lastRefresh"].toString();
+
+        m_table->setRowCount(0);
+        for (int i = 0; i < m_allData.size(); ++i) {
+            appendRow(m_allData[i].toObject());
+        }
+        m_statusLabel->setText(tr("Cached data from %1 - Items: %2").arg(lastRefresh).arg(m_allData.size()));
+    }
+}
+
+void WorkItemWindow::saveCache()
+{
+    QFile file(getCacheFilePath());
+    if (file.open(QIODevice::WriteOnly)) {
+        QJsonObject obj;
+        obj["items"] = m_allData;
+        obj["lastRefresh"] = QDateTime::currentDateTime().toString();
+        QJsonDocument doc(obj);
+        file.write(doc.toJson());
+    }
+}
+
+void WorkItemWindow::loadData(int page)
+{
+    m_currentPage = page;
+    if (page == 1) {
+        m_statusLabel->setText(tr("Refreshing data..."));
+    }
+
+    QString endpointStr = (m_endpointType == EndpointIssues) ? "issues" : "repositories";
+    QUrl url("https://api.github.com/search/" + endpointStr + "?q=" + QUrl::toPercentEncoding(m_baseQuery) + "&per_page=100&page=" + QString::number(m_currentPage));
 
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     m_manager->get(request);
@@ -84,26 +155,50 @@ void WorkItemWindow::loadData()
 void WorkItemWindow::onReplyFinished(QNetworkReply *reply)
 {
     if (reply->error() == QNetworkReply::NoError) {
-        populateTable(reply->readAll());
+        QByteArray data = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject obj = doc.object();
+        QJsonArray items = obj["items"].toArray();
+        int totalCount = obj["total_count"].toInt();
+
+        if (m_currentPage == 1) {
+            m_allData = QJsonArray();
+            m_table->setRowCount(0);
+        }
+
+        for (int i = 0; i < items.size(); ++i) {
+            m_allData.append(items[i]);
+            appendRow(items[i].toObject());
+        }
+
+        if (items.size() > 0 && m_allData.size() < totalCount && m_allData.size() < 1000) {
+            int maxPages = (qMin(totalCount, 1000) + 99) / 100;
+            m_statusLabel->setText(tr("Loading page %1 / %2... (Total: %3)").arg(m_currentPage + 1).arg(maxPages).arg(totalCount));
+            loadData(m_currentPage + 1);
+        } else {
+            saveCache();
+            int maxPages = (qMin(totalCount, 1000) + 99) / 100;
+            QString limitMsg = (totalCount > 1000) ? tr(" (GitHub Search Limit Reached)") : "";
+            m_statusLabel->setText(tr("Items: %1%2 | Pages loaded: %3 / %4 | Last refresh: %5")
+                .arg(m_allData.size())
+                .arg(limitMsg)
+                .arg(m_currentPage)
+                .arg(maxPages)
+                .arg(QDateTime::currentDateTime().toString()));
+        }
     } else {
         QMessageBox::warning(this, tr("Error"), tr("Failed to fetch data: %1").arg(reply->errorString()));
+        m_statusLabel->setText(tr("Error fetching data."));
     }
     reply->deleteLater();
 }
 
-void WorkItemWindow::populateTable(const QByteArray &data)
+void WorkItemWindow::appendRow(const QJsonObject &item)
 {
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject()) return;
+    int row = m_table->rowCount();
+    m_table->insertRow(row);
 
-    QJsonObject obj = doc.object();
-    QJsonArray items = obj["items"].toArray();
-
-    m_table->setRowCount(items.size());
-
-    for (int i = 0; i < items.size(); ++i) {
-        QJsonObject item = items[i].toObject();
-
+    if (m_endpointType == EndpointIssues) {
         QString htmlUrl = item["html_url"].toString();
         QString title = item["title"].toString();
         QString state = item["state"].toString();
@@ -125,11 +220,33 @@ void WorkItemWindow::populateTable(const QByteArray &data)
         // Store the URL in the title item for easy access later
         titleItem->setData(Qt::UserRole, htmlUrl);
 
-        m_table->setItem(i, 0, repoItem);
-        m_table->setItem(i, 1, titleItem);
-        m_table->setItem(i, 2, stateItem);
-        m_table->setItem(i, 3, authorItem);
-        m_table->setItem(i, 4, createdItem);
+        m_table->setItem(row, 0, repoItem);
+        m_table->setItem(row, 1, titleItem);
+        m_table->setItem(row, 2, stateItem);
+        m_table->setItem(row, 3, authorItem);
+        m_table->setItem(row, 4, createdItem);
+    } else {
+        QString htmlUrl = item["html_url"].toString();
+        QString fullName = item["full_name"].toString();
+        QString description = item["description"].toString();
+        QString language = item["language"].toString();
+        QString owner = item["owner"].toObject()["login"].toString();
+        QString createdAt = item["created_at"].toString();
+
+        QTableWidgetItem *repoItem = new QTableWidgetItem(fullName);
+        QTableWidgetItem *descItem = new QTableWidgetItem(description);
+        QTableWidgetItem *langItem = new QTableWidgetItem(language);
+        QTableWidgetItem *ownerItem = new QTableWidgetItem(owner);
+        QTableWidgetItem *createdItem = new QTableWidgetItem(createdAt);
+
+        // Store the URL in the repo item
+        repoItem->setData(Qt::UserRole, htmlUrl);
+
+        m_table->setItem(row, 0, repoItem);
+        m_table->setItem(row, 1, descItem);
+        m_table->setItem(row, 2, langItem);
+        m_table->setItem(row, 3, ownerItem);
+        m_table->setItem(row, 4, createdItem);
     }
 }
 
@@ -244,9 +361,9 @@ void WorkItemWindow::copyLink()
 
 QString WorkItemWindow::getHtmlUrlForRow(int row) const
 {
-    QTableWidgetItem *titleItem = m_table->item(row, 1); // 1 is Title column
-    if (titleItem) {
-        return titleItem->data(Qt::UserRole).toString();
+    QTableWidgetItem *item = m_table->item(row, (m_endpointType == EndpointIssues) ? 1 : 0);
+    if (item) {
+        return item->data(Qt::UserRole).toString();
     }
     return QString();
 }

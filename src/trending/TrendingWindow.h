@@ -11,10 +11,11 @@
 #include <QNetworkReply>
 #include <QSet>
 #include <QNetworkAccessManager>
+#include <QMainWindow>
 
 class GitHubClient;
 
-class TrendingWindow : public QWidget {
+class TrendingWindow : public QMainWindow {
     Q_OBJECT
 
 public:
