@@ -61,14 +61,19 @@ void WorkItemWindow::setupUi()
     connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
     QAction *refreshAction = new QAction(tr("Refresh"), this);
     connect(refreshAction, &QAction::triggered, this, [this]() {
+        m_table->setRowCount(0); // Give immediate visual feedback of refresh
         loadData(1);
     });
+    QAction *closeAction = new QAction(tr("Close"), this);
+    connect(closeAction, &QAction::triggered, this, &WorkItemWindow::close);
 
     // Menu Bar
     QMenuBar *menuBarWidget = menuBar();
     QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
     fileMenu->addAction(exportCsvAction);
     fileMenu->addAction(exportJsonAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(closeAction);
 
     QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
     viewMenu->addAction(refreshAction);
@@ -130,6 +135,10 @@ void WorkItemWindow::saveCache()
 void WorkItemWindow::loadData(int page)
 {
     m_currentPage = page;
+    if (page == 1) {
+        m_statusLabel->setText(tr("Refreshing data..."));
+    }
+
     QString endpointStr = (m_endpointType == EndpointIssues) ? "issues" : "repositories";
     QUrl url("https://api.github.com/search/" + endpointStr + "?q=" + QUrl::toPercentEncoding(m_baseQuery) + "&per_page=100&page=" + QString::number(m_currentPage));
 
