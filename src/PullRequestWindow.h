@@ -1,7 +1,7 @@
 #ifndef PULLREQUESTWINDOW_H
 #define PULLREQUESTWINDOW_H
 
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QTabWidget>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -18,7 +18,7 @@
 #include "Notification.h"
 #include "GitHubClient.h"
 
-class PullRequestWindow : public QMainWindow {
+class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
 
 public:

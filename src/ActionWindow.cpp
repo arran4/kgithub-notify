@@ -6,7 +6,7 @@
 #include <QMessageBox>
 
 ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
+    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
 {
     setWindowTitle(tr("Action Run - %1").arg(n.title));
     resize(700, 500);
@@ -14,6 +14,8 @@ ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget 
     setupUi();
 
     fetchRunDetails();
+
+    setupGUI();
 }
 
 void ActionWindow::setupUi()

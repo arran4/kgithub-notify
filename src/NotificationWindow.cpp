@@ -15,7 +15,7 @@
 #include "ActionWindow.h"
 
 NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_notification(n), m_client(client) {
+    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
     setWindowTitle(tr("Notification Details - %1").arg(n.repository));
     resize(500, 400);
 
@@ -179,6 +179,8 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
         .arg(n.unread ? tr("Unread") : tr("Read"))
         .arg(n.inInbox ? tr("Yes") : tr("No"));
     statusBar()->showMessage(statusText);
+
+    setupGUI();
 }
 
 void NotificationWindow::onOpenUrl() {

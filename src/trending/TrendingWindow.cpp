@@ -22,7 +22,7 @@
 #include <QSettings>
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_client(client) {
+    : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(800, 600); // make it a bit larger to fit columns
 
@@ -167,6 +167,8 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
 
     // Initial fetch
     onRefreshClicked();
+
+    setupGUI();
 }
 
 void TrendingWindow::onModeChanged(int) {

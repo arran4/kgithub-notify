@@ -13,6 +13,8 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt5 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
 find_package(KF5Wallet REQUIRED)
 find_package(KF5Notifications REQUIRED)
+find_package(KF5XmlGui REQUIRED)
+find_package(KF5ConfigWidgets REQUIRED)
 
 enable_testing()
 
@@ -82,6 +84,8 @@ target_link_libraries(kgithub-notify
     KF5::CoreAddons
     KF5::Wallet
     KF5::Notifications
+    KF5::XmlGui
+    KF5::ConfigWidgets
 )
 
 target_compile_definitions(kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")
@@ -105,4 +109,8 @@ install(FILES src/assets/icon.svg
 
 install(FILES src/kgithub-notify.notifyrc
     DESTINATION ${CMAKE_INSTALL_DATADIR}/knotifications5
+)
+
+install(FILES src/kgithub-notifyui.rc
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/kxmlgui5/kgithub-notify
 )

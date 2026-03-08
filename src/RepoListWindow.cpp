@@ -26,7 +26,7 @@
 #include <QVBoxLayout>
 
 RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent), m_client(client), m_table(nullptr), m_toolbar(nullptr), m_statusBar(nullptr), m_timerLabel(nullptr), m_updateTimer(nullptr) {
+    : KXmlGuiWindow(parent), m_client(client), m_table(nullptr), m_toolbar(nullptr), m_statusBar(nullptr), m_timerLabel(nullptr), m_updateTimer(nullptr) {
 
     setupUI();
     loadCache();
@@ -37,6 +37,8 @@ RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &RepoListWindow::updateTimerLabel);
     m_updateTimer->start(60000); // 1 minute
+
+    setupGUI();
 }
 
 void RepoListWindow::setupUI() {

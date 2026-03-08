@@ -1,7 +1,7 @@
 #ifndef WORKITEMWINDOW_H
 #define WORKITEMWINDOW_H
 
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QTableWidget>
 #include <QPushButton>
 #include <QNetworkReply>
@@ -12,7 +12,7 @@
 #include <QJsonArray>
 #include "GitHubClient.h"
 
-class WorkItemWindow : public QMainWindow {
+class WorkItemWindow : public KXmlGuiWindow {
     Q_OBJECT
 
 public:
