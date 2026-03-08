@@ -92,9 +92,10 @@ class MainWindow : public KXmlGuiWindow {
     void setupWindow();
     void setupCentralWidget();
     void setupNotificationList();
+    void setupToolbar();
     void setupPages();
+    void setupMenus();
     void setupStatusBar();
-    void setupActions();
     void loadToken();
     QIcon themedIcon(const QStringList &names, const QString &fallbackResource = QString(),
                      QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
@@ -115,7 +116,8 @@ class MainWindow : public KXmlGuiWindow {
     bool pendingAuthError;
     QString lastError;
 
-    // Actions
+    // Toolbar
+    QToolBar *toolbar;
     QAction *refreshAction;
     QComboBox *filterComboBox;
     QComboBox *repoFilterComboBox;

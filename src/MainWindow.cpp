@@ -25,8 +25,6 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <limits>
-#include <QWidgetAction>
-#include <KXmlGui/KActionCollection>
 
 #include "NotificationItemWidget.h"
 #include "SettingsDialog.h"
@@ -68,10 +66,11 @@ MainWindow::MainWindow(QWidget *parent)
     setupWindow();
     setupCentralWidget();
     setupNotificationList();
+    setupToolbar();
     setupPages();
     createTrayIcon();
+    setupMenus();
     setupStatusBar();
-    setupActions();
 
     setupGUI();
 
@@ -749,58 +748,180 @@ void MainWindow::setupNotificationList() {
     stackWidget->addWidget(notificationListWidget);
 }
 
-void MainWindow::setupActions() {
-    // --- File ---
+void MainWindow::setupToolbar() {
+    toolbar = new QToolBar(this);
+    toolbar->setMovable(false);
+    addToolBar(Qt::TopToolBarArea, toolbar);
+
+    refreshAction = new QAction(themedIcon({QStringLiteral("view-refresh")}, QString(), QStyle::SP_BrowserReload),
+                                tr("Refresh"), this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
+    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    toolbar->addAction(refreshAction);
+
+    filterComboBox = new QComboBox(this);
+    filterComboBox->addItem(tr("Inbox"));
+    filterComboBox->addItem(tr("Unread"));
+    filterComboBox->addItem(tr("Read"));
+    filterComboBox->addItem(tr("All"));
+    connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
+    toolbar->addWidget(filterComboBox);
+
+    toolbar->addSeparator();
+
+    repoFilterComboBox = new QComboBox(this);
+    repoFilterComboBox->addItem(tr("All Repositories"));
+    repoFilterComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
+        if(notificationListWidget) {
+            notificationListWidget->setRepoFilter(repoFilterComboBox->itemText(index));
+        }
+    });
+    toolbar->addWidget(repoFilterComboBox);
+
+    searchLineEdit = new QLineEdit(this);
+    searchLineEdit->setPlaceholderText(tr("Search..."));
+    searchLineEdit->setFixedWidth(200);
+    connect(searchLineEdit, &QLineEdit::textChanged, this, [this](const QString &text){
+        if(notificationListWidget) {
+            notificationListWidget->setSearchFilter(text);
+        }
+    });
+    toolbar->addWidget(searchLineEdit);
+
+    QComboBox *sortComboBox = new QComboBox(this);
+    sortComboBox->addItem(tr("Default (API Order)"));
+    sortComboBox->addItem(tr("Updated (Newest)"));
+    sortComboBox->addItem(tr("Updated (Oldest)"));
+    sortComboBox->addItem(tr("Repository (A-Z)"));
+    sortComboBox->addItem(tr("Repository (Z-A)"));
+    sortComboBox->addItem(tr("Title (A-Z)"));
+    sortComboBox->addItem(tr("Title (Z-A)"));
+    sortComboBox->addItem(tr("Type (A-Z)"));
+    sortComboBox->addItem(tr("Type (Z-A)"));
+    sortComboBox->addItem(tr("Last Read (Newest)"));
+    sortComboBox->addItem(tr("Last Read (Oldest)"));
+    sortComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
+        if(notificationListWidget) {
+            notificationListWidget->setSortMode(index);
+        }
+    });
+    toolbar->addWidget(sortComboBox);
+
+    toolbar->addSeparator();
+
+    selectAllAction = new QAction(tr("Select All"), this);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    toolbar->addAction(selectAllAction);
+
+    selectNoneAction = new QAction(tr("Select None"), this);
+    selectNoneAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    toolbar->addAction(selectNoneAction);
+
+    selectionComboBox = new QComboBox(this);
+    selectionComboBox->addItem(tr("Select..."));
+    connect(selectionComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onSelectionChanged);
+    toolbar->addWidget(selectionComboBox);
+
+    toolbar->addSeparator();
+
+    dismissSelectedAction = new QAction(themedIcon({QStringLiteral("mail-mark-read"), QStringLiteral("edit-delete")},
+                                                   QString(), QStyle::SP_DialogDiscardButton),
+                                        tr("Dismiss Selected"), this);
+    dismissSelectedAction->setShortcut(QKeySequence::Delete);
+    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
+    toolbar->addAction(dismissSelectedAction);
+
+    openSelectedAction =
+        new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")}, QString(),
+                               QStyle::SP_DirOpenIcon),
+                    tr("Open Selected"), this);
+    openSelectedAction->setShortcut(Qt::Key_Return);
+    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
+    toolbar->addAction(openSelectedAction);
+
+    updateSelectionComboBox();
+}
+
+void MainWindow::setupPages() {
+    createErrorPage();
+    stackWidget->addWidget(errorPage);
+
+    createLoginPage();
+    stackWidget->addWidget(loginPage);
+
+    createEmptyStatePage();
+    stackWidget->addWidget(emptyStatePage);
+
+    createLoadingPage();
+    stackWidget->addWidget(loadingPage);
+}
+
+void MainWindow::setupMenus() {
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+
     QAction *settingsAction = new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("&Settings"), this);
     settingsAction->setShortcut(QKeySequence::Preferences);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    actionCollection()->addAction(QStringLiteral("settings_action"), settingsAction);
+    fileMenu->addAction(settingsAction);
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
     connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
-    actionCollection()->addAction(QStringLiteral("notifications_settings_action"), notificationsSettingsAction);
+    fileMenu->addAction(notificationsSettingsAction);
+
+    fileMenu->addSeparator();
 
     QAction *closeAction = new QAction(themedIcon({QStringLiteral("window-close")}), tr("&Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &MainWindow::close);
-    actionCollection()->addAction(QStringLiteral("close_action"), closeAction);
+    fileMenu->addAction(closeAction);
 
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("&Quit"), this);
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    actionCollection()->addAction(QStringLiteral("quit_action"), quitAction);
+    fileMenu->addAction(quitAction);
 
-    // --- Edit ---
-    selectAllAction = new QAction(tr("Select &All"), this);
-    selectAllAction->setShortcut(QKeySequence::SelectAll);
-    connect(selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
-    actionCollection()->addAction(QStringLiteral("select_all_action"), selectAllAction);
+    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
 
-    selectNoneAction = new QAction(tr("Select &None"), this);
-    selectNoneAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+A")));
-    connect(selectNoneAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
-    actionCollection()->addAction(QStringLiteral("select_none_action"), selectNoneAction);
+    QAction *selectAllMenuAction = new QAction(tr("Select &All"), this);
+    selectAllMenuAction->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllMenuAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    editMenu->addAction(selectAllMenuAction);
 
-    // --- View ---
-    refreshAction = new QAction(themedIcon({QStringLiteral("view-refresh")}, QString(), QStyle::SP_BrowserReload),
-                                tr("&Refresh"), this);
-    refreshAction->setShortcut(QKeySequence::Refresh);
-    connect(refreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    actionCollection()->addAction(QStringLiteral("refresh_action"), refreshAction);
+    QAction *selectNoneMenuAction = new QAction(tr("Select &None"), this);
+    selectNoneMenuAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(selectNoneMenuAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    editMenu->addAction(selectNoneMenuAction);
 
-    // --- Tools ---
+    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+    QAction *refreshActionMenu = new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("&Refresh"), this);
+    refreshActionMenu->setShortcut(QKeySequence::Refresh);
+    connect(refreshActionMenu, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    viewMenu->addAction(refreshActionMenu);
+
+    QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+
     QAction *trendingAction = new QAction(tr("Trending Repos & Devs"), this);
     connect(trendingAction, &QAction::triggered, this, &MainWindow::showTrendingWindow);
-    actionCollection()->addAction(QStringLiteral("trending_action"), trendingAction);
+    toolsMenu->addAction(trendingAction);
 
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, [this]() { showDebugWindow(); });
-    actionCollection()->addAction(QStringLiteral("debug_action"), debugAction);
+    toolsMenu->addAction(debugAction);
 
     QAction *repoListAction = new QAction(tr("Repositories List"), this);
     connect(repoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
-    actionCollection()->addAction(QStringLiteral("repolist_action"), repoListAction);
+    toolsMenu->addAction(repoListAction);
+    toolsMenu->addSeparator();
+
+    QMenu *issuesMenu = toolsMenu->addMenu(tr("Issues"));
+    QMenu *prsMenu = toolsMenu->addMenu(tr("Pull Requests"));
+    QMenu *reposMenu = toolsMenu->addMenu(tr("Repositories"));
 
     struct Variant {
         QString name;
@@ -822,9 +943,13 @@ void MainWindow::setupActions() {
         {tr("All (Unfiltered)"), "involves:@me", "involves:@me", "user:@me"}
     };
 
-    auto createActions = [&](const QString& statusName, const QString& statusQuery, const QString& typeQuery, int endpointType, const QString& baseName) {
-        for (int i=0; i<variants.size(); ++i) {
-            const auto& v = variants[i];
+    auto createSubMenu = [&](QMenu* parentMenu, const QString& statusName, const QString& statusQuery, const QString& typeQuery, int endpointType) {
+        QMenu* statusMenu = parentMenu;
+        if (!statusName.isEmpty()) {
+            statusMenu = parentMenu->addMenu(statusName);
+        }
+
+        for (const auto& v : variants) {
             QString vQuery;
             if (endpointType == 0) vQuery = v.issueQuery;
             else if (endpointType == 1) vQuery = v.prQuery;
@@ -841,138 +966,37 @@ void MainWindow::setupActions() {
 
                 QString finalQuery = queryParts.join(" ");
 
-                QString fullTitle = "";
-                if (!statusName.isEmpty()) fullTitle += statusName + " - ";
-                fullTitle += v.name;
+                QString fullTitle = parentMenu->title();
+                if (!statusName.isEmpty()) fullTitle += " - " + statusName;
+                fullTitle += " - " + v.name;
 
                 int actualEndpoint = (endpointType == 2) ? 1 : 0; // 0 = Issues, 1 = Repositories
                 showWorkItems(fullTitle, actualEndpoint, finalQuery);
             });
-
-            QString safeName = baseName + "_" + QString::number(i);
-            actionCollection()->addAction(safeName, action);
+            statusMenu->addAction(action);
         }
     };
 
-    // Create the dynamically generated actions (we add them to actionCollection so rc file can use them)
-    createActions(tr("Open"), "is:open", "is:issue", 0, "issues_open");
-    createActions(tr("Closed"), "is:closed", "is:issue", 0, "issues_closed");
-    createActions(tr("All Statuses"), "", "is:issue", 0, "issues_all");
+    createSubMenu(issuesMenu, tr("Open"), "is:open", "is:issue", 0);
+    createSubMenu(issuesMenu, tr("Closed"), "is:closed", "is:issue", 0);
+    createSubMenu(issuesMenu, tr("All Statuses"), "", "is:issue", 0);
 
-    createActions(tr("Open"), "is:open", "is:pr", 1, "prs_open");
-    createActions(tr("Closed"), "is:closed", "is:pr", 1, "prs_closed");
-    createActions(tr("Merged"), "is:merged", "is:pr", 1, "prs_merged");
-    createActions(tr("All Statuses"), "", "is:pr", 1, "prs_all");
+    createSubMenu(prsMenu, tr("Open"), "is:open", "is:pr", 1);
+    createSubMenu(prsMenu, tr("Closed"), "is:closed", "is:pr", 1);
+    createSubMenu(prsMenu, tr("Merged"), "is:merged", "is:pr", 1);
+    createSubMenu(prsMenu, tr("All Statuses"), "", "is:pr", 1);
 
-    createActions("", "", "", 2, "repos_all");
+    createSubMenu(reposMenu, "", "", "", 2);
 
-    // --- Toolbar Specific Actions (Widgets) ---
-    filterComboBox = new QComboBox(this);
-    filterComboBox->addItem(tr("Inbox"));
-    filterComboBox->addItem(tr("Unread"));
-    filterComboBox->addItem(tr("Read"));
-    filterComboBox->addItem(tr("All"));
-    connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
-
-    QWidgetAction *filterComboAction = new QWidgetAction(this);
-    filterComboAction->setDefaultWidget(filterComboBox);
-    actionCollection()->addAction(QStringLiteral("filter_combo_action"), filterComboAction);
-
-    repoFilterComboBox = new QComboBox(this);
-    repoFilterComboBox->addItem(tr("All Repositories"));
-    repoFilterComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    connect(repoFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
-        if(notificationListWidget) {
-            notificationListWidget->setRepoFilter(repoFilterComboBox->itemText(index));
-        }
-    });
-    QWidgetAction *repoFilterComboAction = new QWidgetAction(this);
-    repoFilterComboAction->setDefaultWidget(repoFilterComboBox);
-    actionCollection()->addAction(QStringLiteral("repo_filter_combo_action"), repoFilterComboAction);
-
-    searchLineEdit = new QLineEdit(this);
-    searchLineEdit->setPlaceholderText(tr("Search..."));
-    searchLineEdit->setFixedWidth(200);
-    connect(searchLineEdit, &QLineEdit::textChanged, this, [this](const QString &text){
-        if(notificationListWidget) {
-            notificationListWidget->setSearchFilter(text);
-        }
-    });
-    QWidgetAction *searchLineAction = new QWidgetAction(this);
-    searchLineAction->setDefaultWidget(searchLineEdit);
-    actionCollection()->addAction(QStringLiteral("search_line_action"), searchLineAction);
-
-    QComboBox *sortComboBox = new QComboBox(this);
-    sortComboBox->addItem(tr("Default (API Order)"));
-    sortComboBox->addItem(tr("Updated (Newest)"));
-    sortComboBox->addItem(tr("Updated (Oldest)"));
-    sortComboBox->addItem(tr("Repository (A-Z)"));
-    sortComboBox->addItem(tr("Repository (Z-A)"));
-    sortComboBox->addItem(tr("Title (A-Z)"));
-    sortComboBox->addItem(tr("Title (Z-A)"));
-    sortComboBox->addItem(tr("Type (A-Z)"));
-    sortComboBox->addItem(tr("Type (Z-A)"));
-    sortComboBox->addItem(tr("Last Read (Newest)"));
-    sortComboBox->addItem(tr("Last Read (Oldest)"));
-    sortComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    connect(sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
-        if(notificationListWidget) {
-            notificationListWidget->setSortMode(index);
-        }
-    });
-    QWidgetAction *sortComboAction = new QWidgetAction(this);
-    sortComboAction->setDefaultWidget(sortComboBox);
-    actionCollection()->addAction(QStringLiteral("sort_combo_action"), sortComboAction);
-
-    selectionComboBox = new QComboBox(this);
-    selectionComboBox->addItem(tr("Select..."));
-    connect(selectionComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &MainWindow::onSelectionChanged);
-    QWidgetAction *selectionComboAction = new QWidgetAction(this);
-    selectionComboAction->setDefaultWidget(selectionComboBox);
-    actionCollection()->addAction(QStringLiteral("selection_combo_action"), selectionComboAction);
-
-    dismissSelectedAction = new QAction(themedIcon({QStringLiteral("mail-mark-read"), QStringLiteral("edit-delete")},
-                                                   QString(), QStyle::SP_DialogDiscardButton),
-                                        tr("Dismiss Selected"), this);
-    dismissSelectedAction->setShortcut(QKeySequence::Delete);
-    connect(dismissSelectedAction, &QAction::triggered, this, &MainWindow::onDismissSelectedClicked);
-    actionCollection()->addAction(QStringLiteral("dismiss_selected_action"), dismissSelectedAction);
-
-    openSelectedAction =
-        new QAction(themedIcon({QStringLiteral("document-open"), QStringLiteral("internet-web-browser")}, QString(),
-                               QStyle::SP_DirOpenIcon),
-                    tr("Open Selected"), this);
-    openSelectedAction->setShortcut(Qt::Key_Return);
-    connect(openSelectedAction, &QAction::triggered, this, &MainWindow::onOpenSelectedClicked);
-    actionCollection()->addAction(QStringLiteral("open_selected_action"), openSelectedAction);
-
-    updateSelectionComboBox();
-
-    // --- Help ---
+    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction *aboutAction = new QAction(themedIcon({QStringLiteral("help-about")}), tr("&About KGitHub Notify"), this);
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
-    actionCollection()->addAction(QStringLiteral("about_action"), aboutAction);
+    helpMenu->addAction(aboutAction);
 
     QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
-    actionCollection()->addAction(QStringLiteral("about_qt_action"), aboutQtAction);
+    helpMenu->addAction(aboutQtAction);
 }
-
-void MainWindow::setupPages() {
-    createErrorPage();
-    stackWidget->addWidget(errorPage);
-
-    createLoginPage();
-    stackWidget->addWidget(loginPage);
-
-    createEmptyStatePage();
-    stackWidget->addWidget(emptyStatePage);
-
-    createLoadingPage();
-    stackWidget->addWidget(loadingPage);
-}
-
 
 void MainWindow::showWorkItems(const QString &title, int endpointType, const QString &query) {
     WorkItemWindow::EndpointType type = (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
