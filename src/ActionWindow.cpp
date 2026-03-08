@@ -6,7 +6,7 @@
 #include <QMessageBox>
 
 ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
+    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
 {
     setWindowTitle(tr("Action Run - %1").arg(n.title));
     resize(700, 500);
@@ -20,6 +20,7 @@ void ActionWindow::setupUi()
 {
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
+    setupGUI();
 
     QVBoxLayout *layout = new QVBoxLayout(centralWidget);
 

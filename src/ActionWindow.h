@@ -1,7 +1,7 @@
 #ifndef ACTIONWINDOW_H
 #define ACTIONWINDOW_H
 
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QVBoxLayout>
@@ -12,7 +12,7 @@
 #include "Notification.h"
 #include "GitHubClient.h"
 
-class ActionWindow : public QMainWindow {
+class ActionWindow : public KXmlGuiWindow {
     Q_OBJECT
 
 public:

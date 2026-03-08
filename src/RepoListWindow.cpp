@@ -26,7 +26,7 @@
 #include <QVBoxLayout>
 
 RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent), m_client(client), m_table(nullptr), m_toolbar(nullptr), m_statusBar(nullptr), m_timerLabel(nullptr), m_updateTimer(nullptr) {
+    : KXmlGuiWindow(parent), m_client(client), m_table(nullptr), m_toolbar(nullptr), m_statusBar(nullptr), m_timerLabel(nullptr), m_updateTimer(nullptr) {
 
     setupUI();
     loadCache();
@@ -59,6 +59,7 @@ void RepoListWindow::setupUI() {
     header->setStretchLastSection(true);
 
     setCentralWidget(m_table);
+    setupGUI();
 
     // Toolbar
     m_toolbar = addToolBar(tr("Main Toolbar"));

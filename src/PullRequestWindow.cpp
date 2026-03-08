@@ -7,7 +7,7 @@
 #include <QDateTime>
 
 PullRequestWindow::PullRequestWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
+    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
 {
     setWindowTitle(tr("Pull Request - %1").arg(n.title));
     resize(800, 600);
@@ -21,6 +21,7 @@ void PullRequestWindow::setupUi()
 {
     m_tabWidget = new QTabWidget(this);
     setCentralWidget(m_tabWidget);
+    setupGUI();
 
     // 1. Conversation Tab
     m_conversationTab = new QWidget();

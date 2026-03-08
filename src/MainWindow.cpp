@@ -52,7 +52,7 @@ static int calculateSafeInterval(int minutes) {
 // -----------------------------------------------------------------------------
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
+    : KXmlGuiWindow(parent),
       debugWindow(nullptr),
       repoListWindow(nullptr),
       trendingWindow(nullptr),
@@ -70,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupPages();
     createTrayIcon();
     setupMenus();
+    setupGUI();
     setupStatusBar();
 
     // Initial State Check

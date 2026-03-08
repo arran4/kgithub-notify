@@ -22,12 +22,13 @@
 #include <QSettings>
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_client(client) {
+    : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(800, 600); // make it a bit larger to fit columns
 
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
+    setupGUI();
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 
     QHBoxLayout *topLayout = new QHBoxLayout();
