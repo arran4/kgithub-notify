@@ -27,6 +27,7 @@ class SettingsDialog : public QDialog {
     void saveSettings();
     void onTestClicked();
     void onVerificationResult(bool valid, const QString &message);
+    void installNotifyRc();
 
    private:
     void updateAutostartEntry();

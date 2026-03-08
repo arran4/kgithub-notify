@@ -93,6 +93,14 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(autostartCheckBox);
     layout->addWidget(startMinimizedCheckBox);
 
+    // Notifications Service
+    QLabel *serviceLabel = new QLabel("Notification Service:", this);
+    layout->addWidget(serviceLabel);
+
+    QPushButton *installServiceBtn = new QPushButton("Install kgithub-notify.notifyrc", this);
+    connect(installServiceBtn, &QPushButton::clicked, this, &SettingsDialog::installNotifyRc);
+    layout->addWidget(installServiceBtn);
+
     if (isAutostartEnabled()) {
         autostartCheckBox->setChecked(true);
         startMinimizedCheckBox->setEnabled(true);
@@ -219,4 +227,36 @@ void SettingsDialog::onVerificationResult(bool valid, const QString &message) {
     } else {
         statusLabel->setStyleSheet("color: red;");
     }
+}
+
+void SettingsDialog::installNotifyRc() {
+    QString targetDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/knotifications5";
+    QDir dir;
+    if (!dir.mkpath(targetDir)) {
+        statusLabel->setText("Failed to create knotifications5 directory.");
+        statusLabel->setStyleSheet("color: red;");
+        statusLabel->show();
+        return;
+    }
+
+    QString targetPath = targetDir + "/kgithub-notify.notifyrc";
+    QFile sourceFile(":/kgithub-notify.notifyrc");
+
+    if (QFile::exists(targetPath)) {
+        if (!QFile::remove(targetPath)) {
+            statusLabel->setText("Failed to remove existing notifyrc file.");
+            statusLabel->setStyleSheet("color: red;");
+            statusLabel->show();
+            return;
+        }
+    }
+
+    if (sourceFile.copy(targetPath)) {
+        statusLabel->setText("Successfully installed kgithub-notify.notifyrc");
+        statusLabel->setStyleSheet("color: green;");
+    } else {
+        statusLabel->setText("Failed to install notifyrc file.");
+        statusLabel->setStyleSheet("color: red;");
+    }
+    statusLabel->show();
 }
