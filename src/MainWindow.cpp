@@ -868,10 +868,33 @@ void MainWindow::setupMenus() {
 
     fileMenu->addSeparator();
 
+    QAction *closeAction = new QAction(themedIcon({QStringLiteral("window-close")}), tr("&Close"), this);
+    closeAction->setShortcut(QKeySequence::Close);
+    connect(closeAction, &QAction::triggered, this, &MainWindow::close);
+    fileMenu->addAction(closeAction);
+
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("&Quit"), this);
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     fileMenu->addAction(quitAction);
+
+    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+
+    QAction *selectAllMenuAction = new QAction(tr("Select &All"), this);
+    selectAllMenuAction->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllMenuAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
+    editMenu->addAction(selectAllMenuAction);
+
+    QAction *selectNoneMenuAction = new QAction(tr("Select &None"), this);
+    selectNoneMenuAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(selectNoneMenuAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
+    editMenu->addAction(selectNoneMenuAction);
+
+    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+    QAction *refreshActionMenu = new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("&Refresh"), this);
+    refreshActionMenu->setShortcut(QKeySequence::Refresh);
+    connect(refreshActionMenu, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    viewMenu->addAction(refreshActionMenu);
 
     QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction *aboutAction = new QAction(themedIcon({QStringLiteral("help-about")}), tr("&About KGitHub Notify"), this);

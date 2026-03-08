@@ -15,17 +15,25 @@ NotificationWindow::NotificationWindow(const Notification &n, QWidget *parent)
     resize(500, 400);
 
     // Menu Bar
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    closeAction->setShortcut(QKeySequence::Close);
+    connect(closeAction, &QAction::triggered, this, &NotificationWindow::close);
+    fileMenu->addAction(closeAction);
+
+    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+
+    QAction *copyLinkAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    copyLinkAction->setShortcut(QKeySequence::Copy);
+    connect(copyLinkAction, &QAction::triggered, this, &NotificationWindow::onCopyLink);
+    editMenu->addAction(copyLinkAction);
+
     QMenu *actionsMenu = menuBar()->addMenu(tr("&Actions"));
 
     QAction *openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
     connect(openUrlAction, &QAction::triggered, this, &NotificationWindow::onOpenUrl);
     actionsMenu->addAction(openUrlAction);
 
-    QAction *copyLinkAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
-    connect(copyLinkAction, &QAction::triggered, this, &NotificationWindow::onCopyLink);
-    actionsMenu->addAction(copyLinkAction);
-
-    actionsMenu->addSeparator();
 
     QAction *markAsReadAction = new QAction(QIcon::fromTheme("mail-mark-read"), tr("Mark as Read"), this);
     connect(markAsReadAction, &QAction::triggered, this, &NotificationWindow::onMarkAsRead);

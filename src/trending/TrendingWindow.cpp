@@ -16,15 +16,18 @@
 #include <QClipboard>
 #include <QHeaderView>
 #include <QTableWidget>
+#include <QMenuBar>
 #include <QTextEdit>
 #include <QDialog>
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
-    : QWidget(parent, Qt::Window), m_client(client) {
+    : QMainWindow(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(800, 600); // make it a bit larger to fit columns
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    QWidget *centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 
     QHBoxLayout *topLayout = new QHBoxLayout();
 
@@ -79,6 +82,36 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
 
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(tableWidget);
+
+    QMenuBar *menuBarWidget = menuBar();
+    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
+    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    closeAction->setShortcut(QKeySequence::Close);
+    connect(closeAction, &QAction::triggered, this, &TrendingWindow::close);
+    fileMenu->addAction(closeAction);
+
+    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    QAction *copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    copyAction->setShortcut(QKeySequence::Copy);
+    connect(copyAction, &QAction::triggered, this, [this]() {
+        QList<QTableWidgetItem *> items = tableWidget->selectedItems();
+        if (!items.isEmpty()) {
+            QTableWidgetItem *item = items.first();
+            if (item) {
+                QString url = item->data(Qt::UserRole).toString();
+                if (!url.isEmpty()) {
+                    QApplication::clipboard()->setText(url);
+                }
+            }
+        }
+    });
+    editMenu->addAction(copyAction);
+
+    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    QAction *refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
+    refreshAction->setShortcut(QKeySequence::Refresh);
+    connect(refreshAction, &QAction::triggered, this, &TrendingWindow::onRefreshClicked);
+    viewMenu->addAction(refreshAction);
 
     connect(refreshButton, &QPushButton::clicked, this, &TrendingWindow::onRefreshClicked);
     connect(modeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onModeChanged);

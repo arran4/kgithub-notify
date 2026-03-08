@@ -64,7 +64,8 @@ void WorkItemWindow::setupUi()
         m_table->setRowCount(0); // Give immediate visual feedback of refresh
         loadData(1);
     });
-    QAction *closeAction = new QAction(tr("Close"), this);
+    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &WorkItemWindow::close);
 
     // Menu Bar
@@ -75,7 +76,14 @@ void WorkItemWindow::setupUi()
     fileMenu->addSeparator();
     fileMenu->addAction(closeAction);
 
+    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    m_copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    m_copyAction->setShortcut(QKeySequence::Copy);
+    connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
+    editMenu->addAction(m_copyAction);
+
     QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    refreshAction->setShortcut(QKeySequence::Refresh);
     viewMenu->addAction(refreshAction);
 
     // Tool Bar
@@ -90,11 +98,9 @@ void WorkItemWindow::setupUi()
     statusBar()->addWidget(m_statusLabel);
 
     // Context Menu Actions
-    m_openAction = new QAction(tr("Open in Browser"), this);
+    m_openAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open in Browser"), this);
     connect(m_openAction, &QAction::triggered, this, &WorkItemWindow::openInBrowser);
 
-    m_copyAction = new QAction(tr("Copy Link"), this);
-    connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
 }
 
 QString WorkItemWindow::getCacheFilePath() const

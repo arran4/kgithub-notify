@@ -9,10 +9,11 @@
 #include <QHBoxLayout>
 #include <QPointer>
 #include <QNetworkReply>
+#include <QMainWindow>
 
 class GitHubClient;
 
-class TrendingWindow : public QWidget {
+class TrendingWindow : public QMainWindow {
     Q_OBJECT
 
 public:
