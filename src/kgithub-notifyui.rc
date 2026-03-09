@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gui name="kgithub-notify" version="1" xmlns="http://www.kde.org/standards/kxmlgui/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kde.org/standards/kxmlgui/1.0 http://www.kde.org/standards/kxmlgui/1.0/kxmlgui.xsd">
+    <MenuBar>
+        <Menu name="file">
+            <text>&amp;File</text>
+            <Action name="options_configure" />
+            <Action name="notifications_settings_action" />
+            <Separator />
+            <Action name="file_quit" />
+        </Menu>
+        <Menu name="edit">
+            <text>&amp;Edit</text>
+            <Action name="select_all_action" />
+            <Action name="select_none_action" />
+        </Menu>
+        <Menu name="view">
+            <text>&amp;View</text>
+            <Action name="refresh_action" />
+        </Menu>
+        <Menu name="tools">
+            <text>&amp;Tools</text>
+            <Action name="trending_action" />
+            <Action name="debug_action" />
+            <Action name="repolist_action" />
+            <Separator />
+            <Menu name="issues_menu">
+                <text>Issues</text>
+                <Action name="issues_open_0" />
+                <Action name="issues_open_1" />
+                <Action name="issues_open_2" />
+                <Action name="issues_open_4" />
+                <Action name="issues_open_5" />
+                <Action name="issues_open_6" />
+                <Action name="issues_open_7" />
+                <Action name="issues_open_8" />
+                <Action name="issues_open_9" />
+                <Separator/>
+                <Action name="issues_closed_0" />
+                <Action name="issues_closed_1" />
+                <Action name="issues_closed_2" />
+                <Action name="issues_closed_4" />
+                <Action name="issues_closed_5" />
+                <Action name="issues_closed_6" />
+                <Action name="issues_closed_7" />
+                <Action name="issues_closed_8" />
+                <Action name="issues_closed_9" />
+                <Separator/>
+                <Action name="issues_all_0" />
+                <Action name="issues_all_1" />
+                <Action name="issues_all_2" />
+                <Action name="issues_all_4" />
+                <Action name="issues_all_5" />
+                <Action name="issues_all_6" />
+                <Action name="issues_all_7" />
+                <Action name="issues_all_8" />
+                <Action name="issues_all_9" />
+            </Menu>
+            <Menu name="prs_menu">
+                <text>Pull Requests</text>
+                <Action name="prs_open_0" />
+                <Action name="prs_open_1" />
+                <Action name="prs_open_2" />
+                <Action name="prs_open_3" />
+                <Action name="prs_open_4" />
+                <Action name="prs_open_5" />
+                <Action name="prs_open_6" />
+                <Action name="prs_open_7" />
+                <Action name="prs_open_8" />
+                <Action name="prs_open_9" />
+                <Separator/>
+                <Action name="prs_closed_0" />
+                <Action name="prs_closed_1" />
+                <Action name="prs_closed_2" />
+                <Action name="prs_closed_3" />
+                <Action name="prs_closed_4" />
+                <Action name="prs_closed_5" />
+                <Action name="prs_closed_6" />
+                <Action name="prs_closed_7" />
+                <Action name="prs_closed_8" />
+                <Action name="prs_closed_9" />
+                <Separator/>
+                <Action name="prs_merged_0" />
+                <Action name="prs_merged_1" />
+                <Action name="prs_merged_2" />
+                <Action name="prs_merged_3" />
+                <Action name="prs_merged_4" />
+                <Action name="prs_merged_5" />
+                <Action name="prs_merged_6" />
+                <Action name="prs_merged_7" />
+                <Action name="prs_merged_8" />
+                <Action name="prs_merged_9" />
+                <Separator/>
+                <Action name="prs_all_0" />
+                <Action name="prs_all_1" />
+                <Action name="prs_all_2" />
+                <Action name="prs_all_3" />
+                <Action name="prs_all_4" />
+                <Action name="prs_all_5" />
+                <Action name="prs_all_6" />
+                <Action name="prs_all_7" />
+                <Action name="prs_all_8" />
+                <Action name="prs_all_9" />
+            </Menu>
+            <Menu name="repos_menu">
+                <text>Repositories</text>
+                <Action name="repos_all_0" />
+                <Action name="repos_all_5" />
+                <Action name="repos_all_6" />
+                <Action name="repos_all_7" />
+                <Action name="repos_all_8" />
+                <Action name="repos_all_9" />
+            </Menu>
+        </Menu>
+        <Menu name="help">
+            <text>&amp;Help</text>
+            <Action name="help_about_app" />
+            <Action name="help_about_kde" />
+        </Menu>
+    </MenuBar>
+    <ToolBar name="mainToolBar">
+        <text>Main Toolbar</text>
+        <Action name="refresh_action" />
+        <Action name="filter_combo_action" />
+        <Separator />
+        <Action name="repo_filter_combo_action" />
+        <Action name="search_line_action" />
+        <Action name="sort_combo_action" />
+        <Separator />
+        <Action name="select_all_action" />
+        <Action name="select_none_action" />
+        <Action name="selection_combo_action" />
+        <Separator />
+        <Action name="dismiss_selected_action" />
+        <Action name="open_selected_action" />
+    </ToolBar>
+</gui>

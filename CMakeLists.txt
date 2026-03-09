@@ -110,3 +110,7 @@ install(FILES src/assets/icon.svg
 install(FILES src/kgithub-notify.notifyrc
     DESTINATION ${CMAKE_INSTALL_DATADIR}/knotifications5
 )
+
+install(FILES src/kgithub-notifyui.rc
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/kxmlgui5/kgithub-notify
+)
