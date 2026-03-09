@@ -52,7 +52,7 @@ static int calculateSafeInterval(int minutes) {
 // -----------------------------------------------------------------------------
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
+    : KXmlGuiWindow(parent),
       debugWindow(nullptr),
       repoListWindow(nullptr),
       trendingWindow(nullptr),
@@ -70,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupPages();
     createTrayIcon();
     setupMenus();
+    setupGUI();
     setupStatusBar();
 
     // Initial State Check
@@ -575,7 +576,6 @@ void MainWindow::updateTrayMenu() {
     trayIconMenu->addSeparator();
 
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
-    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
 
     updateTrayToolTip();
@@ -860,66 +860,65 @@ void MainWindow::setupPages() {
 }
 
 void MainWindow::setupMenus() {
-    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+
 
     QAction *settingsAction = new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("&Settings"), this);
     settingsAction->setShortcut(QKeySequence::Preferences);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    fileMenu->addAction(settingsAction);
+    actionCollection()->addAction("settings_action", settingsAction);
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
     connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
-    fileMenu->addAction(notificationsSettingsAction);
+    actionCollection()->addAction("notifications_settings_action", notificationsSettingsAction);
 
-    fileMenu->addSeparator();
 
-    QAction *closeAction = new QAction(themedIcon({QStringLiteral("window-close")}), tr("&Close"), this);
-    closeAction->setShortcut(QKeySequence::Close);
-    connect(closeAction, &QAction::triggered, this, &MainWindow::close);
-    fileMenu->addAction(closeAction);
 
-    QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("&Quit"), this);
-    quitAction->setShortcut(QKeySequence::Quit);
-    connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    fileMenu->addAction(quitAction);
+    QAction *closeAction = KStandardAction::close(this, SLOT(close()), actionCollection());
+    actionCollection()->addAction("close_action", closeAction);
 
-    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+    QAction *quitAction = KStandardAction::quit(qApp, SLOT(quit()), actionCollection());
+    actionCollection()->addAction("quit_action", quitAction);
+
+
 
     QAction *selectAllMenuAction = new QAction(tr("Select &All"), this);
     selectAllMenuAction->setShortcut(QKeySequence::SelectAll);
     connect(selectAllMenuAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
-    editMenu->addAction(selectAllMenuAction);
+    actionCollection()->addAction("select_all_action", selectAllMenuAction);
 
     QAction *selectNoneMenuAction = new QAction(tr("Select &None"), this);
     selectNoneMenuAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(selectNoneMenuAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
-    editMenu->addAction(selectNoneMenuAction);
+    actionCollection()->addAction("select_none_action", selectNoneMenuAction);
 
-    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+
     QAction *refreshActionMenu = new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("&Refresh"), this);
     refreshActionMenu->setShortcut(QKeySequence::Refresh);
     connect(refreshActionMenu, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    viewMenu->addAction(refreshActionMenu);
+    actionCollection()->addAction("view_refresh_action", refreshActionMenu);
 
-    QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+
 
     QAction *trendingAction = new QAction(tr("Trending Repos & Devs"), this);
     connect(trendingAction, &QAction::triggered, this, &MainWindow::showTrendingWindow);
-    toolsMenu->addAction(trendingAction);
+    actionCollection()->addAction("trending_action", trendingAction);
 
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, [this]() { showDebugWindow(); });
-    toolsMenu->addAction(debugAction);
+    actionCollection()->addAction("debug_action", debugAction);
 
     QAction *repoListAction = new QAction(tr("Repositories List"), this);
     connect(repoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
-    toolsMenu->addAction(repoListAction);
-    toolsMenu->addSeparator();
+    actionCollection()->addAction("repo_list_action", repoListAction);
 
-    QMenu *issuesMenu = toolsMenu->addMenu(tr("Issues"));
-    QMenu *prsMenu = toolsMenu->addMenu(tr("Pull Requests"));
-    QMenu *reposMenu = toolsMenu->addMenu(tr("Repositories"));
+
+    QMenu *issuesMenu = new QMenu(tr("&Issues"), this);
+    QMenu *prsMenu = new QMenu(tr("&Pull Requests"), this);
+    QMenu *reposMenu = new QMenu(tr("&Repositories"), this);
+    actionCollection()->addAction("issues_menu", issuesMenu->menuAction());
+    actionCollection()->addAction("prs_menu", prsMenu->menuAction());
+    actionCollection()->addAction("repos_menu", reposMenu->menuAction());
 
     struct Variant {
         QString name;
@@ -986,14 +985,14 @@ void MainWindow::setupMenus() {
 
     createSubMenu(reposMenu, "", "", "", 2);
 
-    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+
     QAction *aboutAction = new QAction(themedIcon({QStringLiteral("help-about")}), tr("&About KGitHub Notify"), this);
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
-    helpMenu->addAction(aboutAction);
+    actionCollection()->addAction("about_action", aboutAction);
 
     QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
-    helpMenu->addAction(aboutQtAction);
+    actionCollection()->addAction("about_qt_action", aboutQtAction);
 }
 
 void MainWindow::showWorkItems(const QString &title, int endpointType, const QString &query) {
