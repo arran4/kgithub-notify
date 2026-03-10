@@ -1,7 +1,7 @@
 #ifndef REPOLISTWINDOW_H
 #define REPOLISTWINDOW_H
 
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QTableWidget>
 #include <QToolBar>
 #include <QStatusBar>
@@ -11,7 +11,7 @@
 #include <QJsonArray>
 #include "GitHubClient.h"
 
-class RepoListWindow : public QMainWindow {
+class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
 
 public:

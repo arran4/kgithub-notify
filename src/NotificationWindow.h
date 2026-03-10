@@ -1,7 +1,7 @@
 #ifndef NOTIFICATIONWINDOW_H
 #define NOTIFICATIONWINDOW_H
 
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QtGui/QAction>
 #include <QMenu>
 #include <QMenuBar>
@@ -10,7 +10,7 @@
 #include "Notification.h"
 #include "GitHubClient.h"
 
-class NotificationWindow : public QMainWindow {
+class NotificationWindow : public KXmlGuiWindow {
     Q_OBJECT
 public:
     explicit NotificationWindow(const Notification &notification, GitHubClient *client, QWidget *parent = nullptr);

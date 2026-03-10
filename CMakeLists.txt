@@ -73,6 +73,8 @@ add_executable(kgithub-notify
 )
 
 find_package(KF6CoreAddons REQUIRED)
+find_package(KF6XmlGui REQUIRED)
+find_package(KF6ConfigWidgets REQUIRED)
 
 target_link_libraries(kgithub-notify
     Qt6::Widgets
@@ -80,6 +82,8 @@ target_link_libraries(kgithub-notify
     Qt6::Svg
     Qt6::DBus
     KF6::CoreAddons
+    KF6::XmlGui
+    KF6::ConfigWidgets
     KF6::Wallet
     KF6::Notifications
 )
@@ -105,4 +109,8 @@ install(FILES src/assets/icon.svg
 
 install(FILES src/kgithub-notify.notifyrc
     DESTINATION ${CMAKE_INSTALL_DATADIR}/knotifications6
+)
+
+install(FILES src/kgithub-notifyui.rc
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/kxmlgui6/kgithub-notify
 )

@@ -6,7 +6,7 @@
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
-#include <QMainWindow>
+#include <KXmlGuiWindow>
 #include <QMenu>
 #include <QPushButton>
 #include <QStackedWidget>
@@ -32,7 +32,7 @@ class DebugWindow;
 class RepoListWindow;
 class TrendingWindow;
 
-class MainWindow : public QMainWindow {
+class MainWindow : public KXmlGuiWindow {
     Q_OBJECT
    public:
     explicit MainWindow(QWidget *parent = nullptr);

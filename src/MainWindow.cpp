@@ -1,3 +1,4 @@
+#include <KActionCollection>
 #include "MainWindow.h"
 
 #include <QtGui/QAction>
@@ -52,7 +53,7 @@ static int calculateSafeInterval(int minutes) {
 // -----------------------------------------------------------------------------
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
+    : KXmlGuiWindow(parent),
       debugWindow(nullptr),
       repoListWindow(nullptr),
       trendingWindow(nullptr),
@@ -860,62 +861,75 @@ void MainWindow::setupPages() {
 }
 
 void MainWindow::setupMenus() {
-    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-
     QAction *settingsAction = new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("&Settings"), this);
     settingsAction->setShortcut(QKeySequence::Preferences);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    fileMenu->addAction(settingsAction);
+    actionCollection()->addAction(QStringLiteral("settings"), settingsAction);
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
     connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
-    fileMenu->addAction(notificationsSettingsAction);
-
-    fileMenu->addSeparator();
+    actionCollection()->addAction(QStringLiteral("notifications_settings"), notificationsSettingsAction);
 
     QAction *closeAction = new QAction(themedIcon({QStringLiteral("window-close")}), tr("&Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &MainWindow::close);
-    fileMenu->addAction(closeAction);
+    actionCollection()->addAction(QStringLiteral("close"), closeAction);
 
     QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("&Quit"), this);
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    fileMenu->addAction(quitAction);
-
-    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+    actionCollection()->addAction(QStringLiteral("quit"), quitAction);
 
     QAction *selectAllMenuAction = new QAction(tr("Select &All"), this);
     selectAllMenuAction->setShortcut(QKeySequence::SelectAll);
     connect(selectAllMenuAction, &QAction::triggered, this, &MainWindow::onSelectAllClicked);
-    editMenu->addAction(selectAllMenuAction);
+    actionCollection()->addAction(QStringLiteral("select_all"), selectAllMenuAction);
 
     QAction *selectNoneMenuAction = new QAction(tr("Select &None"), this);
     selectNoneMenuAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(selectNoneMenuAction, &QAction::triggered, this, &MainWindow::onSelectNoneClicked);
-    editMenu->addAction(selectNoneMenuAction);
+    actionCollection()->addAction(QStringLiteral("select_none"), selectNoneMenuAction);
 
-    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
     QAction *refreshActionMenu = new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("&Refresh"), this);
     refreshActionMenu->setShortcut(QKeySequence::Refresh);
     connect(refreshActionMenu, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    viewMenu->addAction(refreshActionMenu);
-
-    QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    actionCollection()->addAction(QStringLiteral("refresh"), refreshActionMenu);
 
     QAction *trendingAction = new QAction(tr("Trending Repos & Devs"), this);
     connect(trendingAction, &QAction::triggered, this, &MainWindow::showTrendingWindow);
-    toolsMenu->addAction(trendingAction);
+    actionCollection()->addAction(QStringLiteral("trending"), trendingAction);
 
     QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, [this]() { showDebugWindow(); });
-    toolsMenu->addAction(debugAction);
+    actionCollection()->addAction(QStringLiteral("debug"), debugAction);
 
     QAction *repoListAction = new QAction(tr("Repositories List"), this);
     connect(repoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
-    toolsMenu->addAction(repoListAction);
-    toolsMenu->addSeparator();
+    actionCollection()->addAction(QStringLiteral("repo_list"), repoListAction);
+
+    // Dynamic menus are a bit tricky with pure XMLGUI if we want nested submenus
+    // For now we'll create the QMenu objects manually and add them to the view
+    // Or we can construct the actions and attach them dynamically.
+    // But since `KXmlGuiWindow` generates the menu bar, we can obtain the "tools" menu and append to it
+    // Wait, KXmlGuiWindow provides a menuBar() method.
+    // So we can still do `QMenu *issuesMenu = menuBar()->addMenu(tr("Issues"));` or grab it from GUI.
+
+    // For now we'll just call setupGUI()
+    setupGUI(Default, "kgithub-notifyui.rc");
+
+    // Add dynamic menus after setupGUI since the menuBar is built
+    QMenu* toolsMenu = nullptr;
+    for (QAction* action : menuBar()->actions()) {
+        if (action->text() == tr("&Tools")) {
+            toolsMenu = action->menu();
+            break;
+        }
+    }
+
+    if (!toolsMenu) {
+        toolsMenu = menuBar()->addMenu(tr("&Tools"));
+    }
 
     QMenu *issuesMenu = toolsMenu->addMenu(tr("Issues"));
     QMenu *prsMenu = toolsMenu->addMenu(tr("Pull Requests"));
@@ -955,21 +969,10 @@ void MainWindow::setupMenus() {
 
             if (vQuery.isEmpty()) continue;
 
+            QString finalQuery = QString("%1 %2 %3").arg(typeQuery, statusQuery, vQuery).trimmed();
             QAction *action = new QAction(v.name, this);
             connect(action, &QAction::triggered, this, [=]() {
-                QStringList queryParts;
-                if (!typeQuery.isEmpty()) queryParts << typeQuery;
-                if (!statusQuery.isEmpty()) queryParts << statusQuery;
-                if (!vQuery.isEmpty()) queryParts << vQuery;
-
-                QString finalQuery = queryParts.join(" ");
-
-                QString fullTitle = parentMenu->title();
-                if (!statusName.isEmpty()) fullTitle += " - " + statusName;
-                fullTitle += " - " + v.name;
-
-                int actualEndpoint = (endpointType == 2) ? 1 : 0; // 0 = Issues, 1 = Repositories
-                showWorkItems(fullTitle, actualEndpoint, finalQuery);
+                showWorkItems(v.name, endpointType, finalQuery);
             });
             statusMenu->addAction(action);
         }
@@ -986,16 +989,14 @@ void MainWindow::setupMenus() {
 
     createSubMenu(reposMenu, "", "", "", 2);
 
-    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction *aboutAction = new QAction(themedIcon({QStringLiteral("help-about")}), tr("&About KGitHub Notify"), this);
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
-    helpMenu->addAction(aboutAction);
+    actionCollection()->addAction(QStringLiteral("about"), aboutAction);
 
     QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
-    helpMenu->addAction(aboutQtAction);
+    actionCollection()->addAction(QStringLiteral("about_qt"), aboutQtAction);
 }
-
 void MainWindow::showWorkItems(const QString &title, int endpointType, const QString &query) {
     WorkItemWindow::EndpointType type = (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
     WorkItemWindow *window = new WorkItemWindow(client, title, type, query, this);

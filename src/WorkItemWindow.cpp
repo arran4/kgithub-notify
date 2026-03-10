@@ -20,7 +20,7 @@
 #include <QDateTime>
 
 WorkItemWindow::WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent)
-    : QMainWindow(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
+    : KXmlGuiWindow(parent), m_client(client), m_windowTitle(windowTitle), m_endpointType(endpointType), m_baseQuery(baseQuery), m_currentPage(1), m_manager(new QNetworkAccessManager(this))
 {
     setupUi();
     connect(m_manager, &QNetworkAccessManager::finished, this, &WorkItemWindow::onReplyFinished);
@@ -52,6 +52,7 @@ void WorkItemWindow::setupUi()
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &WorkItemWindow::onCustomContextMenuRequested);
     connect(m_table, &QTableWidget::itemDoubleClicked, this, &WorkItemWindow::onItemDoubleClicked);
 
+    setupGUI(Default, "kgithub-notifyui.rc");
     setCentralWidget(m_table);
 
     // Actions

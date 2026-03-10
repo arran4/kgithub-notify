@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     libkf6wallet-dev \
     libkf6notifications-dev \
     libkf6coreaddons-dev \
+    libkf6xmlgui-dev \
+    libkf6configwidgets-dev \
     libgl1-mesa-dev \
     && rm -rf /var/lib/apt/lists/*
 

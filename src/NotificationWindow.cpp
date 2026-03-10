@@ -15,7 +15,7 @@
 #include "ActionWindow.h"
 
 NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : QMainWindow(parent, Qt::Window), m_notification(n), m_client(client) {
+    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
     setWindowTitle(tr("Notification Details - %1").arg(n.repository));
     resize(500, 400);
 
@@ -148,7 +148,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     bottomLayout->addStretch();
 
     QPushButton *closeBtn = new QPushButton(tr("Close"));
-    connect(closeBtn, &QPushButton::clicked, this, &QMainWindow::close);
+    connect(closeBtn, &QPushButton::clicked, this, &KXmlGuiWindow::close);
     bottomLayout->addWidget(closeBtn);
 
     QPushButton *markDoneBtn = new QPushButton(QIcon::fromTheme("task-complete"), tr("Mark as Done"));
@@ -172,6 +172,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
 
     layout->addLayout(bottomLayout);
 
+    setupGUI(Default, "kgithub-notifyui.rc");
     setCentralWidget(centralWidget);
 
     // Status Bar
