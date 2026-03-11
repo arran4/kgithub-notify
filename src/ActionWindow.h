@@ -2,30 +2,30 @@
 #define ACTIONWINDOW_H
 
 #include <KXmlGuiWindow>
+#include <QLabel>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QVBoxLayout>
-#include <QLabel>
 #include <QTableWidget>
 #include <QTextEdit>
+#include <QVBoxLayout>
 
-#include "Notification.h"
 #include "GitHubClient.h"
+#include "Notification.h"
 
 class ActionWindow : public KXmlGuiWindow {
     Q_OBJECT
 
-public:
+   public:
     explicit ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent = nullptr);
 
-private slots:
+   private slots:
     void fetchRunDetails();
     void onRunDetailsReply(QNetworkReply *reply);
 
     void fetchJobs();
     void onJobsReply(QNetworkReply *reply);
 
-private:
+   private:
     Notification m_notification;
     GitHubClient *m_client;
     QNetworkAccessManager *m_manager;
@@ -37,4 +37,4 @@ private:
     void setupUi();
 };
 
-#endif // ACTIONWINDOW_H
+#endif  // ACTIONWINDOW_H

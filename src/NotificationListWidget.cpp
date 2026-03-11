@@ -1,21 +1,22 @@
 #include "NotificationListWidget.h"
-#include "NotificationItemWidget.h"
-#include "NotificationWindow.h"
-#include "GitHubClient.h"
 
-#include <QVBoxLayout>
-#include <QListWidgetItem>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
-#include <QPushButton>
-#include <QScrollBar>
-#include <QTimer>
-#include <QResizeEvent>
-#include <QJsonDocument>
 #include <QDialog>
+#include <QJsonDocument>
+#include <QListWidgetItem>
+#include <QPushButton>
+#include <QResizeEvent>
+#include <QScrollBar>
 #include <QTextEdit>
+#include <QTimer>
+#include <QVBoxLayout>
 #include <algorithm>
+
+#include "GitHubClient.h"
+#include "NotificationItemWidget.h"
+#include "NotificationWindow.h"
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
@@ -24,7 +25,6 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
       m_sortMode(SortDefault),
       m_hasMore(false),
       m_client(nullptr) {
-
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -36,7 +36,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     listWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(listWidget, &QListWidget::customContextMenuRequested, this, &NotificationListWidget::onListContextMenu);
-    connect(listWidget->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](){ handleLoadMoreStrategy(); });
+    connect(listWidget->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() { handleLoadMoreStrategy(); });
 
     layout->addWidget(listWidget);
 
@@ -148,8 +148,8 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
 
     // Calculate total unread from m_allNotifications
     int totalUnread = 0;
-    for(const auto& n : m_allNotifications) {
-        if(n.unread) totalUnread++;
+    for (const auto &n : m_allNotifications) {
+        if (n.unread) totalUnread++;
     }
 
     emit countsChanged(m_allNotifications.count(), totalUnread, newNotifications, newlyAddedNotifications);
@@ -186,13 +186,9 @@ void NotificationListWidget::setSearchFilter(const QString &text) {
     applyClientFilters();
 }
 
-void NotificationListWidget::selectAll() {
-    listWidget->selectAll();
-}
+void NotificationListWidget::selectAll() { listWidget->selectAll(); }
 
-void NotificationListWidget::selectNone() {
-    listWidget->clearSelection();
-}
+void NotificationListWidget::selectNone() { listWidget->clearSelection(); }
 
 void NotificationListWidget::selectTop(int n) {
     listWidget->clearSelection();
@@ -224,7 +220,7 @@ void NotificationListWidget::dismissSelected() {
             font.setBold(false);
             item->setFont(font);
 
-            emit markAsDone(id); // Effectively mark as read and done
+            emit markAsDone(id);  // Effectively mark as read and done
 
             // Remove item from list
             delete listWidget->takeItem(listWidget->row(item));
@@ -305,11 +301,10 @@ QStringList NotificationListWidget::getAvailableRepos() const {
     return repoList;
 }
 
-int NotificationListWidget::count() const {
-    return listWidget->count();
-}
+int NotificationListWidget::count() const { return listWidget->count(); }
 
-void NotificationListWidget::updateDetails(const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl) {
+void NotificationListWidget::updateDetails(const QString &id, const QString &author, const QString &avatarUrl,
+                                           const QString &htmlUrl) {
     NotificationDetails &details = detailsCache[id];
     details.author = author;
     details.avatarUrl = avatarUrl;
@@ -362,9 +357,7 @@ void NotificationListWidget::onListContextMenu(const QPoint &pos) {
     }
 }
 
-void NotificationListWidget::onItemActivated(QListWidgetItem *item) {
-    openWindowForItem(item);
-}
+void NotificationListWidget::onItemActivated(QListWidgetItem *item) { openWindowForItem(item); }
 
 void NotificationListWidget::triggerLoadMore() {
     if (!loadMoreItem) return;
@@ -377,9 +370,7 @@ void NotificationListWidget::triggerLoadMore() {
     }
 }
 
-void NotificationListWidget::onLoadMoreClicked() {
-    triggerLoadMore();
-}
+void NotificationListWidget::onLoadMoreClicked() { triggerLoadMore(); }
 
 void NotificationListWidget::insertNotificationItem(int row, const Notification &n) {
     QListWidgetItem *item = new QListWidgetItem();
@@ -408,15 +399,16 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification 
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
-    connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() {
-        openUrlForItem(item);
-    });
+    connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() { openUrlForItem(item); });
 
-    connect(widget, &NotificationItemWidget::doneClicked, this, [this, item, safeWidget]() {
-        if (!safeWidget) return;
-        listWidget->setCurrentItem(item);
-        dismissCurrentItem();
-    }, Qt::QueuedConnection);
+    connect(
+        widget, &NotificationItemWidget::doneClicked, this,
+        [this, item, safeWidget]() {
+            if (!safeWidget) return;
+            listWidget->setCurrentItem(item);
+            dismissCurrentItem();
+        },
+        Qt::QueuedConnection);
 
     listWidget->insertItem(row, item);
     listWidget->setItemWidget(item, widget);
@@ -430,13 +422,13 @@ void NotificationListWidget::updateList() {
     QList<Notification> targetNotifications;
     for (const Notification &n : m_allNotifications) {
         bool show = false;
-        if (m_filterMode == 0) { // Inbox
+        if (m_filterMode == 0) {  // Inbox
             if (n.inInbox) show = true;
-        } else if (m_filterMode == 1) { // Unread
+        } else if (m_filterMode == 1) {  // Unread
             if (n.unread) show = true;
-        } else if (m_filterMode == 2) { // Read
+        } else if (m_filterMode == 2) {  // Read
             if (!n.unread) show = true;
-        } else if (m_filterMode == 3) { // All
+        } else if (m_filterMode == 3) {  // All
             show = true;
         }
         if (show) {
@@ -446,56 +438,57 @@ void NotificationListWidget::updateList() {
 
     // Sort the list
     if (m_sortMode != SortDefault) {
-        std::sort(targetNotifications.begin(), targetNotifications.end(), [this](const Notification &a, const Notification &b) {
-            switch (m_sortMode) {
-            case SortUpdatedDesc:
-                return a.updatedAt > b.updatedAt;
-            case SortUpdatedAsc:
-                return a.updatedAt < b.updatedAt;
-            case SortRepoAsc: {
-                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp < 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortRepoDesc: {
-                int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp > 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortTitleAsc: {
-                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp < 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortTitleDesc: {
-                int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp > 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortTypeAsc: {
-                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp < 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortTypeDesc: {
-                int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
-                if (cmp != 0) return cmp > 0;
-                return a.updatedAt > b.updatedAt;
-            }
-            case SortLastReadDesc:
-                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
-                if (a.lastReadAt.isEmpty()) return false; // Nulls at end
-                if (b.lastReadAt.isEmpty()) return true;
-                return a.lastReadAt > b.lastReadAt;
-            case SortLastReadAsc:
-                if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
-                if (a.lastReadAt.isEmpty()) return true; // Nulls at beginning
-                if (b.lastReadAt.isEmpty()) return false;
-                return a.lastReadAt < b.lastReadAt;
-            default:
-                return a.updatedAt > b.updatedAt;
-            }
-        });
+        std::sort(targetNotifications.begin(), targetNotifications.end(),
+                  [this](const Notification &a, const Notification &b) {
+                      switch (m_sortMode) {
+                          case SortUpdatedDesc:
+                              return a.updatedAt > b.updatedAt;
+                          case SortUpdatedAsc:
+                              return a.updatedAt < b.updatedAt;
+                          case SortRepoAsc: {
+                              int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp < 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortRepoDesc: {
+                              int cmp = a.repository.compare(b.repository, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp > 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortTitleAsc: {
+                              int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp < 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortTitleDesc: {
+                              int cmp = a.title.compare(b.title, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp > 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortTypeAsc: {
+                              int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp < 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortTypeDesc: {
+                              int cmp = a.type.compare(b.type, Qt::CaseInsensitive);
+                              if (cmp != 0) return cmp > 0;
+                              return a.updatedAt > b.updatedAt;
+                          }
+                          case SortLastReadDesc:
+                              if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                              if (a.lastReadAt.isEmpty()) return false;  // Nulls at end
+                              if (b.lastReadAt.isEmpty()) return true;
+                              return a.lastReadAt > b.lastReadAt;
+                          case SortLastReadAsc:
+                              if (a.lastReadAt.isEmpty() && b.lastReadAt.isEmpty()) return a.updatedAt > b.updatedAt;
+                              if (a.lastReadAt.isEmpty()) return true;  // Nulls at beginning
+                              if (b.lastReadAt.isEmpty()) return false;
+                              return a.lastReadAt < b.lastReadAt;
+                          default:
+                              return a.updatedAt > b.updatedAt;
+                      }
+                  });
     }
 
     // Sync Loop
@@ -509,14 +502,15 @@ void NotificationListWidget::updateList() {
 
         // Skip "Load More" item if encountered during sync (should be at end)
         if (currentItem == loadMoreItem && loadMoreItem != nullptr) {
-             // If we hit load more item but still have notifications to place,
-             // we need to insert before it.
-             currentId = ""; // Treat as mismatch
+            // If we hit load more item but still have notifications to place,
+            // we need to insert before it.
+            currentId = "";  // Treat as mismatch
         }
 
         if (currentItem && currentId == n.id) {
             // Match: Update existing
-            NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(currentItem));
+            NotificationItemWidget *widget =
+                qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(currentItem));
             if (widget) {
                 widget->updateNotification(n);
             }
@@ -583,38 +577,38 @@ void NotificationListWidget::updateList() {
             listWidget->addItem(loadMoreItem);
             listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
         } else {
-             // Ensure it is at the very end
-             int r = listWidget->row(loadMoreItem);
-             if (r != listWidget->count() - 1) {
-                 QWidget *w = listWidget->itemWidget(loadMoreItem);
-                 if(w) w->deleteLater();
-                 listWidget->takeItem(r);
-                 delete loadMoreItem; // Delete old pointer
+            // Ensure it is at the very end
+            int r = listWidget->row(loadMoreItem);
+            if (r != listWidget->count() - 1) {
+                QWidget *w = listWidget->itemWidget(loadMoreItem);
+                if (w) w->deleteLater();
+                listWidget->takeItem(r);
+                delete loadMoreItem;  // Delete old pointer
 
-                 loadMoreItem = new QListWidgetItem();
-                 QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
-                 connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
+                loadMoreItem = new QListWidgetItem();
+                QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+                connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
 
-                 loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
-                 loadMoreItem->setFlags(Qt::NoItemFlags);
+                loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
+                loadMoreItem->setFlags(Qt::NoItemFlags);
 
-                 listWidget->addItem(loadMoreItem);
-                 listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
-             } else {
-                 QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
-                 if (btn) {
-                     btn->setEnabled(true);
-                     btn->setText(tr("Load More"));
-                 }
-             }
+                listWidget->addItem(loadMoreItem);
+                listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
+            } else {
+                QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+                if (btn) {
+                    btn->setEnabled(true);
+                    btn->setText(tr("Load More"));
+                }
+            }
         }
     } else {
         if (loadMoreItem) {
             int r = listWidget->row(loadMoreItem);
             if (r >= 0) {
-                 QWidget *w = listWidget->itemWidget(loadMoreItem);
-                 if(w) w->deleteLater();
-                 delete listWidget->takeItem(r);
+                QWidget *w = listWidget->itemWidget(loadMoreItem);
+                if (w) w->deleteLater();
+                delete listWidget->takeItem(r);
             }
             loadMoreItem = nullptr;
         }
@@ -763,36 +757,38 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
 
     NotificationWindow *win = new NotificationWindow(n, m_client, this);
     win->setAttribute(Qt::WA_DeleteOnClose);
-    connect(win, &NotificationWindow::debugApiRequested, this, [this](const QString &url) { emit requestDebugApi(url); });
+    connect(win, &NotificationWindow::debugApiRequested, this,
+            [this](const QString &url) { emit requestDebugApi(url); });
 
-    connect(win, &NotificationWindow::actionRequested, this, [this](const QString &actionName, const QString &id, const QString &url) {
-        // Find item by ID
-        QListWidgetItem *targetItem = nullptr;
-        for (int i = 0; i < listWidget->count(); ++i) {
-            QListWidgetItem *it = listWidget->item(i);
-            if (it->data(Qt::UserRole + 1).toString() == id) {
-                targetItem = it;
-                break;
-            }
-        }
+    connect(win, &NotificationWindow::actionRequested, this,
+            [this](const QString &actionName, const QString &id, const QString &url) {
+                // Find item by ID
+                QListWidgetItem *targetItem = nullptr;
+                for (int i = 0; i < listWidget->count(); ++i) {
+                    QListWidgetItem *it = listWidget->item(i);
+                    if (it->data(Qt::UserRole + 1).toString() == id) {
+                        targetItem = it;
+                        break;
+                    }
+                }
 
-        if (targetItem) {
-            listWidget->setCurrentItem(targetItem);
-            if (actionName == "markAsRead") {
-                markAsReadAndRemoveItem(targetItem);
-            } else if (actionName == "markAsDone") {
-                dismissCurrentItem();
-            }
-        } else {
-             // If not found in the visible list, we can at least emit the signal
-             if (actionName == "markAsRead") {
-                 emit markAsRead(id);
-             } else if (actionName == "markAsDone") {
-                 emit markAsDone(id);
-                 knownNotificationIds.remove(id);
-             }
-        }
-    });
+                if (targetItem) {
+                    listWidget->setCurrentItem(targetItem);
+                    if (actionName == "markAsRead") {
+                        markAsReadAndRemoveItem(targetItem);
+                    } else if (actionName == "markAsDone") {
+                        dismissCurrentItem();
+                    }
+                } else {
+                    // If not found in the visible list, we can at least emit the signal
+                    if (actionName == "markAsRead") {
+                        emit markAsRead(id);
+                    } else if (actionName == "markAsDone") {
+                        emit markAsDone(id);
+                        knownNotificationIds.remove(id);
+                    }
+                }
+            });
 
     win->show();
 }

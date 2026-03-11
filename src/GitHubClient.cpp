@@ -7,10 +7,10 @@
 #include <QList>
 #include <QNetworkRequest>
 #include <QPixmap>
-#include <QUrl>
-#include <QUrlQuery>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
+#include <QUrl>
+#include <QUrlQuery>
 
 GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
@@ -74,7 +74,7 @@ void GitHubClient::checkNotifications() {
     reply->setProperty("append", false);
     m_activeNotificationReply = reply;
 
-    m_requestTimeoutTimer->start(30000); // 30 seconds timeout
+    m_requestTimeoutTimer->start(30000);  // 30 seconds timeout
 }
 
 void GitHubClient::loadMore() {
@@ -94,7 +94,7 @@ void GitHubClient::loadMore() {
     reply->setProperty("append", true);
     m_activeNotificationReply = reply;
 
-    m_requestTimeoutTimer->start(30000); // 30 seconds timeout
+    m_requestTimeoutTimer->start(30000);  // 30 seconds timeout
 }
 
 void GitHubClient::verifyToken() {
@@ -218,9 +218,7 @@ void GitHubClient::fetchUserRepos(const QString &pageUrl) {
     reply->setProperty("type", "repos");
 }
 
-QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url) const {
-    return createRequest(url);
-}
+QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url) const { return createRequest(url); }
 
 QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     QNetworkRequest request(url);
@@ -481,7 +479,8 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
     m_nextPageUrl.clear();
     if (reply->hasRawHeader("Link")) {
         QString linkHeader = reply->rawHeader("Link");
-        // Example: <https://api.github.com/resource?page=2>; rel="next", <https://api.github.com/resource?page=5>; rel="last"
+        // Example: <https://api.github.com/resource?page=2>; rel="next", <https://api.github.com/resource?page=5>;
+        // rel="last"
         QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
         QRegularExpressionMatch match = re.match(linkHeader);
         if (match.hasMatch()) {

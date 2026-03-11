@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -12,7 +13,6 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QVBoxLayout>
-#include <QFutureWatcher>
 
 #include "GitHubClient.h"
 #include "WalletManager.h"

@@ -50,9 +50,7 @@ void PopupNotification::setMessage(const QString &message) {
     adjustSize();
 }
 
-void PopupNotification::setSettingsVisible(bool visible) {
-    settingsButton->setVisible(visible);
-}
+void PopupNotification::setSettingsVisible(bool visible) { settingsButton->setVisible(visible); }
 
 void PopupNotification::onSettingsClicked() {
     emit settingsClicked();

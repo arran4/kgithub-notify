@@ -1,17 +1,17 @@
+#include <KAboutData>
+#include <KLocalizedString>
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMessageBox>
-#include <QDir>
-#include <QtDBus/QDBusConnection>
-#include <QtDBus/QDBusError>
 #include <QStandardPaths>
 #include <QTimer>
-#include <KAboutData>
-#include <KLocalizedString>
+#include <QtDBus/QDBusConnection>
+#include <QtDBus/QDBusError>
 
 #include "GitHubClient.h"
 #include "MainWindow.h"
@@ -33,8 +33,7 @@ int main(int argc, char *argv[]) {
 
     KLocalizedString::setApplicationDomain("kgithub-notify");
 
-    KAboutData aboutData(QStringLiteral("kgithub-notify"),
-                         QStringLiteral("KGitHub Notify"),
+    KAboutData aboutData(QStringLiteral("kgithub-notify"), QStringLiteral("KGitHub Notify"),
                          QStringLiteral(KGHN_APP_VERSION));
     aboutData.setDesktopFileName("com.arran4.kgithub_notify");
     KAboutData::setApplicationData(aboutData);
@@ -50,9 +49,8 @@ int main(int argc, char *argv[]) {
         QCoreApplication::translate("main", "Start in the background (system tray only)."));
     parser.addOption(backgroundOption);
 
-    QCommandLineOption diagnoseOption(
-        QStringList() << "diagnose",
-        QCoreApplication::translate("main", "Run self-diagnostics and exit."));
+    QCommandLineOption diagnoseOption(QStringList() << "diagnose",
+                                      QCoreApplication::translate("main", "Run self-diagnostics and exit."));
     parser.addOption(diagnoseOption);
 
     parser.process(app);
@@ -87,8 +85,8 @@ int main(int argc, char *argv[]) {
             qDebug() << "DBus Session Bus: [CONNECTED]";
             qDebug() << "DBus Unique Name:" << QDBusConnection::sessionBus().baseService();
         } else {
-             qDebug() << "DBus Session Bus: [DISCONNECTED]";
-             qDebug() << "  -> Error:" << QDBusConnection::sessionBus().lastError().message();
+            qDebug() << "DBus Session Bus: [DISCONNECTED]";
+            qDebug() << "  -> Error:" << QDBusConnection::sessionBus().lastError().message();
         }
 
         return 0;
@@ -112,7 +110,8 @@ int main(int argc, char *argv[]) {
             }
             if (QFile::copy(":/kgithub-notify.desktop", destPath)) {
                 // Set appropriate permissions
-                QFile::setPermissions(destPath, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
+                QFile::setPermissions(destPath,
+                                      QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
                 copied = true;
                 desktopFileFound = true;
             }
