@@ -33,6 +33,7 @@
             <Action name="repos_menu"/>
         </Menu>
         <Menu name="help">
+            <text>&amp;Help</text>
             <Action name="help_about_app"/>
             <Action name="about_qt"/>
         </Menu>
