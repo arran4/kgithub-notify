@@ -155,3 +155,76 @@ jobs:
           files: build/Kgithub-notify
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-ebuild:
+    name: Update Ebuild in arrans_overlay
+    needs: [release]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout arrans_overlay
+        uses: actions/checkout@v4
+        with:
+          repository: arran4/arrans_overlay
+          path: arrans_overlay
+          token: ${{ secrets.OVERLAY_GITHB_TOKEN }}
+
+      - name: Set up Git
+        run: |
+          cd arrans_overlay
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget jq coreutils
+          url="$(curl -s --header "Accept: application/vnd.github+json" --header "Authorization: Bearer ${{secrets.GITHUB_TOKEN}}" https://api.github.com/repos/arran4/g2/releases/latest | jq -r '.assets[].browser_download_url | select(endswith("_linux_amd64.deb"))')"
+          wget "${url}" -O /tmp/g2.deb
+          sudo dpkg -i /tmp/g2.deb
+          rm /tmp/g2.deb
+
+      - name: Update ebuild and manifest
+        run: |
+          cd arrans_overlay
+          # Extract version from tag
+          VERSION="${GITHUB_REF#refs/tags/v}"
+
+          # Find the latest ebuild
+          EBUILD_DIR="dev-vcs/kgithub-notify"
+          LATEST_EBUILD=$(ls -1 $EBUILD_DIR/*.ebuild | sort -V | tail -n 1)
+          NEW_EBUILD="$EBUILD_DIR/kgithub-notify-${VERSION}.ebuild"
+
+          if [ -f "$NEW_EBUILD" ]; then
+            echo "Ebuild for version ${VERSION} already exists. Skipping."
+          else
+            # Copy to new version
+            cp "$LATEST_EBUILD" "$NEW_EBUILD"
+
+            # Generate Manifest
+            g2 manifest upsert-from-url "https://github.com/arran4/kgithub-notify/archive/refs/tags/v${VERSION}.tar.gz" "kgithub-notify-${VERSION}.tar.gz" "$EBUILD_DIR/Manifest"
+          fi
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.OVERLAY_GITHB_TOKEN }}
+        run: |
+          cd arrans_overlay
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          BRANCH_NAME="update-kgithub-notify-${VERSION}"
+
+          git checkout -b $BRANCH_NAME
+          git add dev-vcs/kgithub-notify/
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "feat: update kgithub-notify to ${VERSION}"
+            git push origin $BRANCH_NAME
+
+            gh pr create \
+              --title "feat: update kgithub-notify to ${VERSION}" \
+              --body "Automated update of kgithub-notify ebuild for version ${VERSION}." \
+              --base main \
+              --head $BRANCH_NAME
+          fi
