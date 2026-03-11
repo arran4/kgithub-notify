@@ -2,22 +2,23 @@
 #define REPOLISTWINDOW_H
 
 #include <KXmlGuiWindow>
-#include <QTableWidget>
-#include <QToolBar>
-#include <QStatusBar>
-#include <QLabel>
-#include <QTimer>
 #include <QDateTime>
 #include <QJsonArray>
+#include <QLabel>
+#include <QStatusBar>
+#include <QTableWidget>
+#include <QTimer>
+#include <QToolBar>
+
 #include "GitHubClient.h"
 
 class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
 
-public:
+   public:
     explicit RepoListWindow(GitHubClient *client, QWidget *parent = nullptr);
 
-private slots:
+   private slots:
     void onRefreshClicked();
     void onExportClicked();
     void onReposReceived(const QJsonArray &repos, const QString &nextPageUrl);
@@ -25,7 +26,7 @@ private slots:
     void onCustomContextMenuRequested(const QPoint &pos);
     void onError(const QString &error);
 
-private:
+   private:
     void setupUI();
     void loadCache();
     void saveCache();
@@ -41,4 +42,4 @@ private:
     QJsonArray m_allRepos;
 };
 
-#endif // REPOLISTWINDOW_H
+#endif  // REPOLISTWINDOW_H

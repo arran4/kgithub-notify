@@ -1,13 +1,16 @@
 #include "ActionWindow.h"
+
+#include <QHeaderView>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QHeaderView>
 #include <QMessageBox>
 
 ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent)
-    : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client), m_manager(new QNetworkAccessManager(this))
-{
+    : KXmlGuiWindow(parent, Qt::Window),
+      m_notification(n),
+      m_client(client),
+      m_manager(new QNetworkAccessManager(this)) {
     setWindowTitle(tr("Action Run - %1").arg(n.title));
     resize(700, 500);
 
@@ -16,8 +19,7 @@ ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget 
     fetchRunDetails();
 }
 
-void ActionWindow::setupUi()
-{
+void ActionWindow::setupUi() {
     QWidget *centralWidget = new QWidget(this);
     setupGUI(Default, ":/kgithub-notifyui.rc");
     setCentralWidget(centralWidget);
@@ -38,16 +40,14 @@ void ActionWindow::setupUi()
     layout->addWidget(m_jobsTable);
 }
 
-void ActionWindow::fetchRunDetails()
-{
+void ActionWindow::fetchRunDetails() {
     QUrl url(m_notification.url);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply *reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onRunDetailsReply(reply); });
 }
 
-void ActionWindow::onRunDetailsReply(QNetworkReply *reply)
-{
+void ActionWindow::onRunDetailsReply(QNetworkReply *reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -59,8 +59,8 @@ void ActionWindow::onRunDetailsReply(QNetworkReply *reply)
 
         m_jobsUrl = obj["jobs_url"].toString();
 
-        m_statusLabel->setText(tr("<b>Run Name:</b> %1<br><b>Status:</b> %2<br><b>Conclusion:</b> %3")
-                               .arg(name, status, conclusion));
+        m_statusLabel->setText(
+            tr("<b>Run Name:</b> %1<br><b>Status:</b> %2<br><b>Conclusion:</b> %3").arg(name, status, conclusion));
 
         fetchJobs();
     } else {
@@ -69,8 +69,7 @@ void ActionWindow::onRunDetailsReply(QNetworkReply *reply)
     reply->deleteLater();
 }
 
-void ActionWindow::fetchJobs()
-{
+void ActionWindow::fetchJobs() {
     if (m_jobsUrl.isEmpty()) return;
 
     QUrl url(m_jobsUrl);
@@ -79,8 +78,7 @@ void ActionWindow::fetchJobs()
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onJobsReply(reply); });
 }
 
-void ActionWindow::onJobsReply(QNetworkReply *reply)
-{
+void ActionWindow::onJobsReply(QNetworkReply *reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);

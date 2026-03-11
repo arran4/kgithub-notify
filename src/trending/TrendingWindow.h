@@ -1,27 +1,27 @@
 #ifndef TRENDINGWINDOW_H
 #define TRENDINGWINDOW_H
 
-#include <QWidget>
-#include <QComboBox>
-#include <QTableWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QPointer>
-#include <QNetworkReply>
-#include <QSet>
-#include <QNetworkAccessManager>
 #include <KXmlGuiWindow>
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPointer>
+#include <QPushButton>
+#include <QSet>
+#include <QTableWidget>
+#include <QVBoxLayout>
+#include <QWidget>
 
 class GitHubClient;
 
 class TrendingWindow : public KXmlGuiWindow {
     Q_OBJECT
 
-public:
+   public:
     explicit TrendingWindow(GitHubClient *client, QWidget *parent = nullptr);
 
-private slots:
+   private slots:
     void onRefreshClicked();
     void onItemActivated(QTableWidgetItem *item);
     void onModeChanged(int index);
@@ -29,7 +29,7 @@ private slots:
     void onRepoStarredCheckFinished(QNetworkReply *reply);
     void onItemSelectionChanged();
 
-private:
+   private:
     QComboBox *modeComboBox;
     QComboBox *timeframeComboBox;
     QComboBox *langComboBox;
@@ -44,4 +44,4 @@ private:
     QNetworkAccessManager *m_netManager;
 };
 
-#endif // TRENDINGWINDOW_H
+#endif  // TRENDINGWINDOW_H

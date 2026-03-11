@@ -2,29 +2,29 @@
 #define PULLREQUESTWINDOW_H
 
 #include <KXmlGuiWindow>
-#include <QTabWidget>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QScrollArea>
-#include <QTextEdit>
-#include <QPushButton>
-#include <QTableWidget>
-#include <QTreeWidget>
 #include <QListWidget>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QTabWidget>
+#include <QTableWidget>
+#include <QTextEdit>
+#include <QTreeWidget>
+#include <QVBoxLayout>
 
-#include "Notification.h"
 #include "GitHubClient.h"
+#include "Notification.h"
 
 class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
 
-public:
+   public:
     explicit PullRequestWindow(const Notification &n, GitHubClient *client, QWidget *parent = nullptr);
 
-private slots:
+   private slots:
     void fetchPrDetails();
     void onPrDetailsReply(QNetworkReply *reply);
 
@@ -43,7 +43,7 @@ private slots:
     void onCommentButtonClicked();
     void onPostCommentReply(QNetworkReply *reply);
 
-private:
+   private:
     Notification m_notification;
     GitHubClient *m_client;
     QNetworkAccessManager *m_manager;
@@ -85,4 +85,4 @@ private:
     void addCommentToUI(const QString &author, const QString &body, const QString &createdAt);
 };
 
-#endif // PULLREQUESTWINDOW_H
+#endif  // PULLREQUESTWINDOW_H

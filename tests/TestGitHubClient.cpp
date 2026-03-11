@@ -1,5 +1,6 @@
-#include <QtTest>
 #include <QSignalSpy>
+#include <QtTest>
+
 #include "../src/GitHubClient.h"
 #include "MockNetworkReply.h"
 
@@ -8,7 +9,7 @@ Q_DECLARE_METATYPE(QList<Notification>)
 
 class TestGitHubClient : public QObject {
     Q_OBJECT
-private slots:
+   private slots:
     void initTestCase() {
         // Register metatype for QList<Notification>
         qRegisterMetaType<QList<Notification>>("QList<Notification>");
@@ -18,12 +19,15 @@ private slots:
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
 
-        QByteArray json = "[{\"id\":\"1\", \"subject\":{\"title\":\"Test\", \"url\":\"http://api.github.com/repos/foo/bar\", \"type\":\"Issue\"}, \"repository\":{\"full_name\":\"foo/bar\"}, \"updated_at\":\"2023-01-01T00:00:00Z\", \"unread\":true}]";
+        QByteArray json =
+            "[{\"id\":\"1\", \"subject\":{\"title\":\"Test\", \"url\":\"http://api.github.com/repos/foo/bar\", "
+            "\"type\":\"Issue\"}, \"repository\":{\"full_name\":\"foo/bar\"}, \"updated_at\":\"2023-01-01T00:00:00Z\", "
+            "\"unread\":true}]";
         MockNetworkReply *reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -41,13 +45,17 @@ private slots:
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
 
-        QByteArray json = "[{\"id\":\"2\", \"subject\":{\"title\":\"Test2\", \"url\":\"url\", \"type\":\"Issue\"}, \"repository\":{\"full_name\":\"repo\"}, \"updated_at\":\"date\", \"unread\":true}]";
+        QByteArray json =
+            "[{\"id\":\"2\", \"subject\":{\"title\":\"Test2\", \"url\":\"url\", \"type\":\"Issue\"}, "
+            "\"repository\":{\"full_name\":\"repo\"}, \"updated_at\":\"date\", \"unread\":true}]";
         MockNetworkReply *reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
-        reply->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\", <https://api.github.com/notifications?page=5>; rel=\"last\"");
+        reply->setRawHeader("Link",
+                            "<https://api.github.com/notifications?page=2>; rel=\"next\", "
+                            "<https://api.github.com/notifications?page=5>; rel=\"last\"");
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -56,7 +64,7 @@ private slots:
         bool hasMore = args.at(2).toBool();
 
         QCOMPARE(notifications.size(), 1);
-        QCOMPARE(append, false); // Default is false unless property set
+        QCOMPARE(append, false);  // Default is false unless property set
         QCOMPARE(hasMore, true);
     }
 
@@ -64,13 +72,14 @@ private slots:
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::detailsReceived);
 
-        QByteArray json = "{\"html_url\":\"http://github.com/foo/bar\", \"user\":{\"login\":\"user\", \"avatar_url\":\"url\"}}";
+        QByteArray json =
+            "{\"html_url\":\"http://github.com/foo/bar\", \"user\":{\"login\":\"user\", \"avatar_url\":\"url\"}}";
         MockNetworkReply *reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "details");
         reply->setProperty("notificationId", "123");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -88,7 +97,7 @@ private slots:
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 404);
         reply->setError(QNetworkReply::ContentNotFoundError, "Not Found");
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -105,7 +114,7 @@ private slots:
         reply->setProperty("type", "verification");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -123,7 +132,7 @@ private slots:
         n1["subject"] = QJsonObject{{"title", "T1"}, {"url", "u1"}, {"type", "Issue"}};
         n1["repository"] = QJsonObject{{"full_name", "r1"}};
         n1["updated_at"] = "2023-01-02T00:00:00Z";
-        n1["unread"] = false; // API says false, but we should override if logic dictates (though here logic says true)
+        n1["unread"] = false;  // API says false, but we should override if logic dictates (though here logic says true)
 
         // Case 2: updated_at > last_read_at -> unread = true
         QJsonObject n2;
@@ -141,7 +150,7 @@ private slots:
         n3["repository"] = QJsonObject{{"full_name", "r3"}};
         n3["updated_at"] = "2023-01-01T00:00:00Z";
         n3["last_read_at"] = "2023-01-02T00:00:00Z";
-        n3["unread"] = true; // API says true (weird), but logic says false
+        n3["unread"] = true;  // API says true (weird), but logic says false
 
         QJsonArray array;
         array.append(n1);
@@ -153,7 +162,7 @@ private slots:
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();
@@ -161,13 +170,13 @@ private slots:
         QCOMPARE(notifications.size(), 3);
 
         QCOMPARE(notifications[0].id, QString("1"));
-        QCOMPARE(notifications[0].unread, true); // Missing last_read_at
+        QCOMPARE(notifications[0].unread, true);  // Missing last_read_at
 
         QCOMPARE(notifications[1].id, QString("2"));
-        QCOMPARE(notifications[1].unread, true); // Updated > Read
+        QCOMPARE(notifications[1].unread, true);  // Updated > Read
 
         QCOMPARE(notifications[2].id, QString("3"));
-        QCOMPARE(notifications[2].unread, false); // Updated <= Read
+        QCOMPARE(notifications[2].unread, false);  // Updated <= Read
     }
 
     void testUserRules() {
@@ -248,7 +257,7 @@ private slots:
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();

@@ -1,15 +1,16 @@
 #ifndef DEBUGWINDOW_H
 #define DEBUGWINDOW_H
 
-#include <QDialog>
-#include <QLineEdit>
-#include <QTextEdit>
-#include <QPushButton>
 #include <QComboBox>
+#include <QDialog>
 #include <QFormLayout>
-#include <QMap>
-#include <QList>
 #include <QLabel>
+#include <QLineEdit>
+#include <QList>
+#include <QMap>
+#include <QPushButton>
+#include <QTextEdit>
+
 #include "GitHubClient.h"
 
 struct ApiPreset {
@@ -21,17 +22,17 @@ struct ApiPreset {
 
 class DebugWindow : public QDialog {
     Q_OBJECT
-public:
+   public:
     explicit DebugWindow(GitHubClient *client, QWidget *parent = nullptr);
     void setEndpoint(const QString &url);
 
-private slots:
+   private slots:
     void sendRequest();
     void displayResponse(const QByteArray &data);
     void onApiSelected(int index);
     void onParamChanged();
 
-private:
+   private:
     GitHubClient *m_client;
 
     QComboBox *m_apiSelector;
@@ -47,4 +48,4 @@ private:
     QList<ApiPreset> m_presets;
 };
 
-#endif // DEBUGWINDOW_H
+#endif  // DEBUGWINDOW_H

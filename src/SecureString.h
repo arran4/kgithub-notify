@@ -1,12 +1,12 @@
 #ifndef SECURESTRING_H
 #define SECURESTRING_H
 
-#include <vector>
-#include <QString>
 #include <QByteArray>
-#include <cstring>
+#include <QString>
 #include <algorithm>
+#include <cstring>
 #include <utility>
+#include <vector>
 
 // Add POSIX includes for mlock
 #ifdef __unix__
@@ -15,27 +15,23 @@
 #endif
 
 class SecureString {
-public:
+   public:
     SecureString() = default;
 
-    explicit SecureString(const QString &str) {
-        set(str);
-    }
+    explicit SecureString(const QString &str) { set(str); }
 
-    ~SecureString() {
-        clear();
-    }
+    ~SecureString() { clear(); }
 
     // Disable copy
-    SecureString(const SecureString&) = delete;
-    SecureString& operator=(const SecureString&) = delete;
+    SecureString(const SecureString &) = delete;
+    SecureString &operator=(const SecureString &) = delete;
 
     // Enable move
     SecureString(SecureString &&other) noexcept : m_data(std::move(other.m_data)) {
         // Since m_data was moved, other.m_data is now empty.
     }
 
-    SecureString& operator=(SecureString &&other) noexcept {
+    SecureString &operator=(SecureString &&other) noexcept {
         if (this != &other) {
             clear();
             m_data = std::move(other.m_data);
@@ -50,10 +46,10 @@ public:
 
         m_data.resize(bytes.size());
 
-        #ifdef __unix__
+#ifdef __unix__
         // Try to lock memory to prevent swapping
         mlock(m_data.data(), m_data.size());
-        #endif
+#endif
 
         std::memcpy(m_data.data(), bytes.constData(), bytes.size());
 
@@ -63,9 +59,7 @@ public:
         while (s--) *p++ = 0;
     }
 
-    bool isEmpty() const {
-        return m_data.empty();
-    }
+    bool isEmpty() const { return m_data.empty(); }
 
     QByteArray toQByteArray() const {
         if (m_data.empty()) return QByteArray();
@@ -77,14 +71,14 @@ public:
         return QString::fromUtf8(m_data.data(), static_cast<int>(m_data.size()));
     }
 
-private:
+   private:
     std::vector<char> m_data;
 
     void clear() {
         if (!m_data.empty()) {
-            #ifdef __unix__
+#ifdef __unix__
             munlock(m_data.data(), m_data.size());
-            #endif
+#endif
 
             volatile char *p = m_data.data();
             size_t s = m_data.size();
@@ -94,4 +88,4 @@ private:
     }
 };
 
-#endif // SECURESTRING_H
+#endif  // SECURESTRING_H

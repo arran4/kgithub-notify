@@ -2,8 +2,8 @@
 #define SETTINGSDIALOG_H
 
 #include <QDialog>
-#include <QLineEdit>
 #include <QFuture>
+#include <QLineEdit>
 
 class QComboBox;
 class QPushButton;

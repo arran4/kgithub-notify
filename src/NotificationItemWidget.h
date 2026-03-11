@@ -1,18 +1,19 @@
 #ifndef NOTIFICATIONITEMWIDGET_H
 #define NOTIFICATIONITEMWIDGET_H
 
-#include <QWidget>
-#include <QLabel>
 #include <QCheckBox>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QToolButton>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QWidget>
+
 #include "GitHubClient.h"
 #include "Notification.h"
 
 class NotificationItemWidget : public QWidget {
     Q_OBJECT
-public:
+   public:
     explicit NotificationItemWidget(const Notification &notification, QWidget *parent = nullptr);
 
     QToolButton *doneButton;
@@ -37,12 +38,12 @@ public:
     bool isLoading() const { return m_isLoading; }
     void updateNotification(const Notification &n);
 
-signals:
+   signals:
     void doneClicked();
     void openClicked();
 
-private:
+   private:
     bool m_isLoading;
 };
 
-#endif // NOTIFICATIONITEMWIDGET_H
+#endif  // NOTIFICATIONITEMWIDGET_H
