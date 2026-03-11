@@ -74,8 +74,8 @@ jobs:
               git checkout -b $BRANCH_NAME
               git add .
               git commit -m "fix: clang-format"
-              git push origin $BRANCH_NAME
-              gh pr create --title "fix: auto-linting" --body "Automated lint fixes triggered by workflow_dispatch" --base main --head $BRANCH_NAME
+              git push -f origin $BRANCH_NAME
+              gh pr create --title "fix: auto-linting" --body "Automated lint fixes triggered by workflow_dispatch" --base main --head $BRANCH_NAME || true
             else
               # Fail if not manual fix request
               exit 1
