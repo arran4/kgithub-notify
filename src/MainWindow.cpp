@@ -962,41 +962,6 @@ void MainWindow::setupMenus() {
     actionCollection()->addAction(QStringLiteral("about_qt"), aboutQtAction);
 
     setupGUI(Default, "kgithub-notifyui.rc");
-
-    // Fallback for Tools menu if KXmlGui fails to render it
-    bool toolsFound = false;
-    for (QAction *action : menuBar()->actions()) {
-        if (action->text().remove('&') == "Tools") {
-            toolsFound = true;
-            break;
-        }
-    }
-
-    if (!toolsFound) {
-        QMenu *toolsMenu = new QMenu(tr("&Tools"), this);
-        toolsMenu->addAction(trendingAction);
-        toolsMenu->addAction(debugAction);
-        toolsMenu->addAction(repoListAction);
-        toolsMenu->addSeparator();
-        toolsMenu->addAction(issuesMenu);
-        toolsMenu->addAction(prsMenu);
-        toolsMenu->addAction(reposMenu);
-
-        // Find help menu to insert before it
-        QAction *helpAction = nullptr;
-        for (QAction *action : menuBar()->actions()) {
-            if (action->text().remove('&') == "Help") {
-                helpAction = action;
-                break;
-            }
-        }
-
-        if (helpAction) {
-            menuBar()->insertMenu(helpAction, toolsMenu);
-        } else {
-            menuBar()->addMenu(toolsMenu);
-        }
-    }
 }
 void MainWindow::showWorkItems(const QString &title, int endpointType, const QString &query) {
     WorkItemWindow::EndpointType type = (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
