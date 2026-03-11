@@ -1,30 +1,31 @@
 #include "TrendingWindow.h"
-#include "../GitHubClient.h"
 
-#include <QDateTime>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QMenu>
-#include <QtGui/QAction>
-#include <QLabel>
-#include <QIcon>
-#include <QStyle>
 #include <QApplication>
 #include <QClipboard>
-#include <QHeaderView>
-#include <QTableWidget>
-#include <QMenuBar>
-#include <QTextEdit>
+#include <QDateTime>
+#include <QDesktopServices>
 #include <QDialog>
+#include <QHeaderView>
+#include <QIcon>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QLabel>
+#include <QMenu>
+#include <QMenuBar>
 #include <QSettings>
+#include <QStyle>
+#include <QTableWidget>
+#include <QTextEdit>
+#include <QUrl>
+#include <QtGui/QAction>
+
+#include "../GitHubClient.h"
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
-    resize(800, 600); // make it a bit larger to fit columns
+    resize(800, 600);  // make it a bit larger to fit columns
 
     QWidget *centralWidget = new QWidget(this);
     setupGUI(Default, ":/kgithub-notifyui.rc");
@@ -120,9 +121,11 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
 
     connect(refreshButton, &QPushButton::clicked, this, &TrendingWindow::onRefreshClicked);
     connect(modeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onModeChanged);
-    connect(timeframeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
+    connect(timeframeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &TrendingWindow::onRefreshClicked);
     connect(langComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
-    connect(spokenLangComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &TrendingWindow::onRefreshClicked);
+    connect(spokenLangComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &TrendingWindow::onRefreshClicked);
     connect(tableWidget, &QTableWidget::itemActivated, this, &TrendingWindow::onItemActivated);
     connect(tableWidget, &QTableWidget::itemSelectionChanged, this, &TrendingWindow::onItemSelectionChanged);
     connect(tableWidget, &QTableWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
@@ -170,9 +173,7 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     onRefreshClicked();
 }
 
-void TrendingWindow::onModeChanged(int) {
-    onRefreshClicked();
-}
+void TrendingWindow::onModeChanged(int) { onRefreshClicked(); }
 
 void TrendingWindow::onRefreshClicked() {
     if (!m_client) return;
@@ -184,9 +185,15 @@ void TrendingWindow::onRefreshClicked() {
 
     int daysToSubtract = 1;
     switch (timeframeComboBox->currentIndex()) {
-        case 0: daysToSubtract = 1; break;  // Today
-        case 1: daysToSubtract = 7; break;  // This Week
-        case 2: daysToSubtract = 30; break; // This Month
+        case 0:
+            daysToSubtract = 1;
+            break;  // Today
+        case 1:
+            daysToSubtract = 7;
+            break;  // This Week
+        case 2:
+            daysToSubtract = 30;
+            break;  // This Month
     }
 
     QDateTime date = QDateTime::currentDateTime().addDays(-daysToSubtract);
@@ -229,12 +236,12 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
     QJsonDocument doc = QJsonDocument::fromJson(data, &error);
 
     if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-        return; // Ignore invalid JSON (might be for something else)
+        return;  // Ignore invalid JSON (might be for something else)
     }
 
     QJsonObject root = doc.object();
     if (!root.contains("items")) {
-        return; // Not a search result
+        return;  // Not a search result
     }
 
     // Clear the loading text
@@ -253,20 +260,22 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
     if (modeComboBox->currentIndex() == 0) {
         // Repositories
         tableWidget->setColumnCount(6);
-        tableWidget->setHorizontalHeaderLabels({tr("★"), tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
+        tableWidget->setHorizontalHeaderLabels(
+            {tr("★"), tr("Name"), tr("Stars"), tr("Language"), tr("Description"), tr("URL")});
 
-        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents); // Starred
-        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // Name
-        tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents); // Stars
-        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents); // Language
-        tableWidget->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Interactive);      // Description gets calculated width
-        tableWidget->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents); // URL
+        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);  // Starred
+        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);  // Name
+        tableWidget->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);  // Stars
+        tableWidget->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);  // Language
+        tableWidget->horizontalHeader()->setSectionResizeMode(
+            4, QHeaderView::Interactive);  // Description gets calculated width
+        tableWidget->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents);  // URL
     } else {
         // Developers
         tableWidget->setColumnCount(2);
         tableWidget->setHorizontalHeaderLabels({tr("Developer"), tr("URL")});
-        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents); // Developer
-        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents); // URL
+        tableWidget->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);  // Developer
+        tableWidget->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);  // URL
     }
 
     for (int i = 0; i < items.size(); ++i) {
@@ -318,7 +327,7 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
             QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
             linkLabel->setOpenExternalLinks(true);
             linkLabel->setFont(font);
-            QTableWidgetItem *urlItem = new QTableWidgetItem(); // Empty item to hold the widget's place and data
+            QTableWidgetItem *urlItem = new QTableWidgetItem();  // Empty item to hold the widget's place and data
             urlItem->setData(Qt::UserRole, htmlUrl);
             urlItem->setData(Qt::UserRole + 1, rawJson);
 
@@ -369,7 +378,7 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
         int maxDescWidth = viewportWidth > 0 ? viewportWidth : 800;
         // Try to give it 40% of the viewport width initially, bounded by min and max
         int targetWidth = qBound(minDescWidth, (int)(viewportWidth * 0.4), maxDescWidth);
-        tableWidget->setColumnWidth(4, targetWidth); // Description is now column 4
+        tableWidget->setColumnWidth(4, targetWidth);  // Description is now column 4
     }
 
     tableWidget->resizeRowsToContents();
@@ -387,7 +396,8 @@ void TrendingWindow::onRepoStarredCheckFinished(QNetworkReply *reply) {
     if (!reply) return;
 
     QString fullName = reply->property("fullName").toString();
-    if (!fullName.isEmpty() && (reply->error() == QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 204)) {
+    if (!fullName.isEmpty() && (reply->error() == QNetworkReply::NoError ||
+                                reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 204)) {
         for (int r = 0; r < tableWidget->rowCount(); ++r) {
             QTableWidgetItem *item = tableWidget->item(r, 0);
             if (item && item->data(Qt::UserRole + 2).toString() == fullName) {

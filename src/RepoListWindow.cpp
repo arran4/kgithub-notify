@@ -1,6 +1,5 @@
 #include "RepoListWindow.h"
 
-#include <QtGui/QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -24,10 +23,16 @@
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QtGui/QAction>
 
 RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
-    : KXmlGuiWindow(parent), m_client(client), m_table(nullptr), m_toolbar(nullptr), m_statusBar(nullptr), m_timerLabel(nullptr), m_updateTimer(nullptr) {
-
+    : KXmlGuiWindow(parent),
+      m_client(client),
+      m_table(nullptr),
+      m_toolbar(nullptr),
+      m_statusBar(nullptr),
+      m_timerLabel(nullptr),
+      m_updateTimer(nullptr) {
     setupUI();
     loadCache();
 
@@ -36,7 +41,7 @@ RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
 
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &RepoListWindow::updateTimerLabel);
-    m_updateTimer->start(60000); // 1 minute
+    m_updateTimer->start(60000);  // 1 minute
 }
 
 void RepoListWindow::setupUI() {
@@ -46,7 +51,8 @@ void RepoListWindow::setupUI() {
     // Table
     m_table = new QTableWidget(this);
     m_table->setColumnCount(8);
-    m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"), tr("Open Issues"), tr("Updated"), tr("URL")});
+    m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"),
+                                        tr("Open Issues"), tr("Updated"), tr("URL")});
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->verticalHeader()->setVisible(false);
@@ -90,7 +96,7 @@ void RepoListWindow::setupUI() {
         QList<QTableWidgetItem *> items = m_table->selectedItems();
         if (!items.isEmpty()) {
             int row = items.first()->row();
-            QTableWidgetItem *urlItem = m_table->item(row, 7); // URL is column 7
+            QTableWidgetItem *urlItem = m_table->item(row, 7);  // URL is column 7
             if (urlItem) {
                 QApplication::clipboard()->setText(urlItem->text());
             }
@@ -109,18 +115,20 @@ void RepoListWindow::setupUI() {
 }
 
 void RepoListWindow::onRefreshClicked() {
-    m_allRepos = QJsonArray(); // Clear previous
+    m_allRepos = QJsonArray();  // Clear previous
     m_client->fetchUserRepos();
-    if(m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
+    if (m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
 }
 
 void RepoListWindow::onExportClicked() {
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Export Repositories"), QDir::homePath() + "/repositories.csv", tr("CSV Files (*.csv)"));
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Export Repositories"),
+                                                    QDir::homePath() + "/repositories.csv", tr("CSV Files (*.csv)"));
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, tr("Export Error"), tr("Could not open file for writing: %1").arg(file.errorString()));
+        QMessageBox::warning(this, tr("Export Error"),
+                             tr("Could not open file for writing: %1").arg(file.errorString()));
         return;
     }
 
@@ -160,7 +168,7 @@ void RepoListWindow::onReposReceived(const QJsonArray &repos, const QString &nex
         saveCache();
         addReposToTable(m_allRepos);
         updateTimerLabel();
-        if(m_statusBar) m_statusBar->showMessage(tr("Finished fetching repositories."), 5000);
+        if (m_statusBar) m_statusBar->showMessage(tr("Finished fetching repositories."), 5000);
     }
 }
 
@@ -188,16 +196,17 @@ void RepoListWindow::addReposToTable(const QJsonArray &repos) {
         QDateTime dt = QDateTime::fromString(updatedStr, Qt::ISODate);
 
         class DateTableItem : public QTableWidgetItem {
-        public:
+           public:
             DateTableItem(const QString &text, const QDateTime &date) : QTableWidgetItem(text), m_date(date) {}
             bool operator<(const QTableWidgetItem &other) const override {
-                const DateTableItem *otherDateItem = dynamic_cast<const DateTableItem*>(&other);
+                const DateTableItem *otherDateItem = dynamic_cast<const DateTableItem *>(&other);
                 if (otherDateItem) {
                     return m_date < otherDateItem->m_date;
                 }
                 return QTableWidgetItem::operator<(other);
             }
-        private:
+
+           private:
             QDateTime m_date;
         };
 
@@ -237,7 +246,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint &pos) {
     if (!item) return;
 
     int row = item->row();
-    QTableWidgetItem *urlItem = m_table->item(row, 7); // URL is col 7
+    QTableWidgetItem *urlItem = m_table->item(row, 7);  // URL is col 7
     if (!urlItem) return;
 
     QString url = urlItem->text();

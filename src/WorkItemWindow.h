@@ -2,29 +2,28 @@
 #define WORKITEMWINDOW_H
 
 #include <KXmlGuiWindow>
-#include <QTableWidget>
-#include <QPushButton>
-#include <QNetworkReply>
-#include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QtGui/QAction>
-#include <QLabel>
 #include <QJsonArray>
+#include <QLabel>
+#include <QNetworkReply>
+#include <QPushButton>
+#include <QTableWidget>
+#include <QVBoxLayout>
+#include <QtGui/QAction>
+
 #include "GitHubClient.h"
 
 class WorkItemWindow : public KXmlGuiWindow {
     Q_OBJECT
 
-public:
-    enum EndpointType {
-        EndpointIssues,
-        EndpointRepositories
-    };
+   public:
+    enum EndpointType { EndpointIssues, EndpointRepositories };
 
-    explicit WorkItemWindow(GitHubClient *client, const QString& windowTitle, EndpointType endpointType, const QString& baseQuery, QWidget *parent = nullptr);
+    explicit WorkItemWindow(GitHubClient *client, const QString &windowTitle, EndpointType endpointType,
+                            const QString &baseQuery, QWidget *parent = nullptr);
     ~WorkItemWindow();
 
-private slots:
+   private slots:
     void onReplyFinished(QNetworkReply *reply);
     void exportToCsv();
     void exportToJson();
@@ -33,7 +32,7 @@ private slots:
     void openInBrowser();
     void copyLink();
 
-private:
+   private:
     GitHubClient *m_client;
     QString m_windowTitle;
     EndpointType m_endpointType;
@@ -55,4 +54,4 @@ private:
     void saveCache();
 };
 
-#endif // WORKITEMWINDOW_H
+#endif  // WORKITEMWINDOW_H

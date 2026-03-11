@@ -1,14 +1,15 @@
 #ifndef NOTIFICATIONLISTWIDGET_H
 #define NOTIFICATIONLISTWIDGET_H
 
-#include <QWidget>
-#include <QListWidget>
 #include <QList>
+#include <QListWidget>
 #include <QMap>
-#include <QSet>
 #include <QMenu>
-#include <QUrl>
 #include <QPixmap>
+#include <QSet>
+#include <QUrl>
+#include <QWidget>
+
 #include "Notification.h"
 #include "SettingsDialog.h"
 
@@ -16,12 +17,12 @@ class NotificationItemWidget;
 
 class NotificationListWidget : public QWidget {
     Q_OBJECT
-public:
+   public:
     explicit NotificationListWidget(QWidget *parent = nullptr);
 
     void setClient(GitHubClient *client) { m_client = client; }
     void setNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
-    void setFilterMode(int mode); // 0: Inbox, 1: Unread, 2: Read
+    void setFilterMode(int mode);  // 0: Inbox, 1: Unread, 2: Read
     void setSortMode(int mode);
     void setRepoFilter(const QString &repo);
     void setSearchFilter(const QString &text);
@@ -52,17 +53,17 @@ public:
     int count() const;
     QList<Notification> getUnreadNotifications(int limit = 5) const;
 
-protected:
+   protected:
     void resizeEvent(QResizeEvent *event) override;
 
-public slots:
+   public slots:
     void updateDetails(const QString &id, const QString &author, const QString &avatarUrl, const QString &htmlUrl);
     void updateImage(const QString &id, const QPixmap &pixmap);
     void updateError(const QString &id, const QString &error);
     void resetLoadMoreState();
 
-signals:
-    void countsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
+   signals:
+    void countsChanged(int total, int unread, int newCount, const QList<Notification> &newItems);
     void statusMessage(const QString &message);
     void linkActivated(const QUrl &url);
     void refreshRequested();
@@ -74,13 +75,13 @@ signals:
     void requestImage(const QString &url, const QString &id);
     void requestDebugApi(const QString &url);
 
-private slots:
+   private slots:
     void onListContextMenu(const QPoint &pos);
     void onItemActivated(QListWidgetItem *item);
     void onLoadMoreClicked();
     void handleLoadMoreStrategy();
 
-private:
+   private:
     void triggerLoadMore();
 
     struct NotificationDetails {
@@ -129,4 +130,4 @@ private:
     QAction *viewRawAction;
 };
 
-#endif // NOTIFICATIONLISTWIDGET_H
+#endif  // NOTIFICATIONLISTWIDGET_H

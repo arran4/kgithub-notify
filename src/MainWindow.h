@@ -2,15 +2,15 @@
 #define MAINWINDOW_H
 
 #include <KNotification>
+#include <KXmlGuiWindow>
 #include <QDateTime>
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
-#include <KXmlGuiWindow>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStackedWidget>
-#include <QMessageBox>
 #include <QStatusBar>
 #include <QStringList>
 #include <QStyle>
@@ -19,10 +19,10 @@
 #include <QToolBar>
 #include <QToolButton>
 
-#include "PopupNotification.h"
 #include "GitHubClient.h"
 #include "Notification.h"
 #include "NotificationListWidget.h"
+#include "PopupNotification.h"
 
 class NotificationItemWidget;
 class QSpinBox;
@@ -72,7 +72,7 @@ class MainWindow : public KXmlGuiWindow {
     void showWorkItems(const QString &title, int endpointType, const QString &query);
 
     // From ListWidget
-    void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
+    void onListCountsChanged(int total, int unread, int newCount, const QList<Notification> &newItems);
     void onListStatusMessage(const QString &message);
 
    protected:
@@ -160,7 +160,7 @@ class MainWindow : public KXmlGuiWindow {
 
     // Cache for tray menu
     int m_lastUnreadCount;
-    QList<Notification> m_lastUnreadNotifications; // Only for tray menu display if needed, or rely on widget
+    QList<Notification> m_lastUnreadNotifications;  // Only for tray menu display if needed, or rely on widget
 };
 
 #endif  // MAINWINDOW_H

@@ -1,14 +1,13 @@
 #include "DebugWindow.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QComboBox>
-#include <QScrollArea>
-#include <QJsonDocument>
 
-DebugWindow::DebugWindow(GitHubClient *client, QWidget *parent)
-    : QDialog(parent), m_client(client)
-{
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QLabel>
+#include <QScrollArea>
+#include <QVBoxLayout>
+
+DebugWindow::DebugWindow(GitHubClient *client, QWidget *parent) : QDialog(parent), m_client(client) {
     setWindowTitle(tr("Debug GitHub API"));
     resize(700, 600);
 
@@ -124,7 +123,7 @@ void DebugWindow::onParamChanged() {
         // But adding rows might interleave? No, addRow appends.
         QLayoutItem *item = m_paramsLayout->itemAt(i, QFormLayout::FieldRole);
         if (item && item->widget()) {
-            QLineEdit *input = qobject_cast<QLineEdit*>(item->widget());
+            QLineEdit *input = qobject_cast<QLineEdit *>(item->widget());
             if (input) {
                 QString value = input->text();
                 endpoint.replace("{" + param + "}", value);
@@ -157,6 +156,4 @@ void DebugWindow::displayResponse(const QByteArray &data) {
     }
 }
 
-void DebugWindow::setEndpoint(const QString &url) {
-    m_endpointInput->setText(url);
-}
+void DebugWindow::setEndpoint(const QString &url) { m_endpointInput->setText(url); }

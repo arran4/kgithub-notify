@@ -1,14 +1,14 @@
 #include "NotificationItemWidget.h"
 
+#include <QApplication>
+#include <QColor>
 #include <QDateTime>
 #include <QFont>
-#include <QLocale>
-#include <QStyle>
-#include <QPixmap>
-#include <QPainter>
 #include <QIcon>
-#include <QColor>
-#include <QApplication>
+#include <QLocale>
+#include <QPainter>
+#include <QPixmap>
+#include <QStyle>
 
 static QIcon getThemedIcon(const QStringList &names, QStyle *style, QStyle::StandardPixmap fallback) {
     for (const QString &name : names) {
@@ -19,8 +19,7 @@ static QIcon getThemedIcon(const QStringList &names, QStyle *style, QStyle::Stan
     return style->standardIcon(fallback);
 }
 
-NotificationItemWidget::NotificationItemWidget(const Notification &n,
-                                               QWidget *parent)
+NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *parent)
     : QWidget(parent), m_isLoading(false) {
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
@@ -35,7 +34,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     {
         QPainter p(&dot);
         p.setRenderHint(QPainter::Antialiasing);
-        p.setBrush(QColor(0, 122, 255)); // Blue
+        p.setBrush(QColor(0, 122, 255));  // Blue
         p.setPen(Qt::NoPen);
         p.drawEllipse(0, 0, 10, 10);
     }
@@ -67,13 +66,11 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     titleLabel->setWordWrap(true);
     titleLayout->addWidget(titleLabel, 1);
 
-
     contentLayout->addLayout(titleLayout);
 
     // Repo, Author and Type
     QHBoxLayout *repoTypeLayout = new QHBoxLayout();
-    repoLabel = new QLabel(
-        QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped()), this);
+    repoLabel = new QLabel(QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped()), this);
     repoLabel->setTextFormat(Qt::RichText);
 
     authorLabel = new QLabel("Author: ...", this);
@@ -93,9 +90,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     // Date
     // Parse date
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid()
-                          ? QLocale::system().toString(dt, QLocale::ShortFormat)
-                          : n.updatedAt;
+    QString dateStr = dt.isValid() ? QLocale::system().toString(dt, QLocale::ShortFormat) : n.updatedAt;
 
     dateLabel = new QLabel("Date: " + dateStr, this);
     contentLayout->addWidget(dateLabel);
@@ -105,8 +100,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
     urlLabel = new QLabel(QString("<a href=\"%1\">Open on GitHub</a>").arg(htmlUrl.toHtmlEscaped()), this);
     urlLabel->setTextFormat(Qt::RichText);
     urlLabel->setOpenExternalLinks(true);
-    urlLabel->setTextInteractionFlags(
-        Qt::TextSelectableByMouse);  // Allow selection
+    urlLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);  // Allow selection
     contentLayout->addWidget(urlLabel);
 
     // Error Label
@@ -131,16 +125,19 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n,
 
     openButton = new QToolButton(this);
     openButton->setAutoRaise(true);
-    openButton->setIcon(getThemedIcon({QStringLiteral("internet-web-browser"), QStringLiteral("document-open-remote"), QStringLiteral("text-html")}, style(), QStyle::SP_DirOpenIcon));
+    openButton->setIcon(getThemedIcon(
+        {QStringLiteral("internet-web-browser"), QStringLiteral("document-open-remote"), QStringLiteral("text-html")},
+        style(), QStyle::SP_DirOpenIcon));
     openButton->setIconSize(QSize(24, 24));
     openButton->setToolTip(tr("Open in Browser"));
     connect(openButton, &QToolButton::clicked, this, &NotificationItemWidget::openClicked);
     actionLayout->addWidget(openButton);
 
-
     doneButton = new QToolButton(this);
     doneButton->setAutoRaise(true);
-    doneButton->setIcon(getThemedIcon({QStringLiteral("task-complete"), QStringLiteral("object-select"), QStringLiteral("dialog-ok")}, style(), QStyle::SP_DialogApplyButton));
+    doneButton->setIcon(
+        getThemedIcon({QStringLiteral("task-complete"), QStringLiteral("object-select"), QStringLiteral("dialog-ok")},
+                      style(), QStyle::SP_DialogApplyButton));
     doneButton->setIconSize(QSize(24, 24));
     doneButton->setToolTip(tr("Mark as Done"));
     connect(doneButton, &QToolButton::clicked, this, &NotificationItemWidget::doneClicked);
@@ -160,7 +157,7 @@ void NotificationItemWidget::setAuthor(const QString &name, const QPixmap &avata
 }
 
 void NotificationItemWidget::setHtmlUrl(const QString &url) {
-     urlLabel->setText(QString("<a href=\"%1\">Open on GitHub</a>").arg(url.toHtmlEscaped()));
+    urlLabel->setText(QString("<a href=\"%1\">Open on GitHub</a>").arg(url.toHtmlEscaped()));
 }
 
 void NotificationItemWidget::setError(const QString &error) {
@@ -203,9 +200,7 @@ void NotificationItemWidget::updateNotification(const Notification &n) {
     }
 
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid()
-                          ? QLocale::system().toString(dt, QLocale::ShortFormat)
-                          : n.updatedAt;
+    QString dateStr = dt.isValid() ? QLocale::system().toString(dt, QLocale::ShortFormat) : n.updatedAt;
     QString dateLabelText = "Date: " + dateStr;
     if (dateLabel->text() != dateLabelText) {
         dateLabel->setText(dateLabelText);

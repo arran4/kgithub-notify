@@ -2,24 +2,25 @@
 #define NOTIFICATIONWINDOW_H
 
 #include <KXmlGuiWindow>
-#include <QtGui/QAction>
 #include <QMenu>
 #include <QMenuBar>
-#include <QToolBar>
 #include <QStatusBar>
-#include "Notification.h"
+#include <QToolBar>
+#include <QtGui/QAction>
+
 #include "GitHubClient.h"
+#include "Notification.h"
 
 class NotificationWindow : public KXmlGuiWindow {
     Q_OBJECT
-public:
+   public:
     explicit NotificationWindow(const Notification &notification, GitHubClient *client, QWidget *parent = nullptr);
 
-signals:
+   signals:
     void actionRequested(const QString &actionName, const QString &id, const QString &url);
     void debugApiRequested(const QString &apiUrl);
 
-private slots:
+   private slots:
     void onOpenUrl();
     void onCopyLink();
     void onMarkAsRead();
@@ -29,9 +30,9 @@ private slots:
     void onViewPullRequest();
     void onViewActionJob();
 
-private:
+   private:
     Notification m_notification;
     GitHubClient *m_client;
 };
 
-#endif // NOTIFICATIONWINDOW_H
+#endif  // NOTIFICATIONWINDOW_H

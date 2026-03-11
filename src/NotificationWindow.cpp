@@ -1,18 +1,20 @@
 #include "NotificationWindow.h"
-#include "GitHubClient.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QPushButton>
-#include <QDesktopServices>
+
 #include <QApplication>
 #include <QClipboard>
-#include <QWidget>
-#include <QJsonDocument>
+#include <QDesktopServices>
 #include <QDialog>
+#include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QLabel>
+#include <QPushButton>
 #include <QTextEdit>
-#include "PullRequestWindow.h"
+#include <QVBoxLayout>
+#include <QWidget>
+
 #include "ActionWindow.h"
+#include "GitHubClient.h"
+#include "PullRequestWindow.h"
 
 NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *client, QWidget *parent)
     : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
@@ -38,7 +40,6 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     QAction *openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
     connect(openUrlAction, &QAction::triggered, this, &NotificationWindow::onOpenUrl);
     actionsMenu->addAction(openUrlAction);
-
 
     QAction *markAsReadAction = new QAction(QIcon::fromTheme("mail-mark-read"), tr("Mark as Read"), this);
     connect(markAsReadAction, &QAction::triggered, this, &NotificationWindow::onMarkAsRead);
@@ -118,10 +119,10 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
 
     if (!n.lastReadAt.isEmpty()) {
         {
-        QLabel *lbl = new QLabel(tr("<b>Last Read At:</b> %1").arg(n.lastReadAt.toHtmlEscaped()));
-        lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
-        layout->addWidget(lbl);
-    }
+            QLabel *lbl = new QLabel(tr("<b>Last Read At:</b> %1").arg(n.lastReadAt.toHtmlEscaped()));
+            lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
+            layout->addWidget(lbl);
+        }
     }
 
     QString apiUrl = n.url;
@@ -129,9 +130,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
 
     QLabel *urlLabel = new QLabel(tr("<b>API URL:</b> <a href=\"%1\">%1</a>").arg(apiUrl.toHtmlEscaped()));
     urlLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    connect(urlLabel, &QLabel::linkActivated, this, [this](const QString &link) {
-        emit debugApiRequested(link);
-    });
+    connect(urlLabel, &QLabel::linkActivated, this, [this](const QString &link) { emit debugApiRequested(link); });
     layout->addWidget(urlLabel);
 
     if (!htmlUrl.isEmpty() && htmlUrl != apiUrl) {
@@ -176,9 +175,8 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     setCentralWidget(centralWidget);
 
     // Status Bar
-    QString statusText = tr("Status: %1 | Inbox: %2")
-        .arg(n.unread ? tr("Unread") : tr("Read"))
-        .arg(n.inInbox ? tr("Yes") : tr("No"));
+    QString statusText =
+        tr("Status: %1 | Inbox: %2").arg(n.unread ? tr("Unread") : tr("Read")).arg(n.inInbox ? tr("Yes") : tr("No"));
     statusBar()->showMessage(statusText);
 }
 
@@ -192,9 +190,7 @@ void NotificationWindow::onCopyLink() {
     QApplication::clipboard()->setText(url);
 }
 
-void NotificationWindow::onMarkAsRead() {
-    emit actionRequested("markAsRead", m_notification.id, m_notification.url);
-}
+void NotificationWindow::onMarkAsRead() { emit actionRequested("markAsRead", m_notification.id, m_notification.url); }
 
 void NotificationWindow::onMarkAsDone() {
     emit actionRequested("markAsDone", m_notification.id, m_notification.url);
