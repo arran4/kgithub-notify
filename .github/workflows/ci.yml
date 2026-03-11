@@ -23,15 +23,10 @@ on:
         options:
         - 'lint-fix'
         - 'build-test'
-        - 'release'
-      release_mode:
-        description: 'Release Mode (only for release action)'
-        required: false
-        default: 'snapshot'
-        type: choice
-        options:
         - 'snapshot'
-        - 'release'
+        - 'release-major'
+        - 'release-minor'
+        - 'release-patch'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -87,6 +82,8 @@ jobs:
     needs: lint-and-fmt
     if: ${{ github.event.inputs.action != 'lint-fix' }}
     runs-on: ${{ matrix.os }}
+    outputs:
+      new_tag: ${{ steps.bump.outputs.new_tag }}
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -94,6 +91,35 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Bump Version
+      id: bump
+      if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.action, 'release-') }}
+      run: |
+        CURRENT_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+        IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+        if [ "${{ github.event.inputs.action }}" == "release-major" ]; then
+          major=$((major + 1))
+          minor=0
+          patch=0
+        elif [ "${{ github.event.inputs.action }}" == "release-minor" ]; then
+          minor=$((minor + 1))
+          patch=0
+        elif [ "${{ github.event.inputs.action }}" == "release-patch" ]; then
+          patch=$((patch + 1))
+        fi
+        NEW_VERSION="${major}.${minor}.${patch}"
+        sed -i "s/project(kgithub-notify VERSION $CURRENT_VERSION)/project(kgithub-notify VERSION $NEW_VERSION)/" CMakeLists.txt
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git add CMakeLists.txt
+        git commit -m "chore: bump version to $NEW_VERSION"
+        git tag "v$NEW_VERSION"
+        git push origin HEAD:${{ github.ref_name }}
+        git push origin "v$NEW_VERSION"
+        echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
     - name: Install Dependencies (Linux)
       if: runner.os == 'Linux'
@@ -125,7 +151,7 @@ jobs:
   release:
     name: Release
     needs: [build-and-test]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'release') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'snapshot' || startsWith(github.event.inputs.action, 'release-'))) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,20 +164,22 @@ jobs:
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.event.inputs.action, 'release-') }}
         with:
+          tag_name: ${{ needs.build-and-test.outputs.new_tag || github.ref_name }}
+          name: Release ${{ needs.build-and-test.outputs.new_tag || github.ref_name }}
           files: build/Kgithub-notify
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Snapshot Release (Manual)
-        if: github.event_name == 'workflow_dispatch'
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'snapshot' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: snapshot-${{ github.run_id }}
           name: Snapshot ${{ github.run_id }}
           draft: false
-          prerelease: ${{ github.event.inputs.release_mode == 'snapshot' }}
+          prerelease: true
           files: build/Kgithub-notify
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
