@@ -18,7 +18,7 @@
 void saveScreenshot(QWidget* widget, const QString& filename) {
     widget->adjustSize();
     QEventLoop loop;
-    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
     loop.exec();
 
     QPixmap pixmap = widget->grab();
@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
 
     // MainWindow
     MainWindow mainWindow;
+    mainWindow.resize(900, 700);
     mainWindow.setClient(&mockClient);
     mainWindow.show();
     mockClient.checkNotifications(); // Populate mock notifications
@@ -49,16 +50,19 @@ int main(int argc, char *argv[]) {
 
     // TrendingWindow
     TrendingWindow trendingWindow(&mockClient);
+    trendingWindow.resize(900, 700);
     trendingWindow.show();
     saveScreenshot(&trendingWindow, "trendingwindow.png");
 
     // RepoListWindow
     RepoListWindow repoListWindow(&mockClient);
+    repoListWindow.resize(900, 700);
     repoListWindow.show();
     saveScreenshot(&repoListWindow, "repolistwindow.png");
 
     // WorkItemWindow
     WorkItemWindow workItemWindow(&mockClient, "Open Issues", WorkItemWindow::EndpointIssues, "is:open is:issue");
+    workItemWindow.resize(900, 700);
     workItemWindow.show();
     saveScreenshot(&workItemWindow, "workitemwindow.png");
 
@@ -77,11 +81,13 @@ int main(int argc, char *argv[]) {
 
     // PullRequestWindow
     PullRequestWindow prWindow(dummyPRNotification, &mockClient);
+    prWindow.resize(900, 700);
     prWindow.show();
     saveScreenshot(&prWindow, "pullrequestwindow.png");
 
     // ActionWindow
     ActionWindow actionWindow(dummyActionNotification, &mockClient);
+    actionWindow.resize(900, 700);
     actionWindow.show();
     saveScreenshot(&actionWindow, "actionwindow.png");
 

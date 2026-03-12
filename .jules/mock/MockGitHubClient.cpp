@@ -1,5 +1,5 @@
-#include <QPixmap>
 #include "MockGitHubClient.h"
+#include <QPixmap>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
@@ -41,6 +41,34 @@ void MockGitHubClient::checkNotifications() {
         n2["updated_at"] = QDateTime::currentDateTime().addSecs(-3600).toString(Qt::ISODate);
         n2["unread"] = false;
         mockNotifications.append(Notification::fromJson(n2));
+
+        QJsonObject n3;
+        n3["id"] = "3";
+        QJsonObject s3;
+        s3["title"] = "Review requested: Add tests";
+        s3["type"] = "PullRequest";
+        s3["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/pulls/15";
+        n3["subject"] = s3;
+        QJsonObject r3;
+        r3["full_name"] = "arran4/Kgithub-notify";
+        n3["repository"] = r3;
+        n3["updated_at"] = QDateTime::currentDateTime().addSecs(-7200).toString(Qt::ISODate);
+        n3["unread"] = true;
+        mockNotifications.append(Notification::fromJson(n3));
+
+        QJsonObject n4;
+        n4["id"] = "4";
+        QJsonObject s4;
+        s4["title"] = "CI Check Failed on main";
+        s4["type"] = "CheckSuite";
+        s4["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/actions/runs/42";
+        n4["subject"] = s4;
+        QJsonObject r4;
+        r4["full_name"] = "arran4/Kgithub-notify";
+        n4["repository"] = r4;
+        n4["updated_at"] = QDateTime::currentDateTime().addSecs(-86400).toString(Qt::ISODate);
+        n4["unread"] = false;
+        mockNotifications.append(Notification::fromJson(n4));
 
         emit notificationsReceived(mockNotifications, false, false);
     });
@@ -89,25 +117,46 @@ void MockGitHubClient::requestRaw(const QString &endpoint, const QString &method
     QTimer::singleShot(100, this, [this, endpoint]() {
         QJsonArray items;
         if (endpoint.contains("pulls")) {
-            QJsonObject item;
-            item["title"] = "Fix crash on startup";
-            item["html_url"] = "https://github.com/arran4/Kgithub-notify/pull/10";
-            item["created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-            item["state"] = "open";
-            QJsonObject user;
-            user["login"] = "mock_author";
-            item["user"] = user;
-            items.append(item);
+            QJsonObject item1;
+            item1["title"] = "Fix crash on startup";
+            item1["html_url"] = "https://github.com/arran4/Kgithub-notify/pull/10";
+            item1["created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+            item1["state"] = "open";
+            QJsonObject user1;
+            user1["login"] = "mock_author";
+            item1["user"] = user1;
+            items.append(item1);
+
+            QJsonObject item2;
+            item2["title"] = "Implement offline mode";
+            item2["html_url"] = "https://github.com/arran4/Kgithub-notify/pull/21";
+            item2["created_at"] = QDateTime::currentDateTime().addDays(-2).toString(Qt::ISODate);
+            item2["state"] = "open";
+            QJsonObject user2;
+            user2["login"] = "jules_dev";
+            item2["user"] = user2;
+            items.append(item2);
+
         } else if (endpoint.contains("issues")) {
-            QJsonObject item;
-            item["title"] = "Add feature X";
-            item["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/12";
-            item["created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-            item["state"] = "open";
-            QJsonObject user;
-            user["login"] = "mock_author";
-            item["user"] = user;
-            items.append(item);
+            QJsonObject item1;
+            item1["title"] = "Add feature X";
+            item1["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/12";
+            item1["created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+            item1["state"] = "open";
+            QJsonObject user1;
+            user1["login"] = "mock_author";
+            item1["user"] = user1;
+            items.append(item1);
+
+            QJsonObject item2;
+            item2["title"] = "Typo in documentation";
+            item2["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/25";
+            item2["created_at"] = QDateTime::currentDateTime().addDays(-1).toString(Qt::ISODate);
+            item2["state"] = "open";
+            QJsonObject user2;
+            user2["login"] = "reader_user";
+            item2["user"] = user2;
+            items.append(item2);
         }
 
         QJsonObject root;
@@ -122,12 +171,21 @@ void MockGitHubClient::fetchUserRepos(const QString &pageUrl) {
     Q_UNUSED(pageUrl);
     QTimer::singleShot(100, this, [this]() {
         QJsonArray repos;
-        QJsonObject repo;
-        repo["full_name"] = "arran4/Kgithub-notify";
-        repo["html_url"] = "https://github.com/arran4/Kgithub-notify";
-        repo["description"] = "A sleek GitHub notification system tray application";
-        repo["stargazers_count"] = 42;
-        repos.append(repo);
+
+        QJsonObject repo1;
+        repo1["full_name"] = "arran4/Kgithub-notify";
+        repo1["html_url"] = "https://github.com/arran4/Kgithub-notify";
+        repo1["description"] = "A sleek GitHub notification system tray application";
+        repo1["stargazers_count"] = 42;
+        repos.append(repo1);
+
+        QJsonObject repo2;
+        repo2["full_name"] = "arran4/awesome-project";
+        repo2["html_url"] = "https://github.com/arran4/awesome-project";
+        repo2["description"] = "Another cool project that does things";
+        repo2["stargazers_count"] = 105;
+        repos.append(repo2);
+
         emit userReposReceived(repos, "");
     });
 }
