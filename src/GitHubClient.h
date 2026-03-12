@@ -24,17 +24,17 @@ class GitHubClient : public QObject {
     void setToken(const QString &token);
     void setApiUrl(const QString &url);
     void setShowAll(bool all);
-    void checkNotifications();
-    void loadMore();
-    void verifyToken();
-    void markAsRead(const QString &id);
-    void markAsDone(const QString &id);
-    void markAsReadAndDone(const QString &id);
-    void fetchNotificationDetails(const QString &url, const QString &notificationId);
-    void fetchImage(const QString &imageUrl, const QString &notificationId);
-    void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
-    void fetchUserRepos(const QString &pageUrl = QString());
-    QNetworkRequest createAuthenticatedRequest(const QUrl &url) const;
+    virtual void checkNotifications();
+    virtual void loadMore();
+    virtual void verifyToken();
+    virtual void markAsRead(const QString &id);
+    virtual void markAsDone(const QString &id);
+    virtual void markAsReadAndDone(const QString &id);
+    virtual void fetchNotificationDetails(const QString &url, const QString &notificationId);
+    virtual void fetchImage(const QString &imageUrl, const QString &notificationId);
+    virtual void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
+    virtual void fetchUserRepos(const QString &pageUrl = QString());
+    virtual QNetworkRequest createAuthenticatedRequest(const QUrl &url) const;
 
    signals:
     void loadingStarted();

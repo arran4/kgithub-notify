@@ -116,3 +116,54 @@ install(FILES src/kgithub-notify.notifyrc
 install(FILES src/kgithub-notifyui.rc
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/kxmlgui6/kgithub-notify
 )
+
+add_executable(kgithub-notify-mock
+    .jules/mock/ScreenshotGenerator.cpp
+    .jules/mock/MockGitHubClient.cpp
+    .jules/mock/MockGitHubClient.h
+    src/GitHubClient.cpp
+    src/GitHubClient.h
+    src/Notification.cpp
+    src/Notification.h
+    src/SecureString.h
+    src/SettingsDialog.cpp
+    src/SettingsDialog.h
+    src/DebugWindow.cpp
+    src/DebugWindow.h
+    src/RepoListWindow.cpp
+    src/RepoListWindow.h
+    src/trending/TrendingWindow.cpp
+    src/trending/TrendingWindow.h
+    src/WalletManager.cpp
+    src/WalletManager.h
+    src/MainWindow.cpp
+    src/MainWindow.h
+    src/PopupNotification.cpp
+    src/PopupNotification.h
+    src/NotificationItemWidget.cpp
+    src/NotificationItemWidget.h
+    src/NotificationListWidget.cpp
+    src/NotificationListWidget.h
+    src/WorkItemWindow.cpp
+    src/WorkItemWindow.h
+    src/NotificationWindow.cpp
+    src/NotificationWindow.h
+    src/PullRequestWindow.cpp
+    src/PullRequestWindow.h
+    src/ActionWindow.cpp
+    src/ActionWindow.h
+    src/resources.qrc
+)
+
+target_link_libraries(kgithub-notify-mock
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Svg
+    Qt6::DBus
+    KF6::CoreAddons
+    KF6::XmlGui
+    KF6::ConfigWidgets
+    KF6::I18n
+    KF6::Wallet
+    KF6::Notifications
+)

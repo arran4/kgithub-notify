@@ -7,8 +7,8 @@ A sleek GitHub notification system tray application written natively in C++ usin
 </div>
 
 <p align="center">
-    <img src="docs/Screenshot_20260221_210604.png" alt="Main Interface" width="45%" />
-    <img src="docs/Screenshot_20260221_210702.png" alt="Notification Item" width="45%" />
+    <img src="docs/mainwindow.png" alt="Main Interface" width="45%" />
+    <img src="docs/workitemwindow.png" alt="Work Items" width="45%" />
 </p>
 
 ## ✨ Features
@@ -24,9 +24,15 @@ Kgithub-notify acts as a mini-client for managing your daily GitHub workflows di
 
 ### 🛠️ Developer Tools & Work Items
 * **Trending Explorer**: Browse trending repositories and developers right from the `Tools` menu, complete with language filters and "star" indicators for repos you already follow.
+  <p align="center"><img src="docs/trendingwindow.png" alt="Trending Interface" width="60%" /></p>
 * **Work Item Hub**: Automatically aggregate your "Open Issues" and "Open Pull Requests" based on involvement (assigned, mentioned, authored, review-requested).
 * **Detailed Views**: Dedicated windows to inspect Pull Requests, GitHub Actions (Check Suites/Workflows), and raw JSON payloads.
+  <p align="center">
+      <img src="docs/pullrequestwindow.png" alt="Pull Request Window" width="45%" />
+      <img src="docs/actionwindow.png" alt="GitHub Action Window" width="45%" />
+  </p>
 * **Repository List**: Export and view a complete list of your repositories directly to CSV.
+  <p align="center"><img src="docs/repolistwindow.png" alt="Repository List Window" width="60%" /></p>
 
 ### 🐧 Deep KDE Integration (KF6)
 * **Native Feel**: Built upon KXmlGuiWindow to adhere perfectly to KDE Human Interface Guidelines (HIG).
