@@ -23,7 +23,7 @@ class WorkItemWindow : public KXmlGuiWindow {
                             const QString &baseQuery, QWidget *parent = nullptr);
     ~WorkItemWindow();
 
-   private slots:
+   public slots:
     void onReplyFinished(QNetworkReply *reply);
     void exportToCsv();
     void exportToJson();
@@ -32,7 +32,7 @@ class WorkItemWindow : public KXmlGuiWindow {
     void openInBrowser();
     void copyLink();
 
-   private:
+   public:
     GitHubClient *m_client;
     QString m_windowTitle;
     EndpointType m_endpointType;

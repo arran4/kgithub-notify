@@ -14,11 +14,12 @@
 #include "../../src/PullRequestWindow.h"
 #include "../../src/ActionWindow.h"
 #include "MockGitHubClient.h"
+#include "MockNetworkAccessManager.h"
 
 void saveScreenshot(QWidget* widget, const QString& filename) {
     widget->adjustSize();
     QEventLoop loop;
-    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
     loop.exec();
 
     QPixmap pixmap = widget->grab();
@@ -51,6 +52,11 @@ int main(int argc, char *argv[]) {
     // TrendingWindow
     TrendingWindow trendingWindow(&mockClient);
     trendingWindow.resize(900, 700);
+    // Inject mock network manager
+    QNetworkAccessManager *oldNetManager = trendingWindow.m_netManager;
+    trendingWindow.m_netManager = new MockNetworkAccessManager(&trendingWindow);
+    if (oldNetManager) oldNetManager->deleteLater();
+    QObject::connect(trendingWindow.m_netManager, &QNetworkAccessManager::finished, &trendingWindow, &TrendingWindow::onRepoStarredCheckFinished);
     trendingWindow.show();
     saveScreenshot(&trendingWindow, "trendingwindow.png");
 
@@ -63,6 +69,11 @@ int main(int argc, char *argv[]) {
     // WorkItemWindow
     WorkItemWindow workItemWindow(&mockClient, "Open Issues", WorkItemWindow::EndpointIssues, "is:open is:issue");
     workItemWindow.resize(900, 700);
+    QNetworkAccessManager *oldWorkManager = workItemWindow.m_manager;
+    workItemWindow.m_manager = new MockNetworkAccessManager(&workItemWindow);
+    if (oldWorkManager) oldWorkManager->deleteLater();
+    QObject::connect(workItemWindow.m_manager, &QNetworkAccessManager::finished, &workItemWindow, &WorkItemWindow::onReplyFinished);
+    workItemWindow.loadData(1);
     workItemWindow.show();
     saveScreenshot(&workItemWindow, "workitemwindow.png");
 
@@ -72,6 +83,7 @@ int main(int argc, char *argv[]) {
     dummyPRNotification.title = "Fix crash on startup";
     dummyPRNotification.type = "PullRequest";
     dummyPRNotification.url = "https://api.github.com/repos/arran4/Kgithub-notify/pulls/10";
+    dummyPRNotification.repository = "arran4/Kgithub-notify";
 
     Notification dummyActionNotification;
     dummyActionNotification.id = "11";
@@ -82,12 +94,25 @@ int main(int argc, char *argv[]) {
     // PullRequestWindow
     PullRequestWindow prWindow(dummyPRNotification, &mockClient);
     prWindow.resize(900, 700);
+    QNetworkAccessManager *oldPrManager = prWindow.m_manager;
+    prWindow.m_manager = new MockNetworkAccessManager(&prWindow);
+    if (oldPrManager) oldPrManager->deleteLater();
+    prWindow.fetchPrDetails();
+    prWindow.fetchComments();
+    prWindow.fetchReviewComments();
+    prWindow.fetchCommits();
+    prWindow.fetchFiles();
     prWindow.show();
     saveScreenshot(&prWindow, "pullrequestwindow.png");
 
     // ActionWindow
     ActionWindow actionWindow(dummyActionNotification, &mockClient);
     actionWindow.resize(900, 700);
+    QNetworkAccessManager *oldActManager = actionWindow.m_manager;
+    actionWindow.m_manager = new MockNetworkAccessManager(&actionWindow);
+    if (oldActManager) oldActManager->deleteLater();
+    actionWindow.fetchRunDetails();
+    actionWindow.fetchJobs();
     actionWindow.show();
     saveScreenshot(&actionWindow, "actionwindow.png");
 

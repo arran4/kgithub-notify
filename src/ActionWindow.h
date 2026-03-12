@@ -18,14 +18,14 @@ class ActionWindow : public KXmlGuiWindow {
    public:
     explicit ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent = nullptr);
 
-   private slots:
+   public slots:
     void fetchRunDetails();
     void onRunDetailsReply(QNetworkReply *reply);
 
     void fetchJobs();
     void onJobsReply(QNetworkReply *reply);
 
-   private:
+   public:
     Notification m_notification;
     GitHubClient *m_client;
     QNetworkAccessManager *m_manager;

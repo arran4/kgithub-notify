@@ -21,7 +21,7 @@ class TrendingWindow : public KXmlGuiWindow {
    public:
     explicit TrendingWindow(GitHubClient *client, QWidget *parent = nullptr);
 
-   private slots:
+   public slots:
     void onRefreshClicked();
     void onItemActivated(QTableWidgetItem *item);
     void onModeChanged(int index);
@@ -29,7 +29,7 @@ class TrendingWindow : public KXmlGuiWindow {
     void onRepoStarredCheckFinished(QNetworkReply *reply);
     void onItemSelectionChanged();
 
-   private:
+   public:
     QComboBox *modeComboBox;
     QComboBox *timeframeComboBox;
     QComboBox *langComboBox;

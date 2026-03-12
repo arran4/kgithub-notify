@@ -24,3 +24,4 @@ public:
 };
 
 #endif // MOCKGITHUBCLIENT_H
+    QNetworkReply *getMockReply(const QNetworkRequest &request, QObject *parent);

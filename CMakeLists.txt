@@ -167,3 +167,4 @@ target_link_libraries(kgithub-notify-mock
     KF6::Wallet
     KF6::Notifications
 )
+target_sources(kgithub-notify-mock PRIVATE .jules/mock/MockNetworkAccessManager.cpp .jules/mock/MockNetworkAccessManager.h)

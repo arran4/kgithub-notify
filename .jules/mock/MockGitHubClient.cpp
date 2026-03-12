@@ -241,6 +241,6 @@ QNetworkRequest MockGitHubClient::createAuthenticatedRequest(const QUrl &url) co
     // We can just return a request for a known dummy URL or intercept it somehow.
     QNetworkRequest request;
     // We intentionally return a file url so we don't hit the real network and wait for timeouts.
-    request.setUrl(QUrl("file:///dev/null"));
+    request.setUrl(url);
     return request;
 }

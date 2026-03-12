@@ -24,7 +24,7 @@ class PullRequestWindow : public KXmlGuiWindow {
    public:
     explicit PullRequestWindow(const Notification &n, GitHubClient *client, QWidget *parent = nullptr);
 
-   private slots:
+   public slots:
     void fetchPrDetails();
     void onPrDetailsReply(QNetworkReply *reply);
 
@@ -43,7 +43,7 @@ class PullRequestWindow : public KXmlGuiWindow {
     void onCommentButtonClicked();
     void onPostCommentReply(QNetworkReply *reply);
 
-   private:
+   public:
     Notification m_notification;
     GitHubClient *m_client;
     QNetworkAccessManager *m_manager;
