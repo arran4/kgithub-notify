@@ -116,7 +116,44 @@ void MockGitHubClient::requestRaw(const QString &endpoint, const QString &method
     Q_UNUSED(body);
     QTimer::singleShot(100, this, [this, endpoint]() {
         QJsonArray items;
-        if (endpoint.contains("pulls")) {
+        if (endpoint.contains("search/repositories")) { // Trending window uses search/repositories
+            QJsonObject repo1;
+            repo1["full_name"] = "arran4/Kgithub-notify";
+            repo1["html_url"] = "https://github.com/arran4/Kgithub-notify";
+            repo1["description"] = "A sleek GitHub notification system tray application";
+            repo1["stargazers_count"] = 42;
+            repo1["language"] = "C++";
+            QJsonObject owner1;
+            owner1["login"] = "arran4";
+            owner1["avatar_url"] = "https://github.com/identicons/arran4.png";
+            repo1["owner"] = owner1;
+            items.append(repo1);
+
+            QJsonObject repo2;
+            repo2["full_name"] = "kde/kxmlgui";
+            repo2["html_url"] = "https://github.com/kde/kxmlgui";
+            repo2["description"] = "KDE Frameworks 6 - framework for managing menu and toolbar actions";
+            repo2["stargazers_count"] = 1250;
+            repo2["language"] = "C++";
+            QJsonObject owner2;
+            owner2["login"] = "kde";
+            owner2["avatar_url"] = "https://github.com/identicons/kde.png";
+            repo2["owner"] = owner2;
+            items.append(repo2);
+
+            QJsonObject repo3;
+            repo3["full_name"] = "mock/project-x";
+            repo3["html_url"] = "https://github.com/mock/project-x";
+            repo3["description"] = "A very interesting mock project";
+            repo3["stargazers_count"] = 8000;
+            repo3["language"] = "Python";
+            QJsonObject owner3;
+            owner3["login"] = "mock";
+            owner3["avatar_url"] = "https://github.com/identicons/mock.png";
+            repo3["owner"] = owner3;
+            items.append(repo3);
+
+        } else if (endpoint.contains("pulls")) {
             QJsonObject item1;
             item1["title"] = "Fix crash on startup";
             item1["html_url"] = "https://github.com/arran4/Kgithub-notify/pull/10";
@@ -185,6 +222,13 @@ void MockGitHubClient::fetchUserRepos(const QString &pageUrl) {
         repo2["description"] = "Another cool project that does things";
         repo2["stargazers_count"] = 105;
         repos.append(repo2);
+
+        QJsonObject repo3;
+        repo3["full_name"] = "arran4/dotfiles";
+        repo3["html_url"] = "https://github.com/arran4/dotfiles";
+        repo3["description"] = "Linux configurations";
+        repo3["stargazers_count"] = 3;
+        repos.append(repo3);
 
         emit userReposReceived(repos, "");
     });
