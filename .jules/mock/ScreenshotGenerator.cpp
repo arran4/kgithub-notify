@@ -16,10 +16,13 @@
 #include "MockGitHubClient.h"
 #include "MockNetworkAccessManager.h"
 
-void saveScreenshot(QWidget* widget, const QString& filename) {
-    widget->adjustSize();
+void saveScreenshot(QWidget* widget, const QString& filename, int delayMs = 3000) {
+    widget->resize(1200, 800);
+    // Force a paint event
+    widget->repaint();
+
     QEventLoop loop;
-    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    QTimer::singleShot(delayMs, &loop, &QEventLoop::quit);
     loop.exec();
 
     QPixmap pixmap = widget->grab();
@@ -43,16 +46,15 @@ int main(int argc, char *argv[]) {
 
     // MainWindow
     MainWindow mainWindow;
-    mainWindow.resize(900, 700);
+    mainWindow.resize(1200, 800);
     mainWindow.setClient(&mockClient);
     mainWindow.show();
     mockClient.checkNotifications(); // Populate mock notifications
-    saveScreenshot(&mainWindow, "mainwindow.png");
+    saveScreenshot(&mainWindow, "mainwindow.png", 4000); // give it more time
 
     // TrendingWindow
     TrendingWindow trendingWindow(&mockClient);
-    trendingWindow.resize(900, 700);
-    // Inject mock network manager
+    trendingWindow.resize(1200, 800);
     QNetworkAccessManager *oldNetManager = trendingWindow.m_netManager;
     trendingWindow.m_netManager = new MockNetworkAccessManager(&trendingWindow);
     if (oldNetManager) oldNetManager->deleteLater();
@@ -62,20 +64,22 @@ int main(int argc, char *argv[]) {
 
     // RepoListWindow
     RepoListWindow repoListWindow(&mockClient);
-    repoListWindow.resize(900, 700);
+    repoListWindow.resize(1200, 800);
+    // Needs user repos injected directly as we use GitHubClient
     repoListWindow.show();
-    saveScreenshot(&repoListWindow, "repolistwindow.png");
+    mockClient.fetchUserRepos(""); // Actually fetches mock repos!
+    saveScreenshot(&repoListWindow, "repolistwindow.png", 4000);
 
     // WorkItemWindow
     WorkItemWindow workItemWindow(&mockClient, "Open Issues", WorkItemWindow::EndpointIssues, "is:open is:issue");
-    workItemWindow.resize(900, 700);
+    workItemWindow.resize(1200, 800);
     QNetworkAccessManager *oldWorkManager = workItemWindow.m_manager;
     workItemWindow.m_manager = new MockNetworkAccessManager(&workItemWindow);
     if (oldWorkManager) oldWorkManager->deleteLater();
     QObject::connect(workItemWindow.m_manager, &QNetworkAccessManager::finished, &workItemWindow, &WorkItemWindow::onReplyFinished);
     workItemWindow.loadData(1);
     workItemWindow.show();
-    saveScreenshot(&workItemWindow, "workitemwindow.png");
+    saveScreenshot(&workItemWindow, "workitemwindow.png", 4000);
 
     // We need dummy notifications for the detail windows
     Notification dummyPRNotification;
@@ -93,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     // PullRequestWindow
     PullRequestWindow prWindow(dummyPRNotification, &mockClient);
-    prWindow.resize(900, 700);
+    prWindow.resize(1200, 800);
     QNetworkAccessManager *oldPrManager = prWindow.m_manager;
     prWindow.m_manager = new MockNetworkAccessManager(&prWindow);
     if (oldPrManager) oldPrManager->deleteLater();
@@ -107,7 +111,7 @@ int main(int argc, char *argv[]) {
 
     // ActionWindow
     ActionWindow actionWindow(dummyActionNotification, &mockClient);
-    actionWindow.resize(900, 700);
+    actionWindow.resize(1200, 800);
     QNetworkAccessManager *oldActManager = actionWindow.m_manager;
     actionWindow.m_manager = new MockNetworkAccessManager(&actionWindow);
     if (oldActManager) oldActManager->deleteLater();
