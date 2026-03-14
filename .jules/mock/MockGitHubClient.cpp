@@ -70,7 +70,65 @@ void MockGitHubClient::checkNotifications() {
         n4["unread"] = false;
         mockNotifications.append(Notification::fromJson(n4));
 
+
+        QJsonObject n5;
+        n5["id"] = "5";
+        QJsonObject s5;
+        s5["title"] = "Please review: Dark mode UI";
+        s5["type"] = "PullRequest";
+        s5["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/pulls/22";
+        n5["subject"] = s5;
+        QJsonObject r5;
+        r5["full_name"] = "arran4/Kgithub-notify";
+        n5["repository"] = r5;
+        n5["updated_at"] = QDateTime::currentDateTime().addSecs(-3600*2).toString(Qt::ISODate);
+        n5["unread"] = true;
+        mockNotifications.append(Notification::fromJson(n5));
+
+        QJsonObject n6;
+        n6["id"] = "6";
+        QJsonObject s6;
+        s6["title"] = "Bug: Tray icon missing on Wayland";
+        s6["type"] = "Issue";
+        s6["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/issues/23";
+        n6["subject"] = s6;
+        QJsonObject r6;
+        r6["full_name"] = "arran4/Kgithub-notify";
+        n6["repository"] = r6;
+        n6["updated_at"] = QDateTime::currentDateTime().addSecs(-3600*5).toString(Qt::ISODate);
+        n6["unread"] = true;
+        mockNotifications.append(Notification::fromJson(n6));
+
+        QJsonObject n7;
+        n7["id"] = "7";
+        QJsonObject s7;
+        s7["title"] = "Update dependencies for v0.2.0";
+        s7["type"] = "PullRequest";
+        s7["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/pulls/24";
+        n7["subject"] = s7;
+        QJsonObject r7;
+        r7["full_name"] = "arran4/Kgithub-notify";
+        n7["repository"] = r7;
+        n7["updated_at"] = QDateTime::currentDateTime().addSecs(-3600*24).toString(Qt::ISODate);
+        n7["unread"] = false;
+        mockNotifications.append(Notification::fromJson(n7));
+
+        QJsonObject n8;
+        n8["id"] = "8";
+        QJsonObject s8;
+        s8["title"] = "Release v0.1.2 pipeline success";
+        s8["type"] = "CheckSuite";
+        s8["url"] = "https://api.github.com/repos/arran4/Kgithub-notify/actions/runs/43";
+        n8["subject"] = s8;
+        QJsonObject r8;
+        r8["full_name"] = "arran4/Kgithub-notify";
+        n8["repository"] = r8;
+        n8["updated_at"] = QDateTime::currentDateTime().addSecs(-3600*48).toString(Qt::ISODate);
+        n8["unread"] = false;
+        mockNotifications.append(Notification::fromJson(n8));
+
         emit notificationsReceived(mockNotifications, false, false);
+
     });
 }
 
@@ -230,7 +288,30 @@ void MockGitHubClient::fetchUserRepos(const QString &pageUrl) {
         repo3["stargazers_count"] = 3;
         repos.append(repo3);
 
+
+        QJsonObject repo4;
+        repo4["full_name"] = "kde/kcoreaddons";
+        repo4["html_url"] = "https://github.com/kde/kcoreaddons";
+        repo4["description"] = "Addons to QtCore";
+        repo4["stargazers_count"] = 502;
+        repos.append(repo4);
+
+        QJsonObject repo5;
+        repo5["full_name"] = "qt/qtbase";
+        repo5["html_url"] = "https://github.com/qt/qtbase";
+        repo5["description"] = "Qt Base (Core, Gui, Widgets, Network, ...)";
+        repo5["stargazers_count"] = 8045;
+        repos.append(repo5);
+
+        QJsonObject repo6;
+        repo6["full_name"] = "arran4/go-ical";
+        repo6["html_url"] = "https://github.com/arran4/go-ical";
+        repo6["description"] = "A an icalendar library for golang";
+        repo6["stargazers_count"] = 2300;
+        repos.append(repo6);
+
         emit userReposReceived(repos, "");
+
     });
 }
 

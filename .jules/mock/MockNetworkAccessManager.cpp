@@ -44,17 +44,54 @@ QNetworkReply *MockNetworkAccessManager::createRequest(Operation op, const QNetw
     if (urlStr.contains("/search/issues") || urlStr.contains("/search/repositories")) {
         // Handled by requestRaw in our earlier mock but just in case
         QJsonObject root;
-        root["total_count"] = 1;
+        root["total_count"] = 5;
         QJsonArray items;
-        QJsonObject item;
-        item["title"] = "Mock Item from intercepted request";
-        item["html_url"] = "https://github.com/mock/mock/issues/1";
-        item["created_at"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-        item["state"] = "open";
-        QJsonObject user;
-        user["login"] = "intercept_mock";
-        item["user"] = user;
-        items.append(item);
+
+        QJsonObject item1;
+        item1["title"] = "Bug: System tray icon is blank on Gnome Shell";
+        item1["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/31";
+        item1["created_at"] = QDateTime::currentDateTime().addDays(-2).toString(Qt::ISODate);
+        item1["state"] = "open";
+        QJsonObject user1; user1["login"] = "gnome_user"; item1["user"] = user1;
+        item1["comments"] = 3;
+        items.append(item1);
+
+        QJsonObject item2;
+        item2["title"] = "Feature request: Add multi-account support";
+        item2["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/28";
+        item2["created_at"] = QDateTime::currentDateTime().addDays(-5).toString(Qt::ISODate);
+        item2["state"] = "open";
+        QJsonObject user2; user2["login"] = "power_user"; item2["user"] = user2;
+        item2["comments"] = 12;
+        items.append(item2);
+
+        QJsonObject item3;
+        item3["title"] = "Crash when network reconnects";
+        item3["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/25";
+        item3["created_at"] = QDateTime::currentDateTime().addDays(-7).toString(Qt::ISODate);
+        item3["state"] = "open";
+        QJsonObject user3; user3["login"] = "laptop_dev"; item3["user"] = user3;
+        item3["comments"] = 1;
+        items.append(item3);
+
+        QJsonObject item4;
+        item4["title"] = "API Rate limit exceeded error not handled gracefully";
+        item4["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/20";
+        item4["created_at"] = QDateTime::currentDateTime().addDays(-14).toString(Qt::ISODate);
+        item4["state"] = "open";
+        QJsonObject user4; user4["login"] = "api_consumer"; item4["user"] = user4;
+        item4["comments"] = 0;
+        items.append(item4);
+
+        QJsonObject item5;
+        item5["title"] = "Update translation files";
+        item5["html_url"] = "https://github.com/arran4/Kgithub-notify/issues/15";
+        item5["created_at"] = QDateTime::currentDateTime().addDays(-30).toString(Qt::ISODate);
+        item5["state"] = "open";
+        QJsonObject user5; user5["login"] = "translator"; item5["user"] = user5;
+        item5["comments"] = 5;
+        items.append(item5);
+
         root["items"] = items;
         responseData = QJsonDocument(root).toJson();
     }
