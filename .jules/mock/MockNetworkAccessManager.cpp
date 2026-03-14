@@ -12,11 +12,10 @@ MockReply::MockReply(QObject *parent, const QByteArray &data, const QNetworkRequ
     setOperation(QNetworkAccessManager::GetOperation);
     open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
-    QTimer::singleShot(100, this, [this]() {
+
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
         emit readyRead();
         emit finished();
-    });
 }
 
 MockReply::~MockReply() {}

@@ -11,7 +11,7 @@ MockGitHubClient::MockGitHubClient(QObject *parent) : GitHubClient(parent) {
 
 void MockGitHubClient::checkNotifications() {
     emit loadingStarted();
-    QTimer::singleShot(100, this, [this]() {
+
         QList<Notification> mockNotifications;
 
         QJsonObject n1;
@@ -129,18 +129,16 @@ void MockGitHubClient::checkNotifications() {
 
         emit notificationsReceived(mockNotifications, false, false);
 
-    });
-}
+    }
 
 void MockGitHubClient::loadMore() {
     // Mock no more data
 }
 
 void MockGitHubClient::verifyToken() {
-    QTimer::singleShot(100, this, [this]() {
+
         emit tokenVerified(true, "Mock user");
-    });
-}
+    }
 
 void MockGitHubClient::markAsRead(const QString &id) {
     Q_UNUSED(id);
@@ -155,24 +153,22 @@ void MockGitHubClient::markAsReadAndDone(const QString &id) {
 }
 
 void MockGitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
-    QTimer::singleShot(100, this, [this, notificationId]() {
+
         emit detailsReceived(notificationId, "mock_author", "https://github.com/identicons/mock.png", "https://github.com/arran4/Kgithub-notify/pull/10");
-    });
-}
+    }
 
 void MockGitHubClient::fetchImage(const QString &imageUrl, const QString &notificationId) {
     Q_UNUSED(imageUrl);
-    QTimer::singleShot(100, this, [this, notificationId]() {
+
         QPixmap pm(32, 32);
         pm.fill(Qt::blue);
         emit imageReceived(notificationId, pm);
-    });
-}
+    }
 
 void MockGitHubClient::requestRaw(const QString &endpoint, const QString &method, const QByteArray &body) {
     Q_UNUSED(method);
     Q_UNUSED(body);
-    QTimer::singleShot(100, this, [this, endpoint]() {
+
         QJsonArray items;
         if (endpoint.contains("search/repositories")) { // Trending window uses search/repositories
             QJsonObject repo1;
@@ -259,12 +255,11 @@ void MockGitHubClient::requestRaw(const QString &endpoint, const QString &method
 
         QJsonDocument doc(root);
         emit rawDataReceived(doc.toJson());
-    });
-}
+    }
 
 void MockGitHubClient::fetchUserRepos(const QString &pageUrl) {
     Q_UNUSED(pageUrl);
-    QTimer::singleShot(100, this, [this]() {
+
         QJsonArray repos;
 
         QJsonObject repo1;
@@ -312,8 +307,7 @@ void MockGitHubClient::fetchUserRepos(const QString &pageUrl) {
 
         emit userReposReceived(repos, "");
 
-    });
-}
+    }
 
 QNetworkRequest MockGitHubClient::createAuthenticatedRequest(const QUrl &url) const {
     // In the mock, we don't want real requests.
