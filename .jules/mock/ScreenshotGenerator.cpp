@@ -50,7 +50,11 @@ int main(int argc, char *argv[]) {
     mainWindow.setClient(&mockClient);
     mainWindow.show();
     mockClient.checkNotifications(); // Populate mock notifications
-    saveScreenshot(&mainWindow, "mainwindow.png", 4000); // give it more time
+
+    // Process events to let the QTimer fire
+    QApplication::processEvents();
+
+    saveScreenshot(&mainWindow, "mainwindow.png", 5000); // give it more time
 
     // TrendingWindow
     TrendingWindow trendingWindow(&mockClient);
@@ -107,7 +111,7 @@ int main(int argc, char *argv[]) {
     prWindow.fetchCommits();
     prWindow.fetchFiles();
     prWindow.show();
-    saveScreenshot(&prWindow, "pullrequestwindow.png");
+    saveScreenshot(&prWindow, "pullrequestwindow.png", 4000);
 
     // ActionWindow
     ActionWindow actionWindow(dummyActionNotification, &mockClient);
@@ -118,7 +122,7 @@ int main(int argc, char *argv[]) {
     actionWindow.fetchRunDetails();
     actionWindow.fetchJobs();
     actionWindow.show();
-    saveScreenshot(&actionWindow, "actionwindow.png");
+    saveScreenshot(&actionWindow, "actionwindow.png", 4000);
 
     qDebug() << "All screenshots generated successfully.";
 
