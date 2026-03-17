@@ -8,8 +8,13 @@
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QScrollBar>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QTextEdit>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -837,9 +842,30 @@ void NotificationListWidget::resetLoadMoreState() {
 
 void NotificationListWidget::loadKnownNotifications() {
     if (SettingsDialog::getNotifyOnce()) {
-        QSettings settings;
-        QStringList list = settings.value("knownNotifications").toStringList();
-        knownNotificationIds = QSet<QString>(list.begin(), list.end());
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QFile file(path + "/known_notifications.json");
+
+        if (file.open(QIODevice::ReadOnly)) {
+            QByteArray data = file.readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isArray()) {
+                QJsonArray array = doc.array();
+                for (const QJsonValue &val : array) {
+                    knownNotificationIds.insert(val.toString());
+                }
+            }
+            file.close();
+        } else {
+            // Fallback to reading from QSettings if the file doesn't exist yet
+            // This ensures a smooth migration for users who already updated
+            QSettings settings;
+            if (settings.contains("knownNotifications")) {
+                QStringList list = settings.value("knownNotifications").toStringList();
+                knownNotificationIds = QSet<QString>(list.begin(), list.end());
+                // Clean up old settings
+                settings.remove("knownNotifications");
+            }
+        }
     } else {
         knownNotificationIds.clear();
     }
@@ -847,12 +873,28 @@ void NotificationListWidget::loadKnownNotifications() {
 
 void NotificationListWidget::saveKnownNotifications() {
     if (SettingsDialog::getNotifyOnce()) {
-        QSettings settings;
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir dir(path);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+
         QStringList list = knownNotificationIds.values();
         // Limit to last 5000 to prevent infinite growth
         if (list.size() > 5000) {
             list = list.mid(list.size() - 5000);
         }
-        settings.setValue("knownNotifications", list);
+
+        QJsonArray array;
+        for (const QString &id : list) {
+            array.append(id);
+        }
+
+        QJsonDocument doc(array);
+        QFile file(path + "/known_notifications.json");
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(doc.toJson());
+            file.close();
+        }
     }
 }
