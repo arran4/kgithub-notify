@@ -845,36 +845,6 @@ void NotificationListWidget::loadKnownNotifications() {
             for (const QString &file : files) {
                 knownNotificationIds.insert(file);
             }
-        } else {
-            // Fallback to reading from QSettings if the directory doesn't exist yet
-            QSettings settings;
-            if (settings.contains("knownNotifications")) {
-                QStringList list = settings.value("knownNotifications").toStringList();
-                for (const QString &id : list) {
-                    knownNotificationIds.insert(id);
-                    addKnownNotification(id);
-                }
-                // Clean up old settings
-                settings.remove("knownNotifications");
-            }
-
-            // Fallback to old JSON file
-            QString oldPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications.json";
-            QFile oldFile(oldPath);
-            if (oldFile.open(QIODevice::ReadOnly)) {
-                QByteArray data = oldFile.readAll();
-                QJsonDocument doc = QJsonDocument::fromJson(data);
-                if (doc.isArray()) {
-                    QJsonArray array = doc.array();
-                    for (const QJsonValue &val : array) {
-                        QString id = val.toString();
-                        knownNotificationIds.insert(id);
-                        addKnownNotification(id);
-                    }
-                }
-                oldFile.close();
-                oldFile.remove();
-            }
         }
     } else {
         knownNotificationIds.clear();
