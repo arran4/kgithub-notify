@@ -530,68 +530,14 @@ void MainWindow::updateTrayMenu() {
 
     trayIconMenu->addSeparator();
 
-    int unreadCount = m_lastUnreadCount;
-    QList<Notification> unreadNotifications =
-        notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
-
-    if (unreadCount > 0) {
-        QAction *header = new QAction(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
-        header->setEnabled(false);
-        trayIconMenu->addAction(header);
-
-        int limit = qMin(unreadNotifications.size(), 5);
-        for (int i = 0; i < limit; ++i) {
-            const Notification &n = unreadNotifications[i];
-            QString label = QString("%1: %2").arg(n.repository, n.title);
-
-            QAction *itemAction = new QAction(label, trayIconMenu);
-            QString id = n.id;
-            QString url = n.url;
-
-            connect(itemAction, &QAction::triggered, [this, url, id]() {
-                if (client) client->markAsRead(id);
-                QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
-                QDesktopServices::openUrl(QUrl(htmlUrl));
-
-                if (notificationListWidget) notificationListWidget->focusNotification(id);
-            });
-            trayIconMenu->addAction(itemAction);
-        }
-
-        trayIconMenu->addSeparator();
-
-        QAction *dismissAllAction = new QAction(tr("Dismiss All"), trayIconMenu);
-        connect(dismissAllAction, &QAction::triggered, this, &MainWindow::dismissAllNotifications);
-        trayIconMenu->addAction(dismissAllAction);
-    } else {
-        QAction *empty = new QAction(tr("No new notifications"), trayIconMenu);
-        empty->setEnabled(false);
-        trayIconMenu->addAction(empty);
-    }
-
-    trayIconMenu->addSeparator();
-
     QAction *trayRefreshAction =
         new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), trayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     trayIconMenu->addAction(trayRefreshAction);
 
-    QAction *settingsAction =
-        new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("Settings"), trayIconMenu);
-    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
-    trayIconMenu->addAction(settingsAction);
-
-
     QAction *newIssueTrayAction = new QAction(tr("New Issue..."), trayIconMenu);
     connect(newIssueTrayAction, &QAction::triggered, this, &MainWindow::showNewIssueDialog);
     trayIconMenu->addAction(newIssueTrayAction);
-
-    trayIconMenu->addSeparator();
-
-    QAction *notificationSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
-                                                      tr("Configure Notifications"), trayIconMenu);
-    connect(notificationSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
-    trayIconMenu->addAction(notificationSettingsAction);
 
     trayIconMenu->addSeparator();
 
