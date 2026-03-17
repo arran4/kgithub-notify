@@ -143,7 +143,6 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     int unreadCount = 0;
     int newNotifications = 0;
     QList<Notification> newlyAddedNotifications;
-    bool addedNew = false;
 
     for (const Notification &n : notifications) {
         if (n.unread) {
@@ -152,13 +151,9 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
                 newNotifications++;
                 knownNotificationIds.insert(n.id);
                 newlyAddedNotifications.append(n);
-                addedNew = true;
+                addKnownNotification(n.id);
             }
         }
-    }
-
-    if (addedNew) {
-        saveKnownNotifications();
     }
 
     // Calculate total unread from m_allNotifications
@@ -702,7 +697,7 @@ void NotificationListWidget::dismissCurrentItem() {
 
     emit markAsDone(id);
     knownNotificationIds.remove(id);
-    saveKnownNotifications();
+    removeKnownNotification(id);
 
     delete listWidget->takeItem(listWidget->row(item));
 }
@@ -802,7 +797,7 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
                     } else if (actionName == "markAsDone") {
                         emit markAsDone(id);
                         knownNotificationIds.remove(id);
-                        saveKnownNotifications();
+                        removeKnownNotification(id);
                     }
                 }
             });
@@ -842,28 +837,43 @@ void NotificationListWidget::resetLoadMoreState() {
 
 void NotificationListWidget::loadKnownNotifications() {
     if (SettingsDialog::getNotifyOnce()) {
-        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        QFile file(path + "/known_notifications.json");
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
+        QDir dir(path);
 
-        if (file.open(QIODevice::ReadOnly)) {
-            QByteArray data = file.readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isArray()) {
-                QJsonArray array = doc.array();
-                for (const QJsonValue &val : array) {
-                    knownNotificationIds.insert(val.toString());
-                }
+        if (dir.exists()) {
+            QStringList files = dir.entryList(QDir::Files);
+            for (const QString &file : files) {
+                knownNotificationIds.insert(file);
             }
-            file.close();
         } else {
-            // Fallback to reading from QSettings if the file doesn't exist yet
-            // This ensures a smooth migration for users who already updated
+            // Fallback to reading from QSettings if the directory doesn't exist yet
             QSettings settings;
             if (settings.contains("knownNotifications")) {
                 QStringList list = settings.value("knownNotifications").toStringList();
-                knownNotificationIds = QSet<QString>(list.begin(), list.end());
+                for (const QString &id : list) {
+                    knownNotificationIds.insert(id);
+                    addKnownNotification(id);
+                }
                 // Clean up old settings
                 settings.remove("knownNotifications");
+            }
+
+            // Fallback to old JSON file
+            QString oldPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications.json";
+            QFile oldFile(oldPath);
+            if (oldFile.open(QIODevice::ReadOnly)) {
+                QByteArray data = oldFile.readAll();
+                QJsonDocument doc = QJsonDocument::fromJson(data);
+                if (doc.isArray()) {
+                    QJsonArray array = doc.array();
+                    for (const QJsonValue &val : array) {
+                        QString id = val.toString();
+                        knownNotificationIds.insert(id);
+                        addKnownNotification(id);
+                    }
+                }
+                oldFile.close();
+                oldFile.remove();
             }
         }
     } else {
@@ -871,30 +881,30 @@ void NotificationListWidget::loadKnownNotifications() {
     }
 }
 
-void NotificationListWidget::saveKnownNotifications() {
-    if (SettingsDialog::getNotifyOnce()) {
-        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+void NotificationListWidget::addKnownNotification(const QString &id) {
+    if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
         QDir dir(path);
         if (!dir.exists()) {
             dir.mkpath(".");
         }
 
-        QStringList list = knownNotificationIds.values();
-        // Limit to last 5000 to prevent infinite growth
-        if (list.size() > 5000) {
-            list = list.mid(list.size() - 5000);
-        }
-
-        QJsonArray array;
-        for (const QString &id : list) {
-            array.append(id);
-        }
-
-        QJsonDocument doc(array);
-        QFile file(path + "/known_notifications.json");
+        QFile file(path + "/" + id);
         if (file.open(QIODevice::WriteOnly)) {
-            file.write(doc.toJson());
+            // Store timestamp as file content just in case it's needed later
+            QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
+            file.write(timestamp.toUtf8());
             file.close();
+        }
+    }
+}
+
+void NotificationListWidget::removeKnownNotification(const QString &id) {
+    if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
+        QFile file(path + "/" + id);
+        if (file.exists()) {
+            file.remove();
         }
     }
 }
