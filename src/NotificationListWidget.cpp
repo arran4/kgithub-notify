@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QSettings>
 #include <QTextEdit>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -17,6 +18,7 @@
 #include "GitHubClient.h"
 #include "NotificationItemWidget.h"
 #include "NotificationWindow.h"
+#include "SettingsDialog.h"
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
@@ -25,6 +27,8 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
       m_sortMode(SortDefault),
       m_hasMore(false),
       m_client(nullptr) {
+    loadKnownNotifications();
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -134,6 +138,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     int unreadCount = 0;
     int newNotifications = 0;
     QList<Notification> newlyAddedNotifications;
+    bool addedNew = false;
 
     for (const Notification &n : notifications) {
         if (n.unread) {
@@ -142,8 +147,13 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
                 newNotifications++;
                 knownNotificationIds.insert(n.id);
                 newlyAddedNotifications.append(n);
+                addedNew = true;
             }
         }
+    }
+
+    if (addedNew) {
+        saveKnownNotifications();
     }
 
     // Calculate total unread from m_allNotifications
@@ -687,6 +697,7 @@ void NotificationListWidget::dismissCurrentItem() {
 
     emit markAsDone(id);
     knownNotificationIds.remove(id);
+    saveKnownNotifications();
 
     delete listWidget->takeItem(listWidget->row(item));
 }
@@ -786,6 +797,7 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
                     } else if (actionName == "markAsDone") {
                         emit markAsDone(id);
                         knownNotificationIds.remove(id);
+                        saveKnownNotifications();
                     }
                 }
             });
@@ -820,5 +832,27 @@ void NotificationListWidget::resetLoadMoreState() {
     if (btn) {
         btn->setEnabled(true);
         btn->setText(tr("Retry Load More"));
+    }
+}
+
+void NotificationListWidget::loadKnownNotifications() {
+    if (SettingsDialog::getNotifyOnce()) {
+        QSettings settings;
+        QStringList list = settings.value("knownNotifications").toStringList();
+        knownNotificationIds = QSet<QString>(list.begin(), list.end());
+    } else {
+        knownNotificationIds.clear();
+    }
+}
+
+void NotificationListWidget::saveKnownNotifications() {
+    if (SettingsDialog::getNotifyOnce()) {
+        QSettings settings;
+        QStringList list = knownNotificationIds.values();
+        // Limit to last 5000 to prevent infinite growth
+        if (list.size() > 5000) {
+            list = list.mid(list.size() - 5000);
+        }
+        settings.setValue("knownNotifications", list);
     }
 }
