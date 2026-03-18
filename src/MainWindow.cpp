@@ -530,6 +530,53 @@ void MainWindow::updateTrayMenu() {
 
     trayIconMenu->addSeparator();
 
+    int unreadCount = m_lastUnreadCount;
+    QList<Notification> unreadNotifications =
+        notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
+
+    if (unreadCount > 0) {
+        QMenu *unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
+        trayIconMenu->addMenu(unreadMenu);
+
+        int limit = qMin(unreadNotifications.size(), 5);
+        for (int i = 0; i < limit; ++i) {
+            const Notification &n = unreadNotifications[i];
+            QString label = QString("%1: %2").arg(n.repository, n.title);
+
+            QAction *itemAction = new QAction(label, unreadMenu);
+            QString id = n.id;
+            QString url = n.url;
+
+            connect(itemAction, &QAction::triggered, [this, url, id]() {
+                if (client) client->markAsRead(id);
+                QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
+                QDesktopServices::openUrl(QUrl(htmlUrl));
+
+                if (notificationListWidget) notificationListWidget->focusNotification(id);
+            });
+            unreadMenu->addAction(itemAction);
+        }
+
+        unreadMenu->addSeparator();
+
+        QAction *dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
+        connect(dismissAllAction, &QAction::triggered, this, [this]() {
+            QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Dismiss All"),
+                                                                      tr("Are you sure you want to dismiss all unread notifications?"),
+                                                                      QMessageBox::Yes | QMessageBox::No);
+            if (reply == QMessageBox::Yes) {
+                this->dismissAllNotifications();
+            }
+        });
+        unreadMenu->addAction(dismissAllAction);
+    } else {
+        QAction *empty = new QAction(tr("No new notifications"), trayIconMenu);
+        empty->setEnabled(false);
+        trayIconMenu->addAction(empty);
+    }
+
+    trayIconMenu->addSeparator();
+
     QAction *trayRefreshAction =
         new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), trayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
