@@ -120,6 +120,20 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     }
     layout->addWidget(notificationDelayCombo);
 
+    QLabel *trayUnreadLimitLabel = new QLabel("Max unread notifications in tray:", this);
+    layout->addWidget(trayUnreadLimitLabel);
+
+    trayUnreadLimitCombo = new QComboBox(this);
+    trayUnreadLimitCombo->addItems({"0", "3", "5", "10", "20"});
+    int currentTrayLimit = getTrayUnreadLimit();
+    index = trayUnreadLimitCombo->findText(QString::number(currentTrayLimit));
+    if (index >= 0) {
+        trayUnreadLimitCombo->setCurrentIndex(index);
+    } else {
+        trayUnreadLimitCombo->setCurrentText("5");
+    }
+    layout->addWidget(trayUnreadLimitCombo);
+
     // Startup
     autostartCheckBox = new QCheckBox("Run on startup", this);
     startMinimizedCheckBox = new QCheckBox("Start minimized (tray only)", this);
@@ -176,6 +190,7 @@ void SettingsDialog::saveSettings() {
     settings.setValue("dataOption", dataOptionCombo->currentData().toInt());
     settings.setValue("summaryThreshold", summaryThresholdCombo->currentText().toInt());
     settings.setValue("notificationDelayMs", notificationDelayCombo->currentText().toInt());
+    settings.setValue("trayUnreadLimit", trayUnreadLimitCombo->currentText().toInt());
 
     updateAutostartEntry();
 
@@ -242,6 +257,11 @@ int SettingsDialog::getSummaryThreshold() {
 int SettingsDialog::getNotificationDelayMs() {
     QSettings settings;
     return settings.value("notificationDelayMs", 1000).toInt();
+}
+
+int SettingsDialog::getTrayUnreadLimit() {
+    QSettings settings;
+    return settings.value("trayUnreadLimit", 5).toInt();
 }
 
 void SettingsDialog::onTestClicked() {

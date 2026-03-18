@@ -538,7 +538,7 @@ void MainWindow::updateTrayMenu() {
         QMenu *unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
         trayIconMenu->addMenu(unreadMenu);
 
-        int limit = qMin(unreadNotifications.size(), 5);
+        int limit = qMin(static_cast<int>(unreadNotifications.size()), SettingsDialog::getTrayUnreadLimit());
         for (int i = 0; i < limit; ++i) {
             const Notification &n = unreadNotifications[i];
             QString label = QString("%1: %2").arg(n.repository, n.title);
