@@ -1,5 +1,4 @@
 #include "RepoListWindow.h"
-#include "NewIssueDialog.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -25,6 +24,8 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QtGui/QAction>
+
+#include "NewIssueDialog.h"
 
 RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
     : KXmlGuiWindow(parent),
@@ -269,7 +270,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint &pos) {
         if (m_client) {
             NewIssueDialog *dialog = new NewIssueDialog(m_client, this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
-            QString repoName = QUrl(url).path().mid(1); // removes leading slash
+            QString repoName = QUrl(url).path().mid(1);  // removes leading slash
             dialog->setInitialRepo(repoName);
             dialog->show();
         }

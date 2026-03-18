@@ -30,13 +30,13 @@
 #include <limits>
 
 #include "DebugWindow.h"
+#include "NewIssueDialog.h"
 #include "NotificationItemWidget.h"
 #include "NotificationListWidget.h"
 #include "RepoListWindow.h"
 #include "SettingsDialog.h"
 #include "WorkItemWindow.h"
 #include "trending/TrendingWindow.h"
-#include "NewIssueDialog.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -561,9 +561,9 @@ void MainWindow::updateTrayMenu() {
 
         QAction *dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
         connect(dismissAllAction, &QAction::triggered, this, [this]() {
-            QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Dismiss All"),
-                                                                      tr("Are you sure you want to dismiss all unread notifications?"),
-                                                                      QMessageBox::Yes | QMessageBox::No);
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                this, tr("Dismiss All"), tr("Are you sure you want to dismiss all unread notifications?"),
+                QMessageBox::Yes | QMessageBox::No);
             if (reply == QMessageBox::Yes) {
                 this->dismissAllNotifications();
             }

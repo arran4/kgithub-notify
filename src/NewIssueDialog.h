@@ -6,9 +6,9 @@
 #include <QDialog>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QTextEdit>
 #include <QTimer>
-#include <QPushButton>
 
 #include "GitHubClient.h"
 
@@ -49,4 +49,4 @@ class NewIssueDialog : public QDialog {
     bool m_isFetchingRepos;
 };
 
-#endif // NEWISSUEDIALOG_H
+#endif  // NEWISSUEDIALOG_H
