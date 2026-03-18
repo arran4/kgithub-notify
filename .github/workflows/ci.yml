@@ -258,7 +258,7 @@ jobs:
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      run: cmake --build build --config Release --target kgithub-notify -j$(nproc)
+      run: cmake --build build --config Release -j$(nproc)
 
     - name: Test
       run: |
