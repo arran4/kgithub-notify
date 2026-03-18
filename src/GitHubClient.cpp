@@ -526,8 +526,8 @@ void GitHubClient::handleRepoVerifyReply(QNetworkReply *reply) {
     }
 }
 
-
-void GitHubClient::createIssue(const QString &repoFullName, const QString &title, const QString &body, const QString &assignee) {
+void GitHubClient::createIssue(const QString &repoFullName, const QString &title, const QString &body,
+                               const QString &assignee) {
     if (m_token.isEmpty()) return;
 
     QUrl url(m_apiUrl + "/repos/" + repoFullName + "/issues");

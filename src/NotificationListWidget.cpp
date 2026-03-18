@@ -4,14 +4,13 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QDialog>
-#include <QJsonDocument>
-#include <QListWidgetItem>
-#include <QPushButton>
-#include <QResizeEvent>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QListWidgetItem>
+#include <QPushButton>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
