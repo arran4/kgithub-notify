@@ -1,5 +1,4 @@
 #include "TrendingWindow.h"
-#include "../NewIssueDialog.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -22,6 +21,7 @@
 #include <QtGui/QAction>
 
 #include "../GitHubClient.h"
+#include "../NewIssueDialog.h"
 
 TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
@@ -152,7 +152,7 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
             if (m_client) {
                 NewIssueDialog *dialog = new NewIssueDialog(m_client, this);
                 dialog->setAttribute(Qt::WA_DeleteOnClose);
-                QString repoName = QUrl(url).path().mid(1); // removes leading slash
+                QString repoName = QUrl(url).path().mid(1);  // removes leading slash
                 dialog->setInitialRepo(repoName);
                 dialog->show();
             }

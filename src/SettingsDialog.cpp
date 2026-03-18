@@ -25,7 +25,11 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     QLabel *label = new QLabel("GitHub Personal Access Token:", this);
     layout->addWidget(label);
 
-    QLabel *helpLabel = new QLabel("<small>Classic PAT scopes: <code>repo</code>, <code>read:org</code>, <code>notifications</code>.<br>Fine-grained token: <code>Issues</code> & <code>Pull requests</code> (Read/Write), <code>Metadata</code> (Read).</small>", this);
+    QLabel *helpLabel = new QLabel(
+        "<small>Classic PAT scopes: <code>repo</code>, <code>read:org</code>, "
+        "<code>notifications</code>.<br>Fine-grained token: <code>Issues</code> & <code>Pull requests</code> "
+        "(Read/Write), <code>Metadata</code> (Read).</small>",
+        this);
     helpLabel->setTextFormat(Qt::RichText);
     helpLabel->setStyleSheet("color: gray;");
     layout->addWidget(helpLabel);

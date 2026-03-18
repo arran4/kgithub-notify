@@ -30,13 +30,13 @@
 #include <limits>
 
 #include "DebugWindow.h"
+#include "NewIssueDialog.h"
 #include "NotificationItemWidget.h"
 #include "NotificationListWidget.h"
 #include "RepoListWindow.h"
 #include "SettingsDialog.h"
 #include "WorkItemWindow.h"
 #include "trending/TrendingWindow.h"
-#include "NewIssueDialog.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -580,7 +580,6 @@ void MainWindow::updateTrayMenu() {
         new QAction(themedIcon({QStringLiteral("settings-configure")}), tr("Settings"), trayIconMenu);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
     trayIconMenu->addAction(settingsAction);
-
 
     QAction *newIssueTrayAction = new QAction(tr("New Issue..."), trayIconMenu);
     connect(newIssueTrayAction, &QAction::triggered, this, &MainWindow::showNewIssueDialog);

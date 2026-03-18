@@ -47,7 +47,7 @@ void NewIssueDialog::setupUI() {
     }
 
     m_repoComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_repoComboBox->setCurrentIndex(-1); // Start empty
+    m_repoComboBox->setCurrentIndex(-1);  // Start empty
     connect(m_repoComboBox, &QComboBox::currentTextChanged, this, &NewIssueDialog::onRepoTextChanged);
     repoLayout->addWidget(m_repoComboBox);
 
@@ -88,7 +88,7 @@ void NewIssueDialog::setupUI() {
     buttonLayout->addWidget(cancelButton);
 
     m_createButton = new QPushButton(tr("Create Issue"), this);
-    m_createButton->setEnabled(false); // Disabled until verified
+    m_createButton->setEnabled(false);  // Disabled until verified
     connect(m_createButton, &QPushButton::clicked, this, &NewIssueDialog::onCreateClicked);
     buttonLayout->addWidget(m_createButton);
 
@@ -119,7 +119,7 @@ void NewIssueDialog::loadCache() {
                 }
                 repoNames.sort();
                 m_repoComboBox->addItems(repoNames);
-                m_repoComboBox->setCurrentIndex(-1); // Empty by default
+                m_repoComboBox->setCurrentIndex(-1);  // Empty by default
             }
         }
     }
@@ -165,7 +165,7 @@ void NewIssueDialog::onRepoTextChanged(const QString &text) {
     m_statusLabel->setStyleSheet("color: gray;");
 
     m_currentVerifyRepo = text.trimmed();
-    m_verifyTimer->start(1000); // 1 second debounce
+    m_verifyTimer->start(1000);  // 1 second debounce
 }
 
 void NewIssueDialog::verifyRepo() {
@@ -235,13 +235,14 @@ void NewIssueDialog::onIssueCreated(const QByteArray &data) {
         }
 
         if (errMsg.contains("Not Found") || errMsg.contains("404")) {
-            errMsg += "\n\n(Hint: Ensure the repository exists, has Issues enabled, and your Personal Access Token has the 'repo', 'public_repo', or 'repo:status' scope depending on repository visibility.)";
+            errMsg +=
+                "\n\n(Hint: Ensure the repository exists, has Issues enabled, and your Personal Access Token has the "
+                "'repo', 'public_repo', or 'repo:status' scope depending on repository visibility.)";
         }
         m_statusLabel->setText(errMsg);
         m_statusLabel->setStyleSheet("color: red;");
         m_createButton->setEnabled(true);
     }
-
 }
 
 void NewIssueDialog::onRefreshClicked() {
@@ -282,7 +283,9 @@ void NewIssueDialog::onErrorOccurred(const QString &error) {
     m_createButton->setEnabled(true);
     QString errMsg = tr("Error: %1").arg(error);
     if (error.contains("404") || error.contains("Not Found")) {
-        errMsg += "\n\n(Hint: Ensure the repository exists, has Issues enabled, and your Personal Access Token has the 'repo', 'public_repo', or 'repo:status' scope depending on repository visibility.)";
+        errMsg +=
+            "\n\n(Hint: Ensure the repository exists, has Issues enabled, and your Personal Access Token has the "
+            "'repo', 'public_repo', or 'repo:status' scope depending on repository visibility.)";
     }
     m_statusLabel->setText(errMsg);
     m_statusLabel->setStyleSheet("color: red;");
