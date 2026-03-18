@@ -8,7 +8,13 @@
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QScrollBar>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QTextEdit>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -17,6 +23,7 @@
 #include "GitHubClient.h"
 #include "NotificationItemWidget.h"
 #include "NotificationWindow.h"
+#include "SettingsDialog.h"
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
     : QWidget(parent),
@@ -25,6 +32,8 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
       m_sortMode(SortDefault),
       m_hasMore(false),
       m_client(nullptr) {
+    loadKnownNotifications();
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -142,6 +151,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
                 newNotifications++;
                 knownNotificationIds.insert(n.id);
                 newlyAddedNotifications.append(n);
+                addKnownNotification(n.id);
             }
         }
     }
@@ -687,6 +697,7 @@ void NotificationListWidget::dismissCurrentItem() {
 
     emit markAsDone(id);
     knownNotificationIds.remove(id);
+    removeKnownNotification(id);
 
     delete listWidget->takeItem(listWidget->row(item));
 }
@@ -786,6 +797,7 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
                     } else if (actionName == "markAsDone") {
                         emit markAsDone(id);
                         knownNotificationIds.remove(id);
+                        removeKnownNotification(id);
                     }
                 }
             });
@@ -820,5 +832,49 @@ void NotificationListWidget::resetLoadMoreState() {
     if (btn) {
         btn->setEnabled(true);
         btn->setText(tr("Retry Load More"));
+    }
+}
+
+void NotificationListWidget::loadKnownNotifications() {
+    if (SettingsDialog::getNotifyOnce()) {
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
+        QDir dir(path);
+
+        if (dir.exists()) {
+            QStringList files = dir.entryList(QDir::Files);
+            for (const QString &file : files) {
+                knownNotificationIds.insert(file);
+            }
+        }
+    } else {
+        knownNotificationIds.clear();
+    }
+}
+
+void NotificationListWidget::addKnownNotification(const QString &id) {
+    if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
+        QDir dir(path);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+
+        QFile file(path + "/" + id);
+        if (file.open(QIODevice::WriteOnly)) {
+            // Store timestamp as file content just in case it's needed later
+            QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
+            file.write(timestamp.toUtf8());
+            file.close();
+        }
+    }
+}
+
+void NotificationListWidget::removeKnownNotification(const QString &id) {
+    if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
+        QFile file(path + "/" + id);
+        if (file.exists()) {
+            file.remove();
+        }
     }
 }

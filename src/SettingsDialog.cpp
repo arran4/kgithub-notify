@@ -141,6 +141,11 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(autostartCheckBox);
     layout->addWidget(startMinimizedCheckBox);
 
+    // Notify once
+    notifyOnceCheckBox = new QCheckBox("Notify only once per notification (persists across restarts)", this);
+    notifyOnceCheckBox->setChecked(getNotifyOnce());
+    layout->addWidget(notifyOnceCheckBox);
+
     // Notifications Service
     QLabel *serviceLabel = new QLabel("Notification Service:", this);
     layout->addWidget(serviceLabel);
@@ -191,6 +196,7 @@ void SettingsDialog::saveSettings() {
     settings.setValue("summaryThreshold", summaryThresholdCombo->currentText().toInt());
     settings.setValue("notificationDelayMs", notificationDelayCombo->currentText().toInt());
     settings.setValue("trayUnreadLimit", trayUnreadLimitCombo->currentText().toInt());
+    setNotifyOnce(notifyOnceCheckBox->isChecked());
 
     updateAutostartEntry();
 
@@ -262,6 +268,16 @@ int SettingsDialog::getNotificationDelayMs() {
 int SettingsDialog::getTrayUnreadLimit() {
     QSettings settings;
     return settings.value("trayUnreadLimit", 5).toInt();
+}
+
+bool SettingsDialog::getNotifyOnce() {
+    QSettings settings;
+    return settings.value("notifyOnce", true).toBool();
+}
+
+void SettingsDialog::setNotifyOnce(bool notify) {
+    QSettings settings;
+    settings.setValue("notifyOnce", notify);
 }
 
 void SettingsDialog::onTestClicked() {

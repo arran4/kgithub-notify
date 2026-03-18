@@ -129,8 +129,8 @@ jobs:
           echo "is_monthly=$is_monthly" >> "$GITHUB_OUTPUT"
           echo "is_nightly=$is_nightly" >> "$GITHUB_OUTPUT"
 
-  lint-and-fmt:
-    name: Lint & Format Check
+  lint-check:
+    name: Lint Check
     needs: route
     if: ${{ needs.route.outputs.run_code_checks == 'true' }}
     runs-on: ubuntu-latest
@@ -139,15 +139,27 @@ jobs:
       - name: Install Lint Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format cppcheck
-
-      - name: Run clang-format
-        run: |
-          find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
+          sudo apt-get install -y cppcheck
 
       - name: Run cppcheck
         run: |
           cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/
+
+  fmt-check:
+    name: Format Check
+    needs: route
+    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Format Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Run clang-format
+        run: |
+          find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
 
       - name: Check for changes
         env:
@@ -155,7 +167,7 @@ jobs:
         run: |
           if ! git diff --exit-code; then
             echo "clang-format found changes."
-            if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ inputs.mode }}" == "lint-fix" ]; then
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ inputs.mode }}" == "lint-fix" ] && [ "${{ inputs.allow_prs }}" == 'true' ]; then
               # Create PR if manually triggered for lint-fix
               git config --global user.email "actions@github.com"
               git config --global user.name "GitHub Actions"
@@ -165,6 +177,7 @@ jobs:
               git commit -m "fix: clang-format"
               git push origin $BRANCH_NAME
               gh pr create --title "fix: auto-linting" --body "Automated lint fixes triggered by workflow_dispatch" --base main --head $BRANCH_NAME
+              exit 1
             else
               # Fail if not manual fix request
               exit 1
@@ -173,7 +186,7 @@ jobs:
 
   bump-version:
     name: Bump Version
-    needs: [route, lint-and-fmt]
+    needs: [route, lint-check, fmt-check]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-') }}
     runs-on: ubuntu-latest
     outputs:
@@ -211,8 +224,8 @@ jobs:
 
   build-and-test:
     name: Build & Test on ${{ matrix.os }}
-    needs: [route, lint-and-fmt, bump-version]
-    if: ${{ always() && needs.route.outputs.run_code_checks == 'true' && needs.lint-and-fmt.result == 'success' && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped') }}
+    needs: [route, lint-check, fmt-check, bump-version]
+    if: ${{ always() && needs.route.outputs.run_code_checks == 'true' && needs.lint-check.result == 'success' && needs.fmt-check.result == 'success' && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped') && (github.event_name != 'workflow_dispatch' || inputs.mode != 'lint-fix') }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

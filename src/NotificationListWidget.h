@@ -109,6 +109,9 @@ class NotificationListWidget : public QWidget {
     QList<Notification> m_allNotifications;
     QMap<QString, NotificationDetails> detailsCache;
     QSet<QString> knownNotificationIds;
+    void loadKnownNotifications();
+    void addKnownNotification(const QString &id);
+    void removeKnownNotification(const QString &id);
     QListWidgetItem *loadMoreItem;
 
     // Filters
