@@ -24,6 +24,7 @@ class SettingsDialog : public QDialog {
     static GetDataOption getGetDataOption();
     static int getSummaryThreshold();
     static int getNotificationDelayMs();
+    static int getTrayUnreadLimit();
     static bool getNotifyOnce();
     static void setNotifyOnce(bool notify);
 
@@ -42,6 +43,7 @@ class SettingsDialog : public QDialog {
     QComboBox *dataOptionCombo;
     QComboBox *summaryThresholdCombo;
     QComboBox *notificationDelayCombo;
+    QComboBox *trayUnreadLimitCombo;
     QCheckBox *autostartCheckBox;
     QCheckBox *startMinimizedCheckBox;
     QCheckBox *notifyOnceCheckBox;
