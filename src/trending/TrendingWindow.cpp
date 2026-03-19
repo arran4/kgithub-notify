@@ -29,8 +29,9 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     resize(800, 600);  // make it a bit larger to fit columns
 
     QWidget *centralWidget = new QWidget(this);
-    setupGUI(Default, ":/kgithub-notifyui.rc");
+    setObjectName("TrendingWindow");
     setCentralWidget(centralWidget);
+    setupGUI(Default, ":/kgithub-notifyui.rc");
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 
     QHBoxLayout *topLayout = new QHBoxLayout();

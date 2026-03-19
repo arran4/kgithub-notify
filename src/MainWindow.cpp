@@ -733,6 +733,7 @@ void MainWindow::ensureWindowActive() {
 }
 
 void MainWindow::setupWindow() {
+    setObjectName("MainWindow");
     setWindowTitle(tr("Kgithub-notify"));
     setWindowIcon(QIcon(":/assets/icon.png"));
     resize(800, 600);
