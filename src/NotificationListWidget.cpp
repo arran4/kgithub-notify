@@ -766,7 +766,6 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
     Notification n = Notification::fromJson(json);
 
     NotificationWindow *win = new NotificationWindow(n, m_client, this);
-    win->setAttribute(Qt::WA_DeleteOnClose);
     connect(win, &NotificationWindow::debugApiRequested, this,
             [this](const QString &url) { emit requestDebugApi(url); });
 

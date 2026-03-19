@@ -224,12 +224,10 @@ void NotificationWindow::onViewRawJson() {
 
 void NotificationWindow::onViewPullRequest() {
     PullRequestWindow *win = new PullRequestWindow(m_notification, m_client, this);
-    win->setAttribute(Qt::WA_DeleteOnClose);
     win->show();
 }
 
 void NotificationWindow::onViewActionJob() {
     ActionWindow *win = new ActionWindow(m_notification, m_client, this);
-    win->setAttribute(Qt::WA_DeleteOnClose);
     win->show();
 }

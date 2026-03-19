@@ -67,6 +67,7 @@ MainWindow::MainWindow(QWidget *parent)
       pendingAuthError(false),
       authNotification(nullptr),
       m_lastUnreadCount(0) {
+    setAttribute(Qt::WA_DeleteOnClose, false);
     setupWindow();
     setupCentralWidget();
     setupNotificationList();
@@ -991,7 +992,6 @@ void MainWindow::showWorkItems(const QString &title, int endpointType, const QSt
     WorkItemWindow::EndpointType type =
         (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
     WorkItemWindow *window = new WorkItemWindow(client, title, type, query, this);
-    window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
 }
 
