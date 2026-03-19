@@ -58,8 +58,9 @@ void WorkItemWindow::setupUi() {
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &WorkItemWindow::onCustomContextMenuRequested);
     connect(m_table, &QTableWidget::itemDoubleClicked, this, &WorkItemWindow::onItemDoubleClicked);
 
-    setupGUI(Default, ":/kgithub-notifyui.rc");
+    setObjectName("WorkItemWindow");
     setCentralWidget(m_table);
+    setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Actions
     QAction *exportCsvAction = new QAction(tr("Export to CSV"), this);
