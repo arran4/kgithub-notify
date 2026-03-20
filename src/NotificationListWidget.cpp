@@ -97,6 +97,15 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         if (m_filterMode == 0 || m_filterMode == 1) {
             delete listWidget->takeItem(listWidget->row(item));
         }
+
+        for (int i = 0; i < m_allNotifications.count(); ++i) {
+            if (m_allNotifications[i].id == id) {
+                m_allNotifications[i].unread = false;
+                m_allNotifications[i].inInbox = false;
+                break;
+            }
+        }
+        emit countsChanged(m_allNotifications.count(), getUnreadNotifications(m_allNotifications.count()).count(), 0, QList<Notification>());
     });
     contextMenu->addAction(markAsReadAction);
 
@@ -233,8 +242,17 @@ void NotificationListWidget::dismissSelected() {
 
             // Remove item from list
             delete listWidget->takeItem(listWidget->row(item));
+
+                    for (int i = 0; i < m_allNotifications.count(); ++i) {
+                if (m_allNotifications[i].id == id) {
+                    m_allNotifications[i].unread = false;
+                    m_allNotifications[i].inInbox = false;
+                    break;
+                }
+            }
         }
     }
+    emit countsChanged(m_allNotifications.count(), getUnreadNotifications(m_allNotifications.count()).count(), 0, QList<Notification>());
 }
 
 void NotificationListWidget::openSelected() {
@@ -695,10 +713,17 @@ void NotificationListWidget::dismissCurrentItem() {
     item->setFont(font);
 
     emit markAsDone(id);
-    knownNotificationIds.remove(id);
-    removeKnownNotification(id);
 
     delete listWidget->takeItem(listWidget->row(item));
+
+    for (int i = 0; i < m_allNotifications.count(); ++i) {
+        if (m_allNotifications[i].id == id) {
+            m_allNotifications[i].unread = false;
+            m_allNotifications[i].inInbox = false;
+            break;
+        }
+    }
+    emit countsChanged(m_allNotifications.count(), getUnreadNotifications(m_allNotifications.count()).count(), 0, QList<Notification>());
 }
 
 void NotificationListWidget::openUrlCurrentItem() {
@@ -738,6 +763,15 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
     if (m_filterMode == 0 || m_filterMode == 1) {
         delete listWidget->takeItem(listWidget->row(item));
     }
+
+    for (int i = 0; i < m_allNotifications.count(); ++i) {
+        if (m_allNotifications[i].id == id) {
+            m_allNotifications[i].unread = false;
+            m_allNotifications[i].inInbox = false;
+            break;
+        }
+    }
+    emit countsChanged(m_allNotifications.count(), getUnreadNotifications(m_allNotifications.count()).count(), 0, QList<Notification>());
 }
 
 void NotificationListWidget::openUrlForItem(QListWidgetItem *item) {
@@ -795,9 +829,7 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
                         emit markAsRead(id);
                     } else if (actionName == "markAsDone") {
                         emit markAsDone(id);
-                        knownNotificationIds.remove(id);
-                        removeKnownNotification(id);
-                    }
+                                                    }
                 }
             });
 
