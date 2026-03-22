@@ -30,6 +30,8 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
       m_filterMode(0),
       m_sortMode(SortDefault),
       m_hasMore(false),
+      m_pendingNewNotifications(0),
+      m_countsDirty(false),
       m_client(nullptr) {
     loadKnownNotifications();
 
@@ -134,34 +136,33 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 void NotificationListWidget::setNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
     if (!append) {
         m_allNotifications = notifications;
+        m_pendingNewNotifications = 0;
+        m_pendingNewlyAddedNotifications.clear();
     } else {
         m_allNotifications.append(notifications);
     }
     m_hasMore = hasMore;
 
-    int unreadCount = 0;
-    int newNotifications = 0;
-    QList<Notification> newlyAddedNotifications;
-
     for (const Notification &n : notifications) {
         if (n.unread) {
-            unreadCount++;
             if (!knownNotificationIds.contains(n.id)) {
-                newNotifications++;
+                m_pendingNewNotifications++;
                 knownNotificationIds.insert(n.id);
-                newlyAddedNotifications.append(n);
+                m_pendingNewlyAddedNotifications.append(n);
                 addKnownNotification(n.id);
             }
         }
     }
 
-    // Calculate total unread from m_allNotifications
+    m_countsDirty = true;
+
+    // Emit progressively without triggering popups (newCount=0, empty list)
     int totalUnread = 0;
     for (const auto &n : m_allNotifications) {
         if (n.unread) totalUnread++;
     }
+    emit countsChanged(m_allNotifications.count(), totalUnread, 0, QList<Notification>());
 
-    emit countsChanged(m_allNotifications.count(), totalUnread, newNotifications, newlyAddedNotifications);
     updateList();
 }
 
@@ -244,40 +245,61 @@ void NotificationListWidget::openSelected() {
     }
 }
 
-void NotificationListWidget::handleLoadMoreStrategy() {
-    if (!loadMoreItem) return;
+bool NotificationListWidget::willLoadMore() const {
+    if (!loadMoreItem) return false;
 
-    // If already loading or not valid, return
     QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
-    if (!btn || !btn->isEnabled()) return;
+    if (!btn || !btn->isEnabled()) return false;
 
     SettingsDialog::GetDataOption option = SettingsDialog::getGetDataOption();
 
     if (option == SettingsDialog::Manual) {
-        return;
+        return false;
     }
 
     if (option == SettingsDialog::FillScreen) {
-        // Trigger if scrollbar range is 0 (content fits in viewport)
         if (listWidget->verticalScrollBar()->maximum() <= 0) {
-            triggerLoadMore();
+            return true;
         }
-        return;
+        return false;
     }
 
     if (option == SettingsDialog::GetAll) {
-        triggerLoadMore();
-        return;
+        return true;
     }
 
     if (option == SettingsDialog::Infinite) {
         QRect itemRect = listWidget->visualItemRect(loadMoreItem);
         QRect viewportRect = listWidget->viewport()->rect();
-
         if (viewportRect.intersects(itemRect)) {
-            triggerLoadMore();
+            return true;
         }
-        return;
+        return false;
+    }
+    return false;
+}
+
+void NotificationListWidget::handleLoadMoreStrategy() {
+    bool currentlyLoading = false;
+    if (loadMoreItem) {
+        QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+        if (btn && !btn->isEnabled()) {
+            currentlyLoading = true;
+        }
+    }
+
+    if (willLoadMore()) {
+        triggerLoadMore();
+    } else if (!currentlyLoading && m_countsDirty) {
+        int totalUnread = 0;
+        for (const auto &n : m_allNotifications) {
+            if (n.unread) totalUnread++;
+        }
+        emit countsChanged(m_allNotifications.count(), totalUnread, m_pendingNewNotifications,
+                           m_pendingNewlyAddedNotifications);
+        m_pendingNewNotifications = 0;
+        m_pendingNewlyAddedNotifications.clear();
+        m_countsDirty = false;
     }
 }
 

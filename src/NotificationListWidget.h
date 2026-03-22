@@ -80,6 +80,7 @@ class NotificationListWidget : public QWidget {
     void onItemActivated(QListWidgetItem *item);
     void onLoadMoreClicked();
     void handleLoadMoreStrategy();
+    bool willLoadMore() const;
 
    private:
     void triggerLoadMore();
@@ -120,6 +121,9 @@ class NotificationListWidget : public QWidget {
     QString m_repoFilter;
     QString m_searchFilter;
     bool m_hasMore;
+    int m_pendingNewNotifications;
+    QList<Notification> m_pendingNewlyAddedNotifications;
+    bool m_countsDirty;
 
     // Context Menu
     GitHubClient *m_client;
