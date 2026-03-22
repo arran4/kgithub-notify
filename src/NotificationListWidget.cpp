@@ -113,7 +113,13 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         if (!item) return;
 
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        QJsonDocument doc(json);
+        Notification n = Notification::fromJson(json);
+
+        QJsonObject combined;
+        combined["extract"] = n.toJson();
+        combined["raw"] = n.rawJson;
+
+        QJsonDocument doc(combined);
         QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
         QDialog *dialog = new QDialog(this);

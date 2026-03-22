@@ -172,7 +172,11 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
 
     QPushButton *viewRawBtn = new QPushButton(QIcon::fromTheme("text-json"), tr("View Raw JSON"));
     connect(viewRawBtn, &QPushButton::clicked, this, [this]() {
-        QJsonDocument doc(m_notification.rawJson);
+        QJsonObject combined;
+        combined["extract"] = m_notification.toJson();
+        combined["raw"] = m_notification.rawJson;
+
+        QJsonDocument doc(combined);
         QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
         QDialog *dialog = new QDialog(this);
@@ -224,8 +228,11 @@ void NotificationWindow::onCloseAndMarkAsRead() {
 }
 
 void NotificationWindow::onViewRawJson() {
-    QJsonObject json = m_notification.toJson();
-    QJsonDocument doc(json);
+    QJsonObject combined;
+    combined["extract"] = m_notification.toJson();
+    combined["raw"] = m_notification.rawJson;
+
+    QJsonDocument doc(combined);
     QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
     QDialog *dialog = new QDialog(this);
