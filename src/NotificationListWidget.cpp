@@ -155,6 +155,14 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     }
 
     m_countsDirty = true;
+
+    // Emit progressively without triggering popups (newCount=0, empty list)
+    int totalUnread = 0;
+    for (const auto &n : m_allNotifications) {
+        if (n.unread) totalUnread++;
+    }
+    emit countsChanged(m_allNotifications.count(), totalUnread, 0, QList<Notification>());
+
     updateList();
 }
 
