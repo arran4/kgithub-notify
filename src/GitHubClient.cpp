@@ -466,6 +466,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
         n.updatedAt = obj["updated_at"].toString();
         n.lastReadAt = obj["last_read_at"].toString();
+        n.reason = obj["reason"].toString();
         n.unread = obj["unread"].toBool();
         n.rawJson = obj;
 

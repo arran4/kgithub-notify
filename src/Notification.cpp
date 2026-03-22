@@ -10,6 +10,7 @@ QJsonObject Notification::toJson() const {
     obj["htmlUrl"] = htmlUrl;
     obj["updatedAt"] = updatedAt;
     obj["lastReadAt"] = lastReadAt;
+    obj["reason"] = reason;
     obj["unread"] = unread;
     obj["rawJson"] = rawJson;
     return obj;
@@ -25,6 +26,7 @@ Notification Notification::fromJson(const QJsonObject &obj) {
     n.htmlUrl = obj["htmlUrl"].toString();
     n.updatedAt = obj["updatedAt"].toString();
     n.lastReadAt = obj["lastReadAt"].toString();
+    n.reason = obj["reason"].toString();
     n.unread = obj["unread"].toBool();
     n.rawJson = obj["rawJson"].toObject();
     return n;

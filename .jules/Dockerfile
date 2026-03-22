@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/base:debian
+FROM debian:bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
