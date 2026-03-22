@@ -170,6 +170,26 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
         bottomLayout->addWidget(viewActionBtn);
     }
 
+    QPushButton *viewRawBtn = new QPushButton(QIcon::fromTheme("text-json"), tr("View Raw JSON"));
+    connect(viewRawBtn, &QPushButton::clicked, this, [this]() {
+        QJsonDocument doc(m_notification.rawJson);
+        QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+
+        QDialog *dialog = new QDialog(this);
+        dialog->setWindowTitle(tr("Raw JSON"));
+        dialog->resize(600, 400);
+
+        QVBoxLayout *layout = new QVBoxLayout(dialog);
+        QTextEdit *textEdit = new QTextEdit(dialog);
+        textEdit->setReadOnly(true);
+        textEdit->setPlainText(rawJson);
+        layout->addWidget(textEdit);
+
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->show();
+    });
+    bottomLayout->addWidget(viewRawBtn);
+
     layout->addLayout(bottomLayout);
 
     setObjectName("NotificationWindow");
@@ -177,8 +197,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Status Bar
-    QString statusText =
-        tr("Status: %1 | Inbox: %2").arg(n.unread ? tr("Unread") : tr("Read")).arg(n.inInbox ? tr("Yes") : tr("No"));
+    QString statusText = tr("Status: %1").arg(n.unread ? tr("Unread") : tr("Read"));
     statusBar()->showMessage(statusText);
 }
 

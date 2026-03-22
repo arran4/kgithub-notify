@@ -28,10 +28,10 @@ add_executable(TestGitHubClient
 )
 
 target_link_libraries(TestGitHubClient
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Svg
-    Qt6::Test
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Svg
+        Qt6::Test
 )
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
@@ -80,16 +80,16 @@ find_package(KF6ConfigWidgets REQUIRED)
 find_package(KF6I18n REQUIRED)
 
 target_link_libraries(kgithub-notify
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Svg
-    Qt6::DBus
-    KF6::CoreAddons
-    KF6::XmlGui
-    KF6::ConfigWidgets
-    KF6::I18n
-    KF6::Wallet
-    KF6::Notifications
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Svg
+        Qt6::DBus
+        KF6::CoreAddons
+        KF6::XmlGui
+        KF6::ConfigWidgets
+        KF6::I18n
+        KF6::Wallet
+        KF6::Notifications
 )
 
 target_compile_definitions(kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")
