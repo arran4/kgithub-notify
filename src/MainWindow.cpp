@@ -783,6 +783,12 @@ void MainWindow::setupToolbar() {
     filterComboBox->addItem(tr("All"));
     filterComboBox->addItem(tr("Mentions (Unread)"));
     filterComboBox->addItem(tr("Mentions (All)"));
+    filterComboBox->addItem(tr("CI Activity (Unread)"));
+    filterComboBox->addItem(tr("CI Activity (All)"));
+    filterComboBox->addItem(tr("Review Requested (Unread)"));
+    filterComboBox->addItem(tr("Review Requested (All)"));
+    filterComboBox->addItem(tr("Subscribed (Unread)"));
+    filterComboBox->addItem(tr("Subscribed (All)"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 

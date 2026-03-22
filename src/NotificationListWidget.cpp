@@ -95,7 +95,8 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         item->setFont(font);
 
         // If filtering by unread, remove it
-        if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5) {
+        if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5 || m_filterMode == 7 || m_filterMode == 9 ||
+            m_filterMode == 11) {
             delete listWidget->takeItem(listWidget->row(item));
         }
     });
@@ -477,6 +478,18 @@ void NotificationListWidget::updateList() {
             if (n.unread && n.reason == "mention") show = true;
         } else if (m_filterMode == 6) {  // Mentions (All)
             if (n.reason == "mention") show = true;
+        } else if (m_filterMode == 7) {  // CI Activity (Unread)
+            if (n.unread && n.reason == "ci_activity") show = true;
+        } else if (m_filterMode == 8) {  // CI Activity (All)
+            if (n.reason == "ci_activity") show = true;
+        } else if (m_filterMode == 9) {  // Review Requested (Unread)
+            if (n.unread && n.reason == "review_requested") show = true;
+        } else if (m_filterMode == 10) {  // Review Requested (All)
+            if (n.reason == "review_requested") show = true;
+        } else if (m_filterMode == 11) {  // Subscribed (Unread)
+            if (n.unread && n.reason == "subscribed") show = true;
+        } else if (m_filterMode == 12) {  // Subscribed (All)
+            if (n.reason == "subscribed") show = true;
         }
         if (show) {
             targetNotifications.append(n);
@@ -771,7 +784,8 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
     font.setBold(false);
     item->setFont(font);
 
-    if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5) {
+    if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5 || m_filterMode == 7 || m_filterMode == 9 ||
+        m_filterMode == 11) {
         delete listWidget->takeItem(listWidget->row(item));
     }
 }
