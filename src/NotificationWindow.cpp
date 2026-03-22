@@ -205,9 +205,14 @@ void NotificationWindow::onCloseAndMarkAsRead() {
 }
 
 void NotificationWindow::onViewRawJson() {
-    QJsonObject json = m_notification.toJson();
-    QJsonDocument doc(json);
-    QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+    QJsonObject combined;
+    QJsonObject extract = m_notification.toJson();
+    extract.remove("rawJson");
+    combined["extract"] = extract;
+    combined["raw"] = m_notification.rawJson;
+
+    QJsonDocument doc(combined);
+    QString jsonString = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
     QDialog *dialog = new QDialog(this);
     dialog->setWindowTitle(tr("Raw JSON"));
@@ -216,7 +221,7 @@ void NotificationWindow::onViewRawJson() {
     QVBoxLayout *layout = new QVBoxLayout(dialog);
     QTextEdit *textEdit = new QTextEdit(dialog);
     textEdit->setReadOnly(true);
-    textEdit->setPlainText(rawJson);
+    textEdit->setPlainText(jsonString);
     layout->addWidget(textEdit);
 
     dialog->setAttribute(Qt::WA_DeleteOnClose);

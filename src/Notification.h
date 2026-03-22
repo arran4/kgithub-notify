@@ -15,6 +15,7 @@ struct Notification {
     QString lastReadAt;
     bool unread;
     bool inInbox;
+    QJsonObject rawJson;  // Full raw JSON from GitHub API
 
     QJsonObject toJson() const;
     static Notification fromJson(const QJsonObject &obj);

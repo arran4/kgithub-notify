@@ -454,6 +454,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
         QJsonObject obj = value.toObject();
         Notification n;
         n.id = obj["id"].toVariant().toString();
+        n.rawJson = obj;
 
         QJsonObject subject = obj["subject"].toObject();
         n.title = subject["title"].toString();

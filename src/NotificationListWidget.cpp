@@ -112,8 +112,14 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         if (!item) return;
 
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-        QJsonDocument doc(json);
-        QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+        Notification n = Notification::fromJson(json);
+        QJsonObject combined;
+        QJsonObject extract = n.toJson();
+        extract.remove("rawJson");
+        combined["extract"] = extract;
+        combined["raw"] = n.rawJson;
+        QJsonDocument doc(combined);
+        QString jsonString = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
         QDialog *dialog = new QDialog(this);
         dialog->setWindowTitle(tr("Raw JSON"));
@@ -122,7 +128,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         QVBoxLayout *layout = new QVBoxLayout(dialog);
         QTextEdit *textEdit = new QTextEdit(dialog);
         textEdit->setReadOnly(true);
-        textEdit->setPlainText(rawJson);
+        textEdit->setPlainText(jsonString);
         layout->addWidget(textEdit);
 
         dialog->setAttribute(Qt::WA_DeleteOnClose);
