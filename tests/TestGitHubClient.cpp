@@ -170,13 +170,13 @@ class TestGitHubClient : public QObject {
         QCOMPARE(notifications.size(), 3);
 
         QCOMPARE(notifications[0].id, QString("1"));
-        QCOMPARE(notifications[0].unread, true);  // Missing last_read_at
+        QCOMPARE(notifications[0].unread, false);  // We now strictly use API's unread
 
         QCOMPARE(notifications[1].id, QString("2"));
-        QCOMPARE(notifications[1].unread, true);  // Updated > Read
+        QCOMPARE(notifications[1].unread, false);  // We now strictly use API's unread
 
         QCOMPARE(notifications[2].id, QString("3"));
-        QCOMPARE(notifications[2].unread, false);  // Updated <= Read
+        QCOMPARE(notifications[2].unread, true);  // We now strictly use API's unread
     }
 
     void testUserRules() {
@@ -265,27 +265,19 @@ class TestGitHubClient : public QObject {
         QCOMPARE(notifications.size(), 4);
 
         // Case 1 Check
-        // unread: false, last_read_at: null -> inInbox = false, unread = true
         QCOMPARE(notifications[0].id, QString("1"));
-        QCOMPARE(notifications[0].inInbox, false);
-        QCOMPARE(notifications[0].unread, true);
+        QCOMPARE(notifications[0].unread, false);
 
         // Case 2 Check
-        // unread: true, updated > last_read -> inInbox = true, unread = true
         QCOMPARE(notifications[1].id, QString("2"));
-        QCOMPARE(notifications[1].inInbox, true);
         QCOMPARE(notifications[1].unread, true);
 
         // Case 3 Check
-        // unread: false, updated > last_read -> inInbox = false, unread = true
         QCOMPARE(notifications[2].id, QString("3"));
-        QCOMPARE(notifications[2].inInbox, false);
-        QCOMPARE(notifications[2].unread, true);
+        QCOMPARE(notifications[2].unread, false);
 
         // Case 4 Check
-        // unread: false, updated < last_read -> inInbox = false, unread = false
         QCOMPARE(notifications[3].id, QString("4"));
-        QCOMPARE(notifications[3].inInbox, false);
         QCOMPARE(notifications[3].unread, false);
     }
 };

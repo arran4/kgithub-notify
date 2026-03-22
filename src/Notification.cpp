@@ -11,7 +11,7 @@ QJsonObject Notification::toJson() const {
     obj["updatedAt"] = updatedAt;
     obj["lastReadAt"] = lastReadAt;
     obj["unread"] = unread;
-    obj["inInbox"] = inInbox;
+    obj["rawJson"] = rawJson;
     return obj;
 }
 
@@ -26,6 +26,6 @@ Notification Notification::fromJson(const QJsonObject &obj) {
     n.updatedAt = obj["updatedAt"].toString();
     n.lastReadAt = obj["lastReadAt"].toString();
     n.unread = obj["unread"].toBool();
-    n.inInbox = obj["inInbox"].toBool();
+    n.rawJson = obj["rawJson"].toObject();
     return n;
 }

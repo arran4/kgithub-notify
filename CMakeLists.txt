@@ -10,9 +10,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
-find_package(KF6Wallet REQUIRED)
-find_package(KF6Notifications REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
+find_package(KF5Wallet REQUIRED)
+find_package(KF5Notifications REQUIRED)
 
 enable_testing()
 
@@ -28,10 +28,10 @@ add_executable(TestGitHubClient
 )
 
 target_link_libraries(TestGitHubClient
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Svg
-    Qt6::Test
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Svg
+    Qt5::Test
 )
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
@@ -74,22 +74,22 @@ add_executable(kgithub-notify
     src/resources.qrc
 )
 
-find_package(KF6CoreAddons REQUIRED)
-find_package(KF6XmlGui REQUIRED)
-find_package(KF6ConfigWidgets REQUIRED)
-find_package(KF6I18n REQUIRED)
+find_package(KF5CoreAddons REQUIRED)
+find_package(KF5XmlGui REQUIRED)
+find_package(KF5ConfigWidgets REQUIRED)
+find_package(KF5I18n REQUIRED)
 
 target_link_libraries(kgithub-notify
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Svg
-    Qt6::DBus
-    KF6::CoreAddons
-    KF6::XmlGui
-    KF6::ConfigWidgets
-    KF6::I18n
-    KF6::Wallet
-    KF6::Notifications
+    Qt5::Widgets
+    Qt5::Network
+    Qt5::Svg
+    Qt5::DBus
+    KF5::CoreAddons
+    KF5::XmlGui
+    KF5::ConfigWidgets
+    KF5::I18n
+    KF5::Wallet
+    KF5::Notifications
 )
 
 target_compile_definitions(kgithub-notify PRIVATE KGHN_APP_VERSION="${PROJECT_VERSION}")

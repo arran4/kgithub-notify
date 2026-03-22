@@ -466,19 +466,8 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
 
         n.updatedAt = obj["updated_at"].toString();
         n.lastReadAt = obj["last_read_at"].toString();
-        n.inInbox = obj["unread"].toBool();
-
-        if (n.lastReadAt.isEmpty()) {
-            n.unread = true;
-        } else {
-            QDateTime updated = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-            QDateTime lastRead = QDateTime::fromString(n.lastReadAt, Qt::ISODate);
-            if (updated > lastRead) {
-                n.unread = true;
-            } else {
-                n.unread = false;
-            }
-        }
+        n.unread = obj["unread"].toBool();
+        n.rawJson = obj;
 
         notifications.append(n);
     }
