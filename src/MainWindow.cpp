@@ -781,6 +781,8 @@ void MainWindow::setupToolbar() {
     filterComboBox->addItem(tr("Updated recently"));
     filterComboBox->addItem(tr("All read"));
     filterComboBox->addItem(tr("All"));
+    filterComboBox->addItem(tr("Mentions (Unread)"));
+    filterComboBox->addItem(tr("Mentions (All)"));
     connect(filterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     toolbar->addWidget(filterComboBox);
 

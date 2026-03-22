@@ -95,7 +95,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         item->setFont(font);
 
         // If filtering by unread, remove it
-        if (m_filterMode == 0 || m_filterMode == 2) {
+        if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5) {
             delete listWidget->takeItem(listWidget->row(item));
         }
     });
@@ -473,6 +473,10 @@ void NotificationListWidget::updateList() {
             if (!n.unread) show = true;
         } else if (m_filterMode == 4) {  // All
             show = true;
+        } else if (m_filterMode == 5) {  // Mentions (Unread)
+            if (n.unread && n.reason == "mention") show = true;
+        } else if (m_filterMode == 6) {  // Mentions (All)
+            if (n.reason == "mention") show = true;
         }
         if (show) {
             targetNotifications.append(n);
@@ -767,7 +771,7 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
     font.setBold(false);
     item->setFont(font);
 
-    if (m_filterMode == 0 || m_filterMode == 2) {
+    if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5) {
         delete listWidget->takeItem(listWidget->row(item));
     }
 }

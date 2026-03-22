@@ -13,6 +13,7 @@ struct Notification {
     QString htmlUrl;  // HTML URL (cached)
     QString updatedAt;
     QString lastReadAt;
+    QString reason;
     bool unread;
     QJsonObject rawJson;
 
