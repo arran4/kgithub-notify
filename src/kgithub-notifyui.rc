@@ -7,7 +7,6 @@
 
     <MenuBar>
         <Menu name="file">
-            <Action name="notifications_settings"/>
             <Separator/>
             <Action name="file_close"/>
             <Action name="file_quit"/>
