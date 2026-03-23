@@ -150,6 +150,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     notifyOnceCheckBox->setChecked(getNotifyOnce());
     layout->addWidget(notifyOnceCheckBox);
 
+    notifyReadCheckBox = new QCheckBox("Notify on read notifications", this);
+    notifyReadCheckBox->setChecked(getNotifyRead());
+    layout->addWidget(notifyReadCheckBox);
+
     // Notifications Service
     QLabel *serviceLabel = new QLabel("Notification Service:", this);
     layout->addWidget(serviceLabel);
@@ -201,6 +205,7 @@ void SettingsDialog::saveSettings() {
     settings.setValue("notificationDelayMs", notificationDelayCombo->currentText().toInt());
     settings.setValue("trayUnreadLimit", trayUnreadLimitCombo->currentText().toInt());
     setNotifyOnce(notifyOnceCheckBox->isChecked());
+    setNotifyRead(notifyReadCheckBox->isChecked());
 
     updateAutostartEntry();
 
@@ -282,6 +287,16 @@ bool SettingsDialog::getNotifyOnce() {
 void SettingsDialog::setNotifyOnce(bool notify) {
     QSettings settings;
     settings.setValue("notifyOnce", notify);
+}
+
+bool SettingsDialog::getNotifyRead() {
+    QSettings settings;
+    return settings.value("notifyRead", false).toBool();
+}
+
+void SettingsDialog::setNotifyRead(bool notify) {
+    QSettings settings;
+    settings.setValue("notifyRead", notify);
 }
 
 void SettingsDialog::onTestClicked() {

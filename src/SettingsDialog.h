@@ -27,6 +27,8 @@ class SettingsDialog : public QDialog {
     static int getTrayUnreadLimit();
     static bool getNotifyOnce();
     static void setNotifyOnce(bool notify);
+    static bool getNotifyRead();
+    static void setNotifyRead(bool notify);
 
    private slots:
     void saveSettings();
@@ -47,6 +49,7 @@ class SettingsDialog : public QDialog {
     QCheckBox *autostartCheckBox;
     QCheckBox *startMinimizedCheckBox;
     QCheckBox *notifyOnceCheckBox;
+    QCheckBox *notifyReadCheckBox;
     QPushButton *testButton;
     QLabel *statusLabel;
     GitHubClient *testClient;
