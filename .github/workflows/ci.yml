@@ -199,7 +199,13 @@ jobs:
         id: bump
         shell: bash
         run: |
-          CURRENT_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          git fetch --tags
+          CMAKE_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          TAG_VERSION=$(git tag -l "v*" | sort -V | tail -n 1 | sed 's/^v//')
+          CURRENT_VERSION=$CMAKE_VERSION
+          if [ -n "$TAG_VERSION" ] && [ "$(printf '%s\n' "$CURRENT_VERSION" "$TAG_VERSION" | sort -V | tail -n1)" == "$TAG_VERSION" ]; then
+            CURRENT_VERSION=$TAG_VERSION
+          fi
           IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
           if [ "${{ inputs.mode }}" == "release-major" ]; then
             major=$((major + 1))
@@ -212,7 +218,7 @@ jobs:
             patch=$((patch + 1))
           fi
           NEW_VERSION="${major}.${minor}.${patch}"
-          sed -i "s/project(kgithub-notify VERSION $CURRENT_VERSION)/project(kgithub-notify VERSION $NEW_VERSION)/" CMakeLists.txt
+          sed -i "s/project(kgithub-notify VERSION $CMAKE_VERSION)/project(kgithub-notify VERSION $NEW_VERSION)/" CMakeLists.txt
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git add CMakeLists.txt
