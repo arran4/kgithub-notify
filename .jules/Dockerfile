@@ -1,4 +1,4 @@
-FROM debian:bookworm
+FROM debian:testing
 
 ENV DEBIAN_FRONTEND=noninteractive
 

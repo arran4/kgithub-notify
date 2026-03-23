@@ -1137,8 +1137,10 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
         } else {
             int delayMs = 0;
             for (const Notification &n : newlyAddedNotifications) {
-                QTimer::singleShot(delayMs, this, [this, n]() { sendNotification(n); });
-                delayMs += stepDelayMs;
+                if (n.unread) {
+                    QTimer::singleShot(delayMs, this, [this, n]() { sendNotification(n); });
+                    delayMs += stepDelayMs;
+                }
             }
         }
     }

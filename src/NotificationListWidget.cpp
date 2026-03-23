@@ -150,13 +150,11 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     m_hasMore = hasMore;
 
     for (const Notification &n : notifications) {
-        if (n.unread) {
-            if (!knownNotificationIds.contains(n.id)) {
-                m_pendingNewNotifications++;
-                knownNotificationIds.insert(n.id);
-                m_pendingNewlyAddedNotifications.append(n);
-                addKnownNotification(n.id);
-            }
+        if (!knownNotificationIds.contains(n.id)) {
+            m_pendingNewNotifications++;
+            knownNotificationIds.insert(n.id);
+            m_pendingNewlyAddedNotifications.append(n);
+            addKnownNotification(n.id);
         }
     }
 
