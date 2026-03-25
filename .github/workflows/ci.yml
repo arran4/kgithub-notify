@@ -244,7 +244,7 @@ jobs:
     - name: Pre-install core tools for container
       run: |
         apt-get update
-        apt-get install -y git sudo curl jq
+        apt-get install -y git sudo curl jq ca-certificates
         git config --global --add safe.directory /__w/kgithub-notify/kgithub-notify
 
     - uses: actions/checkout@v4
