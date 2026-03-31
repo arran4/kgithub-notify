@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QListWidgetItem>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollBar>
@@ -21,7 +22,9 @@
 
 #include "GitHubClient.h"
 #include "NotificationItemWidget.h"
+#include "NotificationRuleEngine.h"
 #include "NotificationWindow.h"
+#include "RulesDialog.h"
 #include "SettingsDialog.h"
 
 NotificationListWidget::NotificationListWidget(QWidget *parent)
@@ -137,6 +140,28 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         dialog->show();
     });
     contextMenu->addAction(viewRawAction);
+    contextMenu->addSeparator();
+
+    QAction *muteRepoAction = new QAction(tr("Mute Repository"), this);
+    connect(muteRepoAction, &QAction::triggered, this, [this]() {
+        if (currentId.isEmpty()) return;
+        Notification n = this->notifications.value(currentId);
+        NotificationRule rule;
+        rule.condition = "repo:" + n.repository;
+        rule.action = "Mute";
+        NotificationRuleEngine::prependRule(rule);
+        QMessageBox::information(this, tr("Rule Added"),
+                                 tr("Muted notifications for repository:\n%1").arg(n.repository));
+    });
+
+    QAction *openRulesAction = new QAction(tr("Manage Notification Rules..."), this);
+    connect(openRulesAction, &QAction::triggered, this, []() {
+        RulesDialog dialog;
+        dialog.exec();
+    });
+
+    contextMenu->addAction(muteRepoAction);
+    contextMenu->addAction(openRulesAction);
 }
 
 void NotificationListWidget::setNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
