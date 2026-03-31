@@ -52,15 +52,32 @@ QString NotificationRule::displayCondition() const {
 }
 
 bool NotificationRule::matches(const Notification& n) const {
-    if (!repoFilter.isEmpty()) {
-        QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(repoFilter),
-                              QRegularExpression::CaseInsensitiveOption);
-        if (!rx.match(n.repository).hasMatch()) return false;
-    }
+    auto matchField = [](const QString& filter, const QString& value, bool isWildcard = false) -> bool {
+        if (filter.isEmpty()) return true;  // Empty filter means it matches anything
 
-    if (!typeFilter.isEmpty() && n.type.compare(typeFilter, Qt::CaseInsensitive) != 0) return false;
-    if (!reasonFilter.isEmpty() && n.reason.compare(reasonFilter, Qt::CaseInsensitive) != 0) return false;
-    if (!titleFilter.isEmpty() && !n.title.contains(titleFilter, Qt::CaseInsensitive)) return false;
+        bool isNegative = filter.startsWith("!");
+        QString actualFilter = isNegative ? filter.mid(1) : filter;
+
+        bool isMatch = false;
+        if (isWildcard) {
+            QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(actualFilter),
+                                  QRegularExpression::CaseInsensitiveOption);
+            isMatch = rx.match(value).hasMatch();
+        } else {
+            isMatch = value.contains(actualFilter, Qt::CaseInsensitive);
+            // exact match for type/reason if not using wildcard logic natively
+            if (!isWildcard && (actualFilter.compare(value, Qt::CaseInsensitive) == 0)) {
+                isMatch = true;
+            }
+        }
+
+        return isNegative ? !isMatch : isMatch;
+    };
+
+    if (!matchField(repoFilter, n.repository, true)) return false;
+    if (!matchField(typeFilter, n.type)) return false;
+    if (!matchField(reasonFilter, n.reason)) return false;
+    if (!matchField(titleFilter, n.title)) return false;
 
     return true;
 }

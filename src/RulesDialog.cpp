@@ -78,6 +78,11 @@ void RulesDialog::addRule(const QString& prepopulateRepo) {
     dialog.setWindowTitle(tr("Add Rule"));
     QVBoxLayout layout(&dialog);
 
+    QLabel* docLabel =
+        new QLabel(tr("All filters support negative matching by prefixing the condition with '!'.\nRepository filter "
+                      "supports '*' wildcards."));
+    docLabel->setWordWrap(true);
+    layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Repository Filter (* wildcards supported):")));
     QLineEdit repoEdit(prepopulateRepo);
     layout.addWidget(&repoEdit);
@@ -130,6 +135,11 @@ void RulesDialog::editRule() {
     dialog.setWindowTitle(tr("Edit Rule"));
     QVBoxLayout layout(&dialog);
 
+    QLabel* docLabel =
+        new QLabel(tr("All filters support negative matching by prefixing the condition with '!'.\nRepository filter "
+                      "supports '*' wildcards."));
+    docLabel->setWordWrap(true);
+    layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Repository Filter (* wildcards supported):")));
     QLineEdit repoEdit(rule.repoFilter);
     layout.addWidget(&repoEdit);
