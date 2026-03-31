@@ -20,6 +20,10 @@
             <text>&amp;View</text>
             <Action name="view_redisplay"/>
         </Menu>
+        <Menu name="settings">
+            <Action name="notification_rules"/>
+            <Separator/>
+        </Menu>
         <Menu name="tools">
             <text>&amp;Tools</text>
             <Action name="trending"/>
