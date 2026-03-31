@@ -64,7 +64,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     actionsMenu->addAction(muteRepoAction);
 
     QAction *openRulesAction =
-        new QAction(themedIcon({QStringLiteral("view-list-details")}), tr("Manage Notification Rules..."), this);
+        new QAction(QIcon::fromTheme("view-list-details"), tr("Manage Notification Rules..."), this);
     connect(openRulesAction, &QAction::triggered, this, [this]() {
         RulesDialog dialog(this, "repo:" + m_notification.repository, "repo:" + m_notification.repository);
         dialog.exec();
