@@ -80,7 +80,7 @@ void RulesDialog::addRule(const QString& prepopulateRepo) {
 
     QLabel* docLabel =
         new QLabel(tr("All filters support negative matching by prefixing the condition with '!'.\nRepository filter "
-                      "supports '*' wildcards."));
+                      "supports '*' wildcards. For example: `arran4/kgithub-notif*`"));
     docLabel->setWordWrap(true);
     layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Repository Filter (* wildcards supported):")));
@@ -137,7 +137,7 @@ void RulesDialog::editRule() {
 
     QLabel* docLabel =
         new QLabel(tr("All filters support negative matching by prefixing the condition with '!'.\nRepository filter "
-                      "supports '*' wildcards."));
+                      "supports '*' wildcards. For example: `arran4/kgithub-notif*`"));
     docLabel->setWordWrap(true);
     layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Repository Filter (* wildcards supported):")));
