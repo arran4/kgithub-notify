@@ -8,16 +8,20 @@
 class RulesDialog : public QDialog {
     Q_OBJECT
    public:
-    explicit RulesDialog(QWidget* parent = nullptr);
+    explicit RulesDialog(QWidget* parent = nullptr, const QString& preFilterRepo = QString(),
+                         const QString& prepopulateCondition = QString());
 
    private slots:
-    void addRule();
+    void addRule(const QString& prepopulateCondition = QString());
+
     void editRule();
     void removeRule();
     void saveRules();
 
    private:
-    void loadRules();
+    void loadRules(const QString& filterRepo = QString());
+    QString m_prepopulateCondition;
+
     QTableWidget* rulesTable;
 };
 

@@ -1,18 +1,19 @@
-#include <QLabel>
-#include <QLineEdit>
-#include <QDialogButtonBox>
 #include "RulesDialog.h"
 
 #include <QComboBox>
+#include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QInputDialog>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QVBoxLayout>
 
 #include "NotificationRuleEngine.h"
 
-RulesDialog::RulesDialog(QWidget* parent) : QDialog(parent) {
+RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QString& prepopulateCondition)
+    : QDialog(parent), m_prepopulateCondition(prepopulateCondition) {
     setWindowTitle(tr("Notification Rules"));
     resize(600, 400);
 
@@ -41,19 +42,21 @@ RulesDialog::RulesDialog(QWidget* parent) : QDialog(parent) {
 
     mainLayout->addLayout(buttonLayout);
 
-    connect(btnAdd, &QPushButton::clicked, this, &RulesDialog::addRule);
+    connect(btnAdd, &QPushButton::clicked, this, [this]() { addRule(m_prepopulateCondition); });
     connect(btnEdit, &QPushButton::clicked, this, &RulesDialog::editRule);
     connect(btnRemove, &QPushButton::clicked, this, &RulesDialog::removeRule);
     connect(btnSave, &QPushButton::clicked, this, &RulesDialog::saveRules);
     connect(btnClose, &QPushButton::clicked, this, &QDialog::accept);
 
-    loadRules();
+    loadRules(preFilterRepo);
 }
 
-void RulesDialog::loadRules() {
+void RulesDialog::loadRules(const QString& filterRepo) {
     rulesTable->setRowCount(0);
     QList<NotificationRule> rules = NotificationRuleEngine::loadRules();
     for (const NotificationRule& rule : rules) {
+        if (!filterRepo.isEmpty() && !rule.condition.contains(filterRepo)) continue;
+
         int row = rulesTable->rowCount();
         rulesTable->insertRow(row);
         rulesTable->setItem(row, 0, new QTableWidgetItem(rule.condition));
@@ -61,13 +64,13 @@ void RulesDialog::loadRules() {
     }
 }
 
-void RulesDialog::addRule() {
+void RulesDialog::addRule(const QString& prepopulateCondition) {
     QDialog dialog(this);
     dialog.setWindowTitle(tr("Add Rule"));
     QVBoxLayout layout(&dialog);
 
     layout.addWidget(new QLabel(tr("Condition (e.g. repo:arran4/kgithub-notify):")));
-    QLineEdit conditionEdit;
+    QLineEdit conditionEdit(prepopulateCondition);
     layout.addWidget(&conditionEdit);
 
     layout.addWidget(new QLabel(tr("Action:")));

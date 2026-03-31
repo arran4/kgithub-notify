@@ -169,8 +169,24 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     });
 
     QAction *openRulesAction = new QAction(tr("Manage Notification Rules..."), this);
-    connect(openRulesAction, &QAction::triggered, this, []() {
-        RulesDialog dialog;
+    connect(openRulesAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = listWidget->currentItem();
+        if (!item) return;
+        QString currentId = item->data(Qt::UserRole + 1).toString();
+        if (currentId.isEmpty()) return;
+
+        Notification n;
+        bool found = false;
+        for (const Notification &notif : m_allNotifications) {
+            if (notif.id == currentId) {
+                n = notif;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return;
+
+        RulesDialog dialog(this, "repo:" + n.repository, "repo:" + n.repository);
         dialog.exec();
     });
 

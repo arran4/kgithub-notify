@@ -898,6 +898,14 @@ void MainWindow::setupMenus() {
     KStandardAction::deselect(this, &MainWindow::onSelectNoneClicked, actionCollection());
     KStandardAction::redisplay(this, &MainWindow::onRefreshClicked, actionCollection());
     KStandardAction::aboutApp(this, &MainWindow::showAboutDialog, actionCollection());
+    QAction *notificationRulesAction = new QAction(themedIcon({QStringLiteral("view-list-details")}),
+                                                       tr("Notification &Rules..."), this);
+    connect(notificationRulesAction, &QAction::triggered, this, []() {
+        RulesDialog dialog;
+        dialog.exec();
+    });
+    actionCollection()->addAction(QStringLiteral("notification_rules"), notificationRulesAction);
+
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
