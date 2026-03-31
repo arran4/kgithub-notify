@@ -1,3 +1,4 @@
+#include "RulesDialog.h"
 #include "NotificationWindow.h"
 
 #include <QApplication>
