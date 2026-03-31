@@ -144,8 +144,22 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     QAction *muteRepoAction = new QAction(tr("Mute Repository"), this);
     connect(muteRepoAction, &QAction::triggered, this, [this]() {
+        QListWidgetItem *item = listWidget->currentItem();
+        if (!item) return;
+        QString currentId = item->data(Qt::UserRole + 1).toString();
         if (currentId.isEmpty()) return;
-        Notification n = this->notifications.value(currentId);
+
+        Notification n;
+        bool found = false;
+        for (const Notification &notif : m_allNotifications) {
+            if (notif.id == currentId) {
+                n = notif;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return;
+
         NotificationRule rule;
         rule.condition = "repo:" + n.repository;
         rule.action = "Mute";
