@@ -1,5 +1,6 @@
 #include "NotificationRuleEngine.h"
 
+#include <QRegularExpression>
 #include <QStringList>
 
 QJsonObject NotificationRule::toJson() const {
@@ -24,7 +25,9 @@ bool NotificationRule::matches(const Notification& n) const {
     for (const QString& part : parts) {
         if (part.startsWith("repo:", Qt::CaseInsensitive)) {
             QString v = part.mid(5);
-            if (!n.repository.contains(v, Qt::CaseInsensitive)) return false;
+            QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(v),
+                                  QRegularExpression::CaseInsensitiveOption);
+            if (!rx.match(n.repository).hasMatch()) return false;
         } else if (part.startsWith("type:", Qt::CaseInsensitive)) {
             QString v = part.mid(5);
             if (n.type.compare(v, Qt::CaseInsensitive) != 0) return false;

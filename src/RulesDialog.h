@@ -16,6 +16,9 @@ class RulesDialog : public QDialog {
 
     void editRule();
     void removeRule();
+    void moveUp();
+    void moveDown();
+
     void saveRules();
 
    private:

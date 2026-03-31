@@ -29,6 +29,8 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     QPushButton* btnAdd = new QPushButton(tr("Add"), this);
     QPushButton* btnEdit = new QPushButton(tr("Edit"), this);
+    QPushButton* btnUp = new QPushButton(tr("Move Up"), this);
+    QPushButton* btnDown = new QPushButton(tr("Move Down"), this);
     QPushButton* btnRemove = new QPushButton(tr("Remove"), this);
     QPushButton* btnSave = new QPushButton(tr("Save"), this);
     QPushButton* btnClose = new QPushButton(tr("Close"), this);
@@ -36,6 +38,9 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
     buttonLayout->addWidget(btnAdd);
     buttonLayout->addWidget(btnEdit);
     buttonLayout->addWidget(btnRemove);
+    buttonLayout->addWidget(btnUp);
+    buttonLayout->addWidget(btnDown);
+
     buttonLayout->addStretch();
     buttonLayout->addWidget(btnSave);
     buttonLayout->addWidget(btnClose);
@@ -45,6 +50,9 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
     connect(btnAdd, &QPushButton::clicked, this, [this]() { addRule(m_prepopulateCondition); });
     connect(btnEdit, &QPushButton::clicked, this, &RulesDialog::editRule);
     connect(btnRemove, &QPushButton::clicked, this, &RulesDialog::removeRule);
+    connect(btnUp, &QPushButton::clicked, this, &RulesDialog::moveUp);
+    connect(btnDown, &QPushButton::clicked, this, &RulesDialog::moveDown);
+
     connect(btnSave, &QPushButton::clicked, this, &RulesDialog::saveRules);
     connect(btnClose, &QPushButton::clicked, this, &QDialog::accept);
 
@@ -69,6 +77,11 @@ void RulesDialog::addRule(const QString& prepopulateCondition) {
     dialog.setWindowTitle(tr("Add Rule"));
     QVBoxLayout layout(&dialog);
 
+    QLabel* docLabel =
+        new QLabel(tr("Conditions support tags like repo:, type:, and reason: separated by spaces.\nThe repo: tag "
+                      "supports wildcard matching (e.g. repo:*arran4* or repo:arran4/kgithub*)."));
+    docLabel->setWordWrap(true);
+    layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Condition (e.g. repo:arran4/kgithub-notify):")));
     QLineEdit conditionEdit(prepopulateCondition);
     layout.addWidget(&conditionEdit);
@@ -99,6 +112,11 @@ void RulesDialog::editRule() {
     dialog.setWindowTitle(tr("Edit Rule"));
     QVBoxLayout layout(&dialog);
 
+    QLabel* docLabel =
+        new QLabel(tr("Conditions support tags like repo:, type:, and reason: separated by spaces.\nThe repo: tag "
+                      "supports wildcard matching (e.g. repo:*arran4* or repo:arran4/kgithub*)."));
+    docLabel->setWordWrap(true);
+    layout.addWidget(docLabel);
     layout.addWidget(new QLabel(tr("Condition:")));
     QLineEdit conditionEdit(rulesTable->item(row, 0)->text());
     layout.addWidget(&conditionEdit);
@@ -136,4 +154,30 @@ void RulesDialog::saveRules() {
         rules.append(rule);
     }
     NotificationRuleEngine::saveRules(rules);
+}
+
+void RulesDialog::moveUp() {
+    int row = rulesTable->currentRow();
+    if (row > 0) {
+        QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
+        QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
+        rulesTable->removeRow(row);
+        rulesTable->insertRow(row - 1);
+        rulesTable->setItem(row - 1, 0, conditionItem);
+        rulesTable->setItem(row - 1, 1, actionItem);
+        rulesTable->selectRow(row - 1);
+    }
+}
+
+void RulesDialog::moveDown() {
+    int row = rulesTable->currentRow();
+    if (row >= 0 && row < rulesTable->rowCount() - 1) {
+        QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
+        QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
+        rulesTable->removeRow(row);
+        rulesTable->insertRow(row + 1);
+        rulesTable->setItem(row + 1, 0, conditionItem);
+        rulesTable->setItem(row + 1, 1, actionItem);
+        rulesTable->selectRow(row + 1);
+    }
 }
