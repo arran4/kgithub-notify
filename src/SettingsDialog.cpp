@@ -15,6 +15,7 @@
 #include <QVBoxLayout>
 
 #include "GitHubClient.h"
+#include "RulesDialog.h"
 #include "WalletManager.h"
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nullptr) {
@@ -153,6 +154,12 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     notifyReadCheckBox = new QCheckBox("Notify on read notifications", this);
     notifyReadCheckBox->setChecked(getNotifyRead());
     layout->addWidget(notifyReadCheckBox);
+    QPushButton *rulesBtn = new QPushButton(tr("Manage Notification Rules..."), this);
+    connect(rulesBtn, &QPushButton::clicked, this, [this]() {
+        RulesDialog dialog(this);
+        dialog.exec();
+    });
+    layout->addWidget(rulesBtn);
 
     // Notifications Service
     QLabel *serviceLabel = new QLabel("Notification Service:", this);

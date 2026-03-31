@@ -33,7 +33,9 @@
 #include "NewIssueDialog.h"
 #include "NotificationItemWidget.h"
 #include "NotificationListWidget.h"
+#include "NotificationRuleEngine.h"
 #include "RepoListWindow.h"
+#include "RulesDialog.h"
 #include "SettingsDialog.h"
 #include "WorkItemWindow.h"
 #include "trending/TrendingWindow.h"
@@ -516,6 +518,8 @@ void MainWindow::createTrayIcon() {
     trayIcon->show();
 }
 
+
+
 void MainWindow::updateTrayMenu() {
     if (!trayIconMenu) return;
     trayIconMenu->clear();
@@ -528,7 +532,7 @@ void MainWindow::updateTrayMenu() {
     connect(openAppAction, &QAction::triggered, this, &QWidget::showNormal);
     trayIconMenu->addAction(openAppAction);
 
-    trayIconMenu->addSeparator();
+        trayIconMenu->addSeparator();
 
     int unreadCount = m_lastUnreadCount;
     QList<Notification> unreadNotifications =
@@ -894,6 +898,14 @@ void MainWindow::setupMenus() {
     KStandardAction::deselect(this, &MainWindow::onSelectNoneClicked, actionCollection());
     KStandardAction::redisplay(this, &MainWindow::onRefreshClicked, actionCollection());
     KStandardAction::aboutApp(this, &MainWindow::showAboutDialog, actionCollection());
+    QAction *notificationRulesAction = new QAction(themedIcon({QStringLiteral("view-list-details")}),
+                                                       tr("Notification &Rules..."), this);
+    connect(notificationRulesAction, &QAction::triggered, this, []() {
+        RulesDialog dialog;
+        dialog.exec();
+    });
+    actionCollection()->addAction(QStringLiteral("notification_rules"), notificationRulesAction);
+
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
@@ -1131,18 +1143,51 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
     if (newNotifications > 0) {
         int threshold = SettingsDialog::getSummaryThreshold();
         int stepDelayMs = SettingsDialog::getNotificationDelayMs();
+        bool notifyRead = SettingsDialog::getNotifyRead();
 
-        if (newNotifications > threshold) {
-            sendSummaryNotification(newNotifications, newlyAddedNotifications);
-        } else {
-            int delayMs = 0;
-            bool notifyRead = SettingsDialog::getNotifyRead();
-            for (const Notification &n : newlyAddedNotifications) {
-                if (n.unread || notifyRead) {
-                    QTimer::singleShot(delayMs, this, [this, n]() { sendNotification(n); });
-                    delayMs += stepDelayMs;
-                }
+        QList<Notification> individualNotifications;
+        QList<Notification> summarizedNotifications;
+
+        for (const Notification &n : newlyAddedNotifications) {
+            if (!n.unread && !notifyRead) continue;
+
+            QString action = NotificationRuleEngine::evaluate(n);
+
+            if (action == "Mute") {
+                continue;
+            } else if (action == "AlwaysIndividual") {
+                individualNotifications.append(n);
+            } else if (action == "NeverIndividual") {
+                summarizedNotifications.append(n);
+            } else if (action == "AlwaysSummarize") {
+                summarizedNotifications.append(n);
+            } else {
+                // Default
+                summarizedNotifications.append(n);
             }
+        }
+
+        // Send summarize notifications if they exceed the threshold or if they explicitly asked to summarize
+        bool hasAlwaysSummarize = false;
+        for (const Notification &n : summarizedNotifications) {
+            if (NotificationRuleEngine::evaluate(n) == "AlwaysSummarize" || NotificationRuleEngine::evaluate(n) == "NeverIndividual") {
+                hasAlwaysSummarize = true;
+                break;
+            }
+        }
+
+        if (summarizedNotifications.size() > threshold || (hasAlwaysSummarize && summarizedNotifications.size() > 0)) {
+            sendSummaryNotification(summarizedNotifications.size(), summarizedNotifications);
+        } else {
+            for (const Notification &n : summarizedNotifications) {
+                individualNotifications.append(n);
+            }
+        }
+
+        int delayMs = 0;
+        for (const Notification &n : individualNotifications) {
+            QTimer::singleShot(delayMs, this, [this, n]() { sendNotification(n); });
+            delayMs += stepDelayMs;
         }
     }
     updateTrayMenu();

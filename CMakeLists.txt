@@ -45,6 +45,10 @@ add_executable(kgithub-notify
     src/SecureString.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
+    src/NotificationRuleEngine.cpp
+    src/NotificationRuleEngine.h
+    src/RulesDialog.cpp
+    src/RulesDialog.h
     src/DebugWindow.cpp
     src/DebugWindow.h
     src/RepoListWindow.cpp

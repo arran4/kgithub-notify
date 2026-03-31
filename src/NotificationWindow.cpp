@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -14,7 +15,9 @@
 
 #include "ActionWindow.h"
 #include "GitHubClient.h"
+#include "NotificationRuleEngine.h"
 #include "PullRequestWindow.h"
+#include "RulesDialog.h"
 
 NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *client, QWidget *parent)
     : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
@@ -48,6 +51,25 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     QAction *markAsDoneAction = new QAction(QIcon::fromTheme("task-complete"), tr("Mark as Done"), this);
     connect(markAsDoneAction, &QAction::triggered, this, &NotificationWindow::onMarkAsDone);
     actionsMenu->addAction(markAsDoneAction);
+    actionsMenu->addSeparator();
+    QAction *muteRepoAction = new QAction(QIcon::fromTheme("notifications-disabled"), tr("Mute Repository"), this);
+    connect(muteRepoAction, &QAction::triggered, this, [this]() {
+        NotificationRule rule;
+        rule.repoFilter = m_notification.repository;
+        rule.action = "Mute";
+        NotificationRuleEngine::prependRule(rule);
+        QMessageBox::information(this, tr("Rule Added"),
+                                 tr("Muted notifications for repository:\n%1").arg(m_notification.repository));
+    });
+    actionsMenu->addAction(muteRepoAction);
+
+    QAction *openRulesAction =
+        new QAction(QIcon::fromTheme("view-list-details"), tr("Manage Notification Rules..."), this);
+    connect(openRulesAction, &QAction::triggered, this, [this]() {
+        RulesDialog dialog(this, m_notification.repository, m_notification.repository);
+        dialog.exec();
+    });
+    actionsMenu->addAction(openRulesAction);
 
     actionsMenu->addSeparator();
 
