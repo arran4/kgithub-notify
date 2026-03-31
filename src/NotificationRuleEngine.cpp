@@ -5,41 +5,63 @@
 
 QJsonObject NotificationRule::toJson() const {
     QJsonObject obj;
-    obj["condition"] = condition;
+    obj["repoFilter"] = repoFilter;
+    obj["typeFilter"] = typeFilter;
+    obj["reasonFilter"] = reasonFilter;
+    obj["titleFilter"] = titleFilter;
     obj["action"] = action;
     return obj;
 }
 
 NotificationRule NotificationRule::fromJson(const QJsonObject& obj) {
     NotificationRule rule;
-    rule.condition = obj["condition"].toString();
+    rule.repoFilter = obj["repoFilter"].toString();
+    rule.typeFilter = obj["typeFilter"].toString();
+    rule.reasonFilter = obj["reasonFilter"].toString();
+    rule.titleFilter = obj["titleFilter"].toString();
     rule.action = obj["action"].toString();
-    return rule;
-}
 
-bool NotificationRule::matches(const Notification& n) const {
-    QString c = condition.trimmed();
-    if (c.isEmpty() || c == "*") return true;
-
-    QStringList parts = c.split(' ', Qt::SkipEmptyParts);
-    for (const QString& part : parts) {
-        if (part.startsWith("repo:", Qt::CaseInsensitive)) {
-            QString v = part.mid(5);
-            QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(v),
-                                  QRegularExpression::CaseInsensitiveOption);
-            if (!rx.match(n.repository).hasMatch()) return false;
-        } else if (part.startsWith("type:", Qt::CaseInsensitive)) {
-            QString v = part.mid(5);
-            if (n.type.compare(v, Qt::CaseInsensitive) != 0) return false;
-        } else if (part.startsWith("reason:", Qt::CaseInsensitive)) {
-            QString v = part.mid(7);
-            if (n.reason.compare(v, Qt::CaseInsensitive) != 0) return false;
-        } else {
-            if (!n.repository.contains(part, Qt::CaseInsensitive) && !n.title.contains(part, Qt::CaseInsensitive)) {
-                return false;
+    // Backwards compatibility for the string based "condition"
+    if (obj.contains("condition")) {
+        QString c = obj["condition"].toString().trimmed();
+        QStringList parts = c.split(' ', Qt::SkipEmptyParts);
+        for (const QString& part : parts) {
+            if (part.startsWith("repo:", Qt::CaseInsensitive)) {
+                rule.repoFilter = part.mid(5);
+            } else if (part.startsWith("type:", Qt::CaseInsensitive)) {
+                rule.typeFilter = part.mid(5);
+            } else if (part.startsWith("reason:", Qt::CaseInsensitive)) {
+                rule.reasonFilter = part.mid(7);
+            } else {
+                rule.titleFilter = part;
             }
         }
     }
+    return rule;
+}
+
+QString NotificationRule::displayCondition() const {
+    QStringList parts;
+    if (!repoFilter.isEmpty()) parts << "Repo: " + repoFilter;
+    if (!typeFilter.isEmpty()) parts << "Type: " + typeFilter;
+    if (!reasonFilter.isEmpty()) parts << "Reason: " + reasonFilter;
+    if (!titleFilter.isEmpty()) parts << "Title: " + titleFilter;
+
+    if (parts.isEmpty()) return "All Notifications";
+    return parts.join(" | ");
+}
+
+bool NotificationRule::matches(const Notification& n) const {
+    if (!repoFilter.isEmpty()) {
+        QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(repoFilter),
+                              QRegularExpression::CaseInsensitiveOption);
+        if (!rx.match(n.repository).hasMatch()) return false;
+    }
+
+    if (!typeFilter.isEmpty() && n.type.compare(typeFilter, Qt::CaseInsensitive) != 0) return false;
+    if (!reasonFilter.isEmpty() && n.reason.compare(reasonFilter, Qt::CaseInsensitive) != 0) return false;
+    if (!titleFilter.isEmpty() && !n.title.contains(titleFilter, Qt::CaseInsensitive)) return false;
+
     return true;
 }
 

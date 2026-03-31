@@ -12,12 +12,18 @@
 
 class NotificationRule {
    public:
-    QString condition;
+    QString repoFilter;    // repo matches, supports * wildcard
+    QString typeFilter;    // issue, pull request, etc
+    QString reasonFilter;  // mention, review_requested, etc
+    QString titleFilter;   // general text matching title
+
     QString action;  // "Mute", "AlwaysIndividual", "NeverIndividual", "AlwaysSummarize", "Default"
 
     QJsonObject toJson() const;
     static NotificationRule fromJson(const QJsonObject& obj);
     bool matches(const Notification& n) const;
+
+    QString displayCondition() const;
 };
 
 class NotificationRuleEngine {

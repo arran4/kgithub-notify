@@ -161,7 +161,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         if (!found) return;
 
         NotificationRule rule;
-        rule.condition = "repo:" + n.repository;
+        rule.repoFilter = n.repository;
         rule.action = "Mute";
         NotificationRuleEngine::prependRule(rule);
         QMessageBox::information(this, tr("Rule Added"),
@@ -186,7 +186,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         }
         if (!found) return;
 
-        RulesDialog dialog(this, "repo:" + n.repository, "repo:" + n.repository);
+        RulesDialog dialog(this, n.repository, n.repository);
         dialog.exec();
     });
 
