@@ -57,7 +57,7 @@ static int calculateSafeInterval(int minutes) {
 // Constructor / Destructor
 // -----------------------------------------------------------------------------
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(QWidget* parent)
     : KXmlGuiWindow(parent),
       debugWindow(nullptr),
       repoListWindow(nullptr),
@@ -94,7 +94,7 @@ MainWindow::~MainWindow() {
 // Public Methods
 // -----------------------------------------------------------------------------
 
-void MainWindow::setClient(GitHubClient *c) {
+void MainWindow::setClient(GitHubClient* c) {
     client = c;
     connect(client, &GitHubClient::loadingStarted, this, &MainWindow::onLoadingStarted);
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
@@ -113,7 +113,7 @@ void MainWindow::setClient(GitHubClient *c) {
     connect(notificationListWidget, &NotificationListWidget::requestImage, client, &GitHubClient::fetchImage);
     connect(notificationListWidget, &NotificationListWidget::markAsRead, client, &GitHubClient::markAsRead);
     connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this,
-            [this](const QString &url) { showDebugWindow(url); });
+            [this](const QString& url) { showDebugWindow(url); });
     connect(notificationListWidget, &NotificationListWidget::markAsDone, client, &GitHubClient::markAsDone);
     connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, client, &GitHubClient::loadMore);
 
@@ -130,11 +130,11 @@ void MainWindow::setClient(GitHubClient *c) {
     }
 }
 
-void MainWindow::showTrayMessage(const QString &title, const QString &message) {
+void MainWindow::showTrayMessage(const QString& title, const QString& message) {
     trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 3000);
 }
 
-void MainWindow::showDesktopFileWarning(const QString &desktopFileName, const QStringList &appPaths) {
+void MainWindow::showDesktopFileWarning(const QString& desktopFileName, const QStringList& appPaths) {
     desktopWarningMessage =
         tr("The desktop file <b>%1</b> was not found in standard application paths.<br><br>"
            "This may prevent the system tray icon and notifications from working correctly due to portal "
@@ -152,7 +152,7 @@ void MainWindow::showDesktopFileWarning(const QString &desktopFileName, const QS
 // Slots
 // -----------------------------------------------------------------------------
 
-void MainWindow::updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
+void MainWindow::updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore) {
     m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
@@ -170,7 +170,7 @@ void MainWindow::updateNotifications(const QList<Notification> &notifications, b
     }
 }
 
-void MainWindow::onListCountsChanged(int total, int unread, int newCount, const QList<Notification> &newItems) {
+void MainWindow::onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems) {
     m_lastUnreadCount = unread;
     updateTrayIconState(unread, newCount, newItems);
 
@@ -204,13 +204,13 @@ void MainWindow::onListCountsChanged(int total, int unread, int newCount, const 
     repoFilterComboBox->blockSignals(wasBlocked);
 }
 
-void MainWindow::onListStatusMessage(const QString &message) {
+void MainWindow::onListStatusMessage(const QString& message) {
     if (countLabel) {
         countLabel->setText(message);
     }
 }
 
-void MainWindow::showError(const QString &error) {
+void MainWindow::showError(const QString& error) {
     if (error == lastError) return;
     lastError = error;
 
@@ -243,7 +243,7 @@ void MainWindow::showError(const QString &error) {
     updateTrayToolTip();
 }
 
-void MainWindow::onAuthError(const QString &message) {
+void MainWindow::onAuthError(const QString& message) {
     pendingAuthError = true;
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
@@ -449,7 +449,7 @@ void MainWindow::showAboutDialog() {
     aboutBox.exec();
 }
 
-void MainWindow::showDebugWindow(const QString &url) {
+void MainWindow::showDebugWindow(const QString& url) {
     if (!debugWindow) {
         debugWindow = new DebugWindow(client, this);
     }
@@ -494,7 +494,7 @@ void MainWindow::openKdeNotificationSettings() {
     }
 }
 
-void MainWindow::closeEvent(QCloseEvent *event) {
+void MainWindow::closeEvent(QCloseEvent* event) {
     if (trayIcon->isVisible()) {
         hide();
         event->ignore();
@@ -518,13 +518,11 @@ void MainWindow::createTrayIcon() {
     trayIcon->show();
 }
 
-
-
 void MainWindow::updateTrayMenu() {
     if (!trayIconMenu) return;
     trayIconMenu->clear();
 
-    QAction *openAppAction =
+    QAction* openAppAction =
         new QAction(themedIcon({QStringLiteral("kgithub-notify")}), tr("Open Kgithub-notify"), trayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
@@ -532,22 +530,22 @@ void MainWindow::updateTrayMenu() {
     connect(openAppAction, &QAction::triggered, this, &QWidget::showNormal);
     trayIconMenu->addAction(openAppAction);
 
-        trayIconMenu->addSeparator();
+    trayIconMenu->addSeparator();
 
     int unreadCount = m_lastUnreadCount;
     QList<Notification> unreadNotifications =
         notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
 
     if (unreadCount > 0) {
-        QMenu *unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
+        QMenu* unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
         trayIconMenu->addMenu(unreadMenu);
 
         int limit = qMin(static_cast<int>(unreadNotifications.size()), SettingsDialog::getTrayUnreadLimit());
         for (int i = 0; i < limit; ++i) {
-            const Notification &n = unreadNotifications[i];
+            const Notification& n = unreadNotifications[i];
             QString label = QString("%1: %2").arg(n.repository, n.title);
 
-            QAction *itemAction = new QAction(label, unreadMenu);
+            QAction* itemAction = new QAction(label, unreadMenu);
             QString id = n.id;
             QString url = n.url;
 
@@ -563,7 +561,7 @@ void MainWindow::updateTrayMenu() {
 
         unreadMenu->addSeparator();
 
-        QAction *dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
+        QAction* dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
         connect(dismissAllAction, &QAction::triggered, this, [this]() {
             QMessageBox::StandardButton reply = QMessageBox::question(
                 this, tr("Dismiss All"), tr("Are you sure you want to dismiss all unread notifications?"),
@@ -574,25 +572,25 @@ void MainWindow::updateTrayMenu() {
         });
         unreadMenu->addAction(dismissAllAction);
     } else {
-        QAction *empty = new QAction(tr("No new notifications"), trayIconMenu);
+        QAction* empty = new QAction(tr("No new notifications"), trayIconMenu);
         empty->setEnabled(false);
         trayIconMenu->addAction(empty);
     }
 
     trayIconMenu->addSeparator();
 
-    QAction *trayRefreshAction =
+    QAction* trayRefreshAction =
         new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), trayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
     trayIconMenu->addAction(trayRefreshAction);
 
-    QAction *newIssueTrayAction = new QAction(tr("New Issue..."), trayIconMenu);
+    QAction* newIssueTrayAction = new QAction(tr("New Issue..."), trayIconMenu);
     connect(newIssueTrayAction, &QAction::triggered, this, &MainWindow::showNewIssueDialog);
     trayIconMenu->addAction(newIssueTrayAction);
 
     trayIconMenu->addSeparator();
 
-    QAction *quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
+    QAction* quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
     trayIconMenu->addAction(quitAction);
 
@@ -621,7 +619,7 @@ void MainWindow::updateTrayToolTip() {
     if (!unreadNotifications.isEmpty()) {
         int limit = qMin(unreadNotifications.size(), 5);
         for (int i = 0; i < limit; ++i) {
-            const Notification &n = unreadNotifications[i];
+            const Notification& n = unreadNotifications[i];
             parts << QStringLiteral("- %1: %2").arg(n.repository, n.title);
         }
         if (m_lastUnreadCount > 5) {
@@ -643,7 +641,7 @@ void MainWindow::updateTrayToolTip() {
     trayIcon->setToolTip(parts.join(QStringLiteral("\n")));
 }
 
-void MainWindow::positionPopup(QWidget *popup) {
+void MainWindow::positionPopup(QWidget* popup) {
     if (!popup) return;
 
     QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
@@ -671,7 +669,7 @@ void MainWindow::positionPopup(QWidget *popup) {
 
 void MainWindow::createErrorPage() {
     errorPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(errorPage);
+    QVBoxLayout* layout = new QVBoxLayout(errorPage);
     layout->setAlignment(Qt::AlignCenter);
 
     errorLabel = new QLabel(tr("Authentication Error"), errorPage);
@@ -687,7 +685,7 @@ void MainWindow::createErrorPage() {
 
 void MainWindow::createLoginPage() {
     loginPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(loginPage);
+    QVBoxLayout* layout = new QVBoxLayout(loginPage);
     layout->setAlignment(Qt::AlignCenter);
 
     loginLabel = new QLabel(
@@ -705,7 +703,7 @@ void MainWindow::createLoginPage() {
 
 void MainWindow::createEmptyStatePage() {
     emptyStatePage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(emptyStatePage);
+    QVBoxLayout* layout = new QVBoxLayout(emptyStatePage);
     layout->setAlignment(Qt::AlignCenter);
 
     emptyStateLabel = new QLabel(tr("No new notifications"), emptyStatePage);
@@ -716,7 +714,7 @@ void MainWindow::createEmptyStatePage() {
 
 void MainWindow::createLoadingPage() {
     loadingPage = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(loadingPage);
+    QVBoxLayout* layout = new QVBoxLayout(loadingPage);
     layout->setAlignment(Qt::AlignCenter);
 
     loadingLabel = new QLabel(tr("Loading..."), loadingPage);
@@ -760,7 +758,7 @@ void MainWindow::setupNotificationList() {
     notificationListWidget = new NotificationListWidget(this);
     connect(notificationListWidget, &NotificationListWidget::countsChanged, this, &MainWindow::onListCountsChanged);
     connect(notificationListWidget, &NotificationListWidget::statusMessage, this, &MainWindow::onListStatusMessage);
-    connect(notificationListWidget, &NotificationListWidget::linkActivated, this, [this](const QUrl &url) {
+    connect(notificationListWidget, &NotificationListWidget::linkActivated, this, [this](const QUrl& url) {
         // Do nothing specific, link already opened. Maybe update status?
     });
 
@@ -811,14 +809,14 @@ void MainWindow::setupToolbar() {
     searchLineEdit = new QLineEdit(this);
     searchLineEdit->setPlaceholderText(tr("Search..."));
     searchLineEdit->setFixedWidth(200);
-    connect(searchLineEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
+    connect(searchLineEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
         if (notificationListWidget) {
             notificationListWidget->setSearchFilter(text);
         }
     });
     toolbar->addWidget(searchLineEdit);
 
-    QComboBox *sortComboBox = new QComboBox(this);
+    QComboBox* sortComboBox = new QComboBox(this);
     sortComboBox->addItem(tr("Default (API Order)"));
     sortComboBox->addItem(tr("Updated (Newest)"));
     sortComboBox->addItem(tr("Updated (Oldest)"));
@@ -898,43 +896,42 @@ void MainWindow::setupMenus() {
     KStandardAction::deselect(this, &MainWindow::onSelectNoneClicked, actionCollection());
     KStandardAction::redisplay(this, &MainWindow::onRefreshClicked, actionCollection());
     KStandardAction::aboutApp(this, &MainWindow::showAboutDialog, actionCollection());
-    QAction *notificationRulesAction = new QAction(themedIcon({QStringLiteral("view-list-details")}),
-                                                       tr("Notification &Rules..."), this);
+    QAction* notificationRulesAction =
+        new QAction(themedIcon({QStringLiteral("view-list-details")}), tr("Notification &Rules..."), this);
     connect(notificationRulesAction, &QAction::triggered, this, []() {
         RulesDialog dialog;
         dialog.exec();
     });
     actionCollection()->addAction(QStringLiteral("notification_rules"), notificationRulesAction);
 
-
-    QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
+    QAction* notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
     connect(notificationsSettingsAction, &QAction::triggered, this, &MainWindow::openKdeNotificationSettings);
     actionCollection()->addAction(QStringLiteral("notifications_settings"), notificationsSettingsAction);
 
-    QAction *trendingAction = new QAction(tr("Trending Repos & Devs"), this);
+    QAction* trendingAction = new QAction(tr("Trending Repos & Devs"), this);
     connect(trendingAction, &QAction::triggered, this, &MainWindow::showTrendingWindow);
     actionCollection()->addAction(QStringLiteral("trending"), trendingAction);
 
-    QAction *debugAction = new QAction(tr("Debug GitHub API"), this);
+    QAction* debugAction = new QAction(tr("Debug GitHub API"), this);
     connect(debugAction, &QAction::triggered, this, [this]() { showDebugWindow(); });
     actionCollection()->addAction(QStringLiteral("debug"), debugAction);
 
-    QAction *newIssueAction = new QAction(tr("New Issue..."), this);
+    QAction* newIssueAction = new QAction(tr("New Issue..."), this);
     connect(newIssueAction, &QAction::triggered, this, &MainWindow::showNewIssueDialog);
     actionCollection()->addAction(QStringLiteral("new_issue"), newIssueAction);
 
-    QAction *repoListAction = new QAction(tr("Repositories List"), this);
+    QAction* repoListAction = new QAction(tr("Repositories List"), this);
     connect(repoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
     actionCollection()->addAction(QStringLiteral("repo_list"), repoListAction);
 
-    KActionMenu *issuesMenu = new KActionMenu(tr("Issues"), this);
+    KActionMenu* issuesMenu = new KActionMenu(tr("Issues"), this);
     actionCollection()->addAction(QStringLiteral("issues_menu"), issuesMenu);
 
-    KActionMenu *prsMenu = new KActionMenu(tr("Pull Requests"), this);
+    KActionMenu* prsMenu = new KActionMenu(tr("Pull Requests"), this);
     actionCollection()->addAction(QStringLiteral("prs_menu"), prsMenu);
 
-    KActionMenu *reposMenu = new KActionMenu(tr("Repositories"), this);
+    KActionMenu* reposMenu = new KActionMenu(tr("Repositories"), this);
     actionCollection()->addAction(QStringLiteral("repos_menu"), reposMenu);
 
     struct Variant {
@@ -962,16 +959,16 @@ void MainWindow::setupMenus() {
          "archived:true user:@me"},
         {tr("All (Unfiltered)"), "unfiltered", "involves:@me", "involves:@me", "user:@me"}};
 
-    auto createSubMenu = [&](KActionMenu *parentMenu, const QString &statusName, const QString &statusId,
-                             const QString &statusQuery, const QString &typeQuery, int endpointType) {
-        KActionMenu *statusMenu = parentMenu;
+    auto createSubMenu = [&](KActionMenu* parentMenu, const QString& statusName, const QString& statusId,
+                             const QString& statusQuery, const QString& typeQuery, int endpointType) {
+        KActionMenu* statusMenu = parentMenu;
         if (!statusName.isEmpty()) {
             statusMenu = new KActionMenu(statusName, this);
             actionCollection()->addAction(QStringLiteral("submenu_") + statusId, statusMenu);
             parentMenu->addAction(statusMenu);
         }
 
-        for (const auto &v : variants) {
+        for (const auto& v : variants) {
             QString vQuery;
             if (endpointType == 0)
                 vQuery = v.issueQuery;
@@ -983,7 +980,7 @@ void MainWindow::setupMenus() {
             if (vQuery.isEmpty()) continue;
 
             QString finalQuery = QString("%1 %2 %3").arg(typeQuery, statusQuery, vQuery).trimmed();
-            QAction *action = new QAction(v.name, this);
+            QAction* action = new QAction(v.name, this);
             connect(action, &QAction::triggered, this, [=]() { showWorkItems(v.name, endpointType, finalQuery); });
 
             QString actionName = QStringLiteral("action_") + statusId + QStringLiteral("_") + v.actionId;
@@ -1003,16 +1000,16 @@ void MainWindow::setupMenus() {
 
     createSubMenu(reposMenu, "", "repos", "", "", 2);
 
-    QAction *aboutQtAction = new QAction(tr("About &Qt"), this);
+    QAction* aboutQtAction = new QAction(tr("About &Qt"), this);
     connect(aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
     actionCollection()->addAction(QStringLiteral("about_qt"), aboutQtAction);
 
     setupGUI(Default, ":/kgithub-notifyui.rc");
 }
-void MainWindow::showWorkItems(const QString &title, int endpointType, const QString &query) {
+void MainWindow::showWorkItems(const QString& title, int endpointType, const QString& query) {
     WorkItemWindow::EndpointType type =
         (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
-    WorkItemWindow *window = new WorkItemWindow(client, title, type, query, this);
+    WorkItemWindow* window = new WorkItemWindow(client, title, type, query, this);
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
 }
@@ -1056,9 +1053,9 @@ void MainWindow::loadToken() {
     tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
 }
 
-QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackResource,
+QIcon MainWindow::themedIcon(const QStringList& names, const QString& fallbackResource,
                              QStyle::StandardPixmap fallbackPixmap) const {
-    for (const QString &name : names) {
+    for (const QString& name : names) {
         QIcon icon = QIcon::fromTheme(name);
         if (!icon.isNull()) {
             return icon;
@@ -1075,8 +1072,8 @@ QIcon MainWindow::themedIcon(const QStringList &names, const QString &fallbackRe
     return QApplication::style()->standardIcon(fallbackPixmap);
 }
 
-void MainWindow::sendNotification(const Notification &n) {
-    KNotification *notification = new KNotification("NewNotification");
+void MainWindow::sendNotification(const Notification& n) {
+    KNotification* notification = new KNotification("NewNotification");
     notification->setComponentName(QStringLiteral("kgithub-notify"));
     notification->setTitle(n.repository);
     notification->setText(n.title);
@@ -1101,8 +1098,8 @@ void MainWindow::sendNotification(const Notification &n) {
     notification->sendEvent();
 }
 
-void MainWindow::sendSummaryNotification(int count, const QList<Notification> &notifications) {
-    KNotification *notification = new KNotification("NewNotification");
+void MainWindow::sendSummaryNotification(int count, const QList<Notification>& notifications) {
+    KNotification* notification = new KNotification("NewNotification");
     notification->setComponentName(QStringLiteral("kgithub-notify"));
     notification->setTitle(tr("%1 New Notifications").arg(count));
 
@@ -1131,7 +1128,7 @@ void MainWindow::sendSummaryNotification(int count, const QList<Notification> &n
 }
 
 void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
-                                     const QList<Notification> &newlyAddedNotifications) {
+                                     const QList<Notification>& newlyAddedNotifications) {
     if (unreadCount <= 0) {
         trayIcon->setIcon(themedIcon({QStringLiteral("kgithub-notify")}, QStringLiteral(":/assets/icon.png"),
                                      QStyle::SP_ComputerIcon));
@@ -1148,7 +1145,7 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
         QList<Notification> individualNotifications;
         QList<Notification> summarizedNotifications;
 
-        for (const Notification &n : newlyAddedNotifications) {
+        for (const Notification& n : newlyAddedNotifications) {
             if (!n.unread && !notifyRead) continue;
 
             QString action = NotificationRuleEngine::evaluate(n);
@@ -1169,8 +1166,9 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
 
         // Send summarize notifications if they exceed the threshold or if they explicitly asked to summarize
         bool hasAlwaysSummarize = false;
-        for (const Notification &n : summarizedNotifications) {
-            if (NotificationRuleEngine::evaluate(n) == "AlwaysSummarize" || NotificationRuleEngine::evaluate(n) == "NeverIndividual") {
+        for (const Notification& n : summarizedNotifications) {
+            if (NotificationRuleEngine::evaluate(n) == "AlwaysSummarize" ||
+                NotificationRuleEngine::evaluate(n) == "NeverIndividual") {
                 hasAlwaysSummarize = true;
                 break;
             }
@@ -1179,13 +1177,13 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
         if (summarizedNotifications.size() > threshold || (hasAlwaysSummarize && summarizedNotifications.size() > 0)) {
             sendSummaryNotification(summarizedNotifications.size(), summarizedNotifications);
         } else {
-            for (const Notification &n : summarizedNotifications) {
+            for (const Notification& n : summarizedNotifications) {
                 individualNotifications.append(n);
             }
         }
 
         int delayMs = 0;
-        for (const Notification &n : individualNotifications) {
+        for (const Notification& n : individualNotifications) {
             QTimer::singleShot(delayMs, this, [this, n]() { sendNotification(n); });
             delayMs += stepDelayMs;
         }
@@ -1214,7 +1212,7 @@ void MainWindow::updateSelectionComboBox() {
 }
 
 void MainWindow::showNewIssueDialog() {
-    NewIssueDialog *dialog = new NewIssueDialog(client, this);
+    NewIssueDialog* dialog = new NewIssueDialog(client, this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();
 }

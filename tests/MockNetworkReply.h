@@ -7,7 +7,7 @@
 class MockNetworkReply : public QNetworkReply {
     Q_OBJECT
    public:
-    MockNetworkReply(const QByteArray &data, QObject *parent = nullptr) : QNetworkReply(parent) {
+    MockNetworkReply(const QByteArray& data, QObject* parent = nullptr) : QNetworkReply(parent) {
         setOpenMode(QIODevice::ReadOnly);
         m_buffer.setData(data);
         m_buffer.open(QIODevice::ReadOnly);
@@ -15,17 +15,17 @@ class MockNetworkReply : public QNetworkReply {
 
     void abort() override {}
 
-    qint64 readData(char *data, qint64 maxlen) override { return m_buffer.read(data, maxlen); }
+    qint64 readData(char* data, qint64 maxlen) override { return m_buffer.read(data, maxlen); }
 
     qint64 bytesAvailable() const override { return m_buffer.bytesAvailable() + QNetworkReply::bytesAvailable(); }
 
-    void setAttribute(QNetworkRequest::Attribute code, const QVariant &value) {
+    void setAttribute(QNetworkRequest::Attribute code, const QVariant& value) {
         QNetworkReply::setAttribute(code, value);
     }
 
-    void setError(NetworkError code, const QString &errorString) { QNetworkReply::setError(code, errorString); }
+    void setError(NetworkError code, const QString& errorString) { QNetworkReply::setError(code, errorString); }
 
-    void setRawHeader(const QByteArray &name, const QByteArray &value) { QNetworkReply::setRawHeader(name, value); }
+    void setRawHeader(const QByteArray& name, const QByteArray& value) { QNetworkReply::setRawHeader(name, value); }
 
    private:
     QBuffer m_buffer;

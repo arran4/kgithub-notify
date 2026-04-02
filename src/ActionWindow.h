@@ -16,22 +16,22 @@ class ActionWindow : public KXmlGuiWindow {
     Q_OBJECT
 
    public:
-    explicit ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent = nullptr);
+    explicit ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr);
 
    private slots:
     void fetchRunDetails();
-    void onRunDetailsReply(QNetworkReply *reply);
+    void onRunDetailsReply(QNetworkReply* reply);
 
     void fetchJobs();
-    void onJobsReply(QNetworkReply *reply);
+    void onJobsReply(QNetworkReply* reply);
 
    private:
     Notification m_notification;
-    GitHubClient *m_client;
-    QNetworkAccessManager *m_manager;
+    GitHubClient* m_client;
+    QNetworkAccessManager* m_manager;
 
-    QLabel *m_statusLabel;
-    QTableWidget *m_jobsTable;
+    QLabel* m_statusLabel;
+    QTableWidget* m_jobsTable;
     QString m_jobsUrl;
 
     void setupUi();

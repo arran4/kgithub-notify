@@ -18,15 +18,15 @@
 #include "RulesDialog.h"
 #include "WalletManager.h"
 
-SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nullptr) {
+SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nullptr) {
     setWindowTitle("Settings");
 
-    QVBoxLayout *layout = new QVBoxLayout(this);
+    QVBoxLayout* layout = new QVBoxLayout(this);
 
-    QLabel *label = new QLabel("GitHub Personal Access Token:", this);
+    QLabel* label = new QLabel("GitHub Personal Access Token:", this);
     layout->addWidget(label);
 
-    QLabel *helpLabel = new QLabel(
+    QLabel* helpLabel = new QLabel(
         "<small>Classic PAT scopes: <code>repo</code>, <code>read:org</code>, "
         "<code>notifications</code>.<br>Fine-grained token: <code>Issues</code> & <code>Pull requests</code> "
         "(Read/Write), <code>Metadata</code> (Read).</small>",
@@ -35,7 +35,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     helpLabel->setStyleSheet("color: gray;");
     layout->addWidget(helpLabel);
 
-    QHBoxLayout *tokenLayout = new QHBoxLayout();
+    QHBoxLayout* tokenLayout = new QHBoxLayout();
     tokenEdit = new QLineEdit(this);
     tokenEdit->setEchoMode(QLineEdit::Password);
 
@@ -43,7 +43,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     tokenEdit->setEnabled(false);
     tokenEdit->setPlaceholderText("Loading...");
 
-    QFutureWatcher<QString> *watcher = new QFutureWatcher<QString>(this);
+    QFutureWatcher<QString>* watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
         tokenEdit->setText(watcher->result());
         tokenEdit->setEnabled(true);
@@ -65,7 +65,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(statusLabel);
 
     // Interval
-    QLabel *intervalLabel = new QLabel("Refresh Interval (minutes):", this);
+    QLabel* intervalLabel = new QLabel("Refresh Interval (minutes):", this);
     layout->addWidget(intervalLabel);
 
     intervalCombo = new QComboBox(this);
@@ -80,7 +80,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(intervalCombo);
 
     // Data Loading Strategy
-    QLabel *dataLabel = new QLabel("Data Loading Strategy:", this);
+    QLabel* dataLabel = new QLabel("Data Loading Strategy:", this);
     layout->addWidget(dataLabel);
 
     dataOptionCombo = new QComboBox(this);
@@ -97,7 +97,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(dataOptionCombo);
 
     // Notifications configuration
-    QLabel *summaryThresholdLabel = new QLabel("Max notifications before summary:", this);
+    QLabel* summaryThresholdLabel = new QLabel("Max notifications before summary:", this);
     layout->addWidget(summaryThresholdLabel);
 
     summaryThresholdCombo = new QComboBox(this);
@@ -111,7 +111,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     }
     layout->addWidget(summaryThresholdCombo);
 
-    QLabel *notificationDelayLabel = new QLabel("Notification delay (ms):", this);
+    QLabel* notificationDelayLabel = new QLabel("Notification delay (ms):", this);
     layout->addWidget(notificationDelayLabel);
 
     notificationDelayCombo = new QComboBox(this);
@@ -125,7 +125,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     }
     layout->addWidget(notificationDelayCombo);
 
-    QLabel *trayUnreadLimitLabel = new QLabel("Max unread notifications in tray:", this);
+    QLabel* trayUnreadLimitLabel = new QLabel("Max unread notifications in tray:", this);
     layout->addWidget(trayUnreadLimitLabel);
 
     trayUnreadLimitCombo = new QComboBox(this);
@@ -154,7 +154,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     notifyReadCheckBox = new QCheckBox("Notify on read notifications", this);
     notifyReadCheckBox->setChecked(getNotifyRead());
     layout->addWidget(notifyReadCheckBox);
-    QPushButton *rulesBtn = new QPushButton(tr("Manage Notification Rules..."), this);
+    QPushButton* rulesBtn = new QPushButton(tr("Manage Notification Rules..."), this);
     connect(rulesBtn, &QPushButton::clicked, this, [this]() {
         RulesDialog dialog(this);
         dialog.exec();
@@ -162,10 +162,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
     layout->addWidget(rulesBtn);
 
     // Notifications Service
-    QLabel *serviceLabel = new QLabel("Notification Service:", this);
+    QLabel* serviceLabel = new QLabel("Notification Service:", this);
     layout->addWidget(serviceLabel);
 
-    QPushButton *installServiceBtn = new QPushButton("Install kgithub-notify.notifyrc", this);
+    QPushButton* installServiceBtn = new QPushButton("Install kgithub-notify.notifyrc", this);
     connect(installServiceBtn, &QPushButton::clicked, this, &SettingsDialog::installNotifyRc);
     layout->addWidget(installServiceBtn);
 
@@ -190,9 +190,9 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), testClient(nu
 
     connect(autostartCheckBox, &QCheckBox::toggled, startMinimizedCheckBox, &QCheckBox::setEnabled);
 
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    QPushButton *saveButton = new QPushButton("Save", this);
-    QPushButton *cancelButton = new QPushButton("Cancel", this);
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    QPushButton* saveButton = new QPushButton("Save", this);
+    QPushButton* cancelButton = new QPushButton("Cancel", this);
 
     buttonLayout->addWidget(saveButton);
     buttonLayout->addWidget(cancelButton);
@@ -327,7 +327,7 @@ void SettingsDialog::onTestClicked() {
     testClient->verifyToken();
 }
 
-void SettingsDialog::onVerificationResult(bool valid, const QString &message) {
+void SettingsDialog::onVerificationResult(bool valid, const QString& message) {
     testButton->setEnabled(true);
     statusLabel->setText(message);
     if (valid) {

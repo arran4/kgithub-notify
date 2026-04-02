@@ -7,7 +7,7 @@
 #include <QScrollArea>
 #include <QVBoxLayout>
 
-DebugWindow::DebugWindow(GitHubClient *client, QWidget *parent) : QDialog(parent), m_client(client) {
+DebugWindow::DebugWindow(GitHubClient* client, QWidget* parent) : QDialog(parent), m_client(client) {
     setWindowTitle(tr("Debug GitHub API"));
     resize(700, 600);
 
@@ -20,13 +20,13 @@ DebugWindow::DebugWindow(GitHubClient *client, QWidget *parent) : QDialog(parent
     m_presets.append({"List Issues", "GET", "/repos/{owner}/{repo}/issues", {"owner", "repo"}});
     m_presets.append({"Rate Limit", "GET", "/rate_limit", {}});
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     // API Selection
-    QHBoxLayout *topLayout = new QHBoxLayout();
+    QHBoxLayout* topLayout = new QHBoxLayout();
     topLayout->addWidget(new QLabel(tr("API Action:")));
     m_apiSelector = new QComboBox(this);
-    for (const auto &preset : m_presets) {
+    for (const auto& preset : m_presets) {
         m_apiSelector->addItem(preset.name);
     }
     // Use the Qt 5 connect syntax for overloaded signals if needed, or function pointer
@@ -79,7 +79,7 @@ DebugWindow::DebugWindow(GitHubClient *client, QWidget *parent) : QDialog(parent
 void DebugWindow::onApiSelected(int index) {
     if (index < 0 || index >= m_presets.size()) return;
 
-    const ApiPreset &preset = m_presets[index];
+    const ApiPreset& preset = m_presets[index];
 
     // Update Method
     int methodIndex = m_methodSelector->findText(preset.method);
@@ -91,7 +91,7 @@ void DebugWindow::onApiSelected(int index) {
     m_endpointInput->setText(preset.endpoint);
 
     // Clear existing params
-    QLayoutItem *child;
+    QLayoutItem* child;
     while ((child = m_paramsLayout->takeAt(0)) != nullptr) {
         if (child->widget()) {
             child->widget()->deleteLater();
@@ -100,8 +100,8 @@ void DebugWindow::onApiSelected(int index) {
     }
 
     // Generate new params
-    for (const QString &param : preset.params) {
-        QLineEdit *input = new QLineEdit(this);
+    for (const QString& param : preset.params) {
+        QLineEdit* input = new QLineEdit(this);
         // Connect changes to update endpoint
         connect(input, &QLineEdit::textChanged, this, &DebugWindow::onParamChanged);
         m_paramsLayout->addRow(param + ":", input);
@@ -112,7 +112,7 @@ void DebugWindow::onParamChanged() {
     int index = m_apiSelector->currentIndex();
     if (index < 0 || index >= m_presets.size()) return;
 
-    const ApiPreset &preset = m_presets[index];
+    const ApiPreset& preset = m_presets[index];
     QString endpoint = preset.endpoint;
 
     // Iterate through params layout
@@ -121,9 +121,9 @@ void DebugWindow::onParamChanged() {
         // itemAt(row, role)
         // QFormLayout rows are indexed 0..count
         // But adding rows might interleave? No, addRow appends.
-        QLayoutItem *item = m_paramsLayout->itemAt(i, QFormLayout::FieldRole);
+        QLayoutItem* item = m_paramsLayout->itemAt(i, QFormLayout::FieldRole);
         if (item && item->widget()) {
-            QLineEdit *input = qobject_cast<QLineEdit *>(item->widget());
+            QLineEdit* input = qobject_cast<QLineEdit*>(item->widget());
             if (input) {
                 QString value = input->text();
                 endpoint.replace("{" + param + "}", value);
@@ -145,7 +145,7 @@ void DebugWindow::sendRequest() {
     m_client->requestRaw(endpoint, method, body);
 }
 
-void DebugWindow::displayResponse(const QByteArray &data) {
+void DebugWindow::displayResponse(const QByteArray& data) {
     // Only update if we are visible
     // Check if JSON and format it?
     QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -156,4 +156,4 @@ void DebugWindow::displayResponse(const QByteArray &data) {
     }
 }
 
-void DebugWindow::setEndpoint(const QString &url) { m_endpointInput->setText(url); }
+void DebugWindow::setEndpoint(const QString& url) { m_endpointInput->setText(url); }

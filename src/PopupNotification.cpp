@@ -3,13 +3,13 @@
 #include <QApplication>
 #include <QStyle>
 
-PopupNotification::PopupNotification(QWidget *parent) : QWidget(parent) {
+PopupNotification::PopupNotification(QWidget* parent) : QWidget(parent) {
     // Set window flags for a tooltip-like, topmost, frameless window
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_ShowWithoutActivating);
     setAttribute(Qt::WA_DeleteOnClose, false);  // We manage showing/hiding
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(10, 10, 10, 10);
     mainLayout->setSpacing(5);
 
@@ -20,7 +20,7 @@ PopupNotification::PopupNotification(QWidget *parent) : QWidget(parent) {
     mainLayout->addWidget(messageLabel);
 
     // Buttons Layout
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
     buttonLayout->addStretch();
 
@@ -45,7 +45,7 @@ PopupNotification::PopupNotification(QWidget *parent) : QWidget(parent) {
     setFixedWidth(300);
 }
 
-void PopupNotification::setMessage(const QString &message) {
+void PopupNotification::setMessage(const QString& message) {
     messageLabel->setText(message);
     adjustSize();
 }

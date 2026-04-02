@@ -10,8 +10,8 @@
 #include <QPixmap>
 #include <QStyle>
 
-static QIcon getThemedIcon(const QStringList &names, QStyle *style, QStyle::StandardPixmap fallback) {
-    for (const QString &name : names) {
+static QIcon getThemedIcon(const QStringList& names, QStyle* style, QStyle::StandardPixmap fallback) {
+    for (const QString& name : names) {
         if (QIcon::hasThemeIcon(name)) {
             return QIcon::fromTheme(name);
         }
@@ -19,9 +19,9 @@ static QIcon getThemedIcon(const QStringList &names, QStyle *style, QStyle::Stan
     return style->standardIcon(fallback);
 }
 
-NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *parent)
+NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* parent)
     : QWidget(parent), m_isLoading(false) {
-    QHBoxLayout *mainLayout = new QHBoxLayout(this);
+    QHBoxLayout* mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
 
     setMinimumHeight(60);
@@ -50,10 +50,10 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
     avatarLabel->setPixmap(placeholder);
     mainLayout->addWidget(avatarLabel);
 
-    QVBoxLayout *contentLayout = new QVBoxLayout();
+    QVBoxLayout* contentLayout = new QVBoxLayout();
 
     // Title Layout (Title + Status Icons)
-    QHBoxLayout *titleLayout = new QHBoxLayout();
+    QHBoxLayout* titleLayout = new QHBoxLayout();
     titleLayout->setContentsMargins(0, 0, 0, 0);
 
     titleLabel = new QLabel(n.title, this);
@@ -69,7 +69,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
     contentLayout->addLayout(titleLayout);
 
     // Repo, Author and Type
-    QHBoxLayout *repoTypeLayout = new QHBoxLayout();
+    QHBoxLayout* repoTypeLayout = new QHBoxLayout();
     repoLabel = new QLabel(QString("Repo: <b>%1</b>").arg(n.repository.toHtmlEscaped()), this);
     repoLabel->setTextFormat(Qt::RichText);
 
@@ -119,7 +119,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
     mainLayout->addLayout(contentLayout);
 
     // Action Buttons
-    QVBoxLayout *actionLayout = new QVBoxLayout();
+    QVBoxLayout* actionLayout = new QVBoxLayout();
     actionLayout->setContentsMargins(0, 0, 0, 0);
     actionLayout->setAlignment(Qt::AlignTop);
 
@@ -149,18 +149,18 @@ NotificationItemWidget::NotificationItemWidget(const Notification &n, QWidget *p
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 }
 
-void NotificationItemWidget::setAuthor(const QString &name, const QPixmap &avatar) {
+void NotificationItemWidget::setAuthor(const QString& name, const QPixmap& avatar) {
     authorLabel->setText("Author: " + name);
     if (!avatar.isNull()) {
         avatarLabel->setPixmap(avatar.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
 }
 
-void NotificationItemWidget::setHtmlUrl(const QString &url) {
+void NotificationItemWidget::setHtmlUrl(const QString& url) {
     urlLabel->setText(QString("<a href=\"%1\">Open on GitHub</a>").arg(url.toHtmlEscaped()));
 }
 
-void NotificationItemWidget::setError(const QString &error) {
+void NotificationItemWidget::setError(const QString& error) {
     errorLabel->setText(tr("Error: %1").arg(error));
     errorLabel->show();
 }
@@ -184,7 +184,7 @@ void NotificationItemWidget::setLoading(bool loading) {
     }
 }
 
-void NotificationItemWidget::updateNotification(const Notification &n) {
+void NotificationItemWidget::updateNotification(const Notification& n) {
     if (titleLabel->text() != n.title) {
         titleLabel->setText(n.title);
     }

@@ -36,16 +36,16 @@ class NewIssueDialog;
 class MainWindow : public KXmlGuiWindow {
     Q_OBJECT
    public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
-    void setClient(GitHubClient *client);
-    void showTrayMessage(const QString &title, const QString &message);
-    void showDesktopFileWarning(const QString &desktopFileName, const QStringList &appPaths);
+    void setClient(GitHubClient* client);
+    void showTrayMessage(const QString& title, const QString& message);
+    void showDesktopFileWarning(const QString& desktopFileName, const QStringList& appPaths);
 
    public slots:
-    void updateNotifications(const QList<Notification> &notifications, bool append, bool hasMore);
-    void showError(const QString &error);
-    void onAuthError(const QString &message);
+    void updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore);
+    void showError(const QString& error);
+    void onAuthError(const QString& message);
 
    private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
@@ -67,25 +67,25 @@ class MainWindow : public KXmlGuiWindow {
     void onFilterChanged(int index);
     void showAboutDialog();
     void openKdeNotificationSettings();
-    void showDebugWindow(const QString &url = "");
+    void showDebugWindow(const QString& url = "");
     void showRepoListWindow();
     void showTrendingWindow();
     void showNewIssueDialog();
-    void showWorkItems(const QString &title, int endpointType, const QString &query);
+    void showWorkItems(const QString& title, int endpointType, const QString& query);
 
     // From ListWidget
-    void onListCountsChanged(int total, int unread, int newCount, const QList<Notification> &newItems);
-    void onListStatusMessage(const QString &message);
+    void onListCountsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
+    void onListStatusMessage(const QString& message);
 
    protected:
-    void closeEvent(QCloseEvent *event) override;
+    void closeEvent(QCloseEvent* event) override;
 
    private:
     // Helpers
     void createTrayIcon();
     void updateTrayMenu();
     void updateTrayToolTip();
-    void positionPopup(QWidget *popup);
+    void positionPopup(QWidget* popup);
     void createErrorPage();
     void createLoginPage();
     void createEmptyStatePage();
@@ -99,63 +99,63 @@ class MainWindow : public KXmlGuiWindow {
     void setupMenus();
     void setupStatusBar();
     void loadToken();
-    QIcon themedIcon(const QStringList &names, const QString &fallbackResource = QString(),
+    QIcon themedIcon(const QStringList& names, const QString& fallbackResource = QString(),
                      QStyle::StandardPixmap fallbackPixmap = QStyle::SP_FileIcon) const;
-    void sendNotification(const Notification &n);
-    void sendSummaryNotification(int count, const QList<Notification> &notifications);
+    void sendNotification(const Notification& n);
+    void sendSummaryNotification(int count, const QList<Notification>& notifications);
     void updateSelectionComboBox();
-    void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification> &newlyAddedNotifications);
+    void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification>& newlyAddedNotifications);
 
     // Member Variables
-    DebugWindow *debugWindow;
-    RepoListWindow *repoListWindow;
-    TrendingWindow *trendingWindow;
-    QSystemTrayIcon *trayIcon;
-    QMenu *trayIconMenu;
-    NotificationListWidget *notificationListWidget;
-    GitHubClient *client;
+    DebugWindow* debugWindow;
+    RepoListWindow* repoListWindow;
+    TrendingWindow* trendingWindow;
+    QSystemTrayIcon* trayIcon;
+    QMenu* trayIconMenu;
+    NotificationListWidget* notificationListWidget;
+    GitHubClient* client;
 
     bool pendingAuthError;
     QString lastError;
 
     // Toolbar
-    QToolBar *toolbar;
-    QAction *refreshAction;
-    QComboBox *filterComboBox;
-    QComboBox *repoFilterComboBox;
-    QLineEdit *searchLineEdit;
-    QAction *selectAllAction;
-    QAction *selectNoneAction;
-    QComboBox *selectionComboBox;
-    QAction *dismissSelectedAction;
-    QAction *openSelectedAction;
+    QToolBar* toolbar;
+    QAction* refreshAction;
+    QComboBox* filterComboBox;
+    QComboBox* repoFilterComboBox;
+    QLineEdit* searchLineEdit;
+    QAction* selectAllAction;
+    QAction* selectNoneAction;
+    QComboBox* selectionComboBox;
+    QAction* dismissSelectedAction;
+    QAction* openSelectedAction;
 
     // UI components
-    QStackedWidget *stackWidget;
-    QWidget *errorPage;
-    QLabel *errorLabel;
-    QPushButton *settingsButton;
-    QWidget *loginPage;
-    QLabel *loginLabel;
-    QPushButton *loginButton;
-    QWidget *emptyStatePage;
-    QLabel *emptyStateLabel;
-    QWidget *loadingPage;
-    QLabel *loadingLabel;
+    QStackedWidget* stackWidget;
+    QWidget* errorPage;
+    QLabel* errorLabel;
+    QPushButton* settingsButton;
+    QWidget* loginPage;
+    QLabel* loginLabel;
+    QPushButton* loginButton;
+    QWidget* emptyStatePage;
+    QLabel* emptyStateLabel;
+    QWidget* loadingPage;
+    QLabel* loadingLabel;
 
-    PopupNotification *authNotification;
+    PopupNotification* authNotification;
 
     // Status Bar
-    QStatusBar *statusBar;
-    QToolButton *desktopWarningButton;
+    QStatusBar* statusBar;
+    QToolButton* desktopWarningButton;
     QString desktopWarningMessage;
-    QLabel *countLabel;
-    QLabel *timerLabel;
-    QTimer *refreshTimer;
-    QTimer *countdownTimer;
-    QLabel *statusLabel;
+    QLabel* countLabel;
+    QLabel* timerLabel;
+    QTimer* refreshTimer;
+    QTimer* countdownTimer;
+    QLabel* statusLabel;
 
-    QFutureWatcher<QString> *tokenWatcher;
+    QFutureWatcher<QString>* tokenWatcher;
     QString m_loadedToken;
 
     QDateTime m_lastCheckTime;
