@@ -1,7 +1,6 @@
 #ifndef NOTIFICATIONLISTWIDGET_H
 #define NOTIFICATIONLISTWIDGET_H
 
-#include <QtGui/QAction>
 #include <QList>
 #include <QListWidget>
 #include <QMap>
@@ -10,6 +9,7 @@
 #include <QSet>
 #include <QUrl>
 #include <QWidget>
+#include <QtGui/QAction>
 
 #include "Notification.h"
 #include "SettingsDialog.h"
