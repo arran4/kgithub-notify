@@ -1,5 +1,7 @@
 #include "Notification.h"
 
+#include <QJsonArray>
+
 QJsonObject Notification::toJson() const {
     QJsonObject obj;
     obj["id"] = id;
@@ -13,6 +15,13 @@ QJsonObject Notification::toJson() const {
     obj["reason"] = reason;
     obj["unread"] = unread;
     obj["rawJson"] = rawJson;
+
+    QJsonArray grouped;
+    for (const auto& n : groupedNotifications) {
+        grouped.append(n.toJson());
+    }
+    obj["groupedNotifications"] = grouped;
+
     return obj;
 }
 
@@ -29,5 +38,13 @@ Notification Notification::fromJson(const QJsonObject& obj) {
     n.reason = obj["reason"].toString();
     n.unread = obj["unread"].toBool();
     n.rawJson = obj["rawJson"].toObject();
+
+    if (obj.contains("groupedNotifications")) {
+        QJsonArray grouped = obj["groupedNotifications"].toArray();
+        for (const QJsonValue& v : grouped) {
+            n.groupedNotifications.append(Notification::fromJson(v.toObject()));
+        }
+    }
+
     return n;
 }

@@ -473,6 +473,22 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
         notifications.append(n);
     }
 
+    // Group Action Results with Pull Requests
+    for (int i = 0; i < notifications.size(); ++i) {
+        if (notifications[i].type == "PullRequest") {
+            for (int j = notifications.size() - 1; j >= 0; --j) {
+                if (i != j && notifications[j].repository == notifications[i].repository &&
+                    (notifications[j].type == "CheckSuite" || notifications[j].type == "WorkflowRun")) {
+                    notifications[i].groupedNotifications.append(notifications[j]);
+                    notifications.removeAt(j);
+                    if (j < i) {
+                        --i; // Adjust index if a preceding element was removed
+                    }
+                }
+            }
+        }
+    }
+
     // Parse Link header
     m_nextPageUrl.clear();
     if (reply->hasRawHeader("Link")) {

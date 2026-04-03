@@ -21,8 +21,15 @@ static QIcon getThemedIcon(const QStringList& names, QStyle* style, QStyle::Stan
 
 NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* parent)
     : QWidget(parent), m_isLoading(false) {
-    QHBoxLayout* mainLayout = new QHBoxLayout(this);
+
+    QVBoxLayout* outerLayout = new QVBoxLayout(this);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
+    outerLayout->setSpacing(0);
+
+    QWidget* topWidget = new QWidget(this);
+    QHBoxLayout* mainLayout = new QHBoxLayout(topWidget);
     mainLayout->setContentsMargins(5, 5, 5, 5);
+    outerLayout->addWidget(topWidget);
 
     setMinimumHeight(60);
 
@@ -123,6 +130,14 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
     actionLayout->setContentsMargins(0, 0, 0, 0);
     actionLayout->setAlignment(Qt::AlignTop);
 
+    expandButton = new QToolButton(this);
+    expandButton->setAutoRaise(true);
+    expandButton->setIcon(QIcon::fromTheme("go-down", style()->standardIcon(QStyle::SP_ArrowDown)));
+    expandButton->setIconSize(QSize(24, 24));
+    expandButton->setToolTip(tr("Expand Grouped Notifications"));
+    expandButton->setVisible(!n.groupedNotifications.isEmpty());
+    actionLayout->addWidget(expandButton);
+
     openButton = new QToolButton(this);
     openButton->setAutoRaise(true);
     openButton->setIcon(getThemedIcon(
@@ -145,6 +160,31 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
 
     actionLayout->addStretch();
     mainLayout->addLayout(actionLayout);
+
+    childrenContainer = new QWidget(this);
+    QVBoxLayout* childrenLayout = new QVBoxLayout(childrenContainer);
+    childrenLayout->setContentsMargins(40, 0, 5, 5); // Indent children
+    childrenLayout->setSpacing(2);
+
+    if (!n.groupedNotifications.isEmpty()) {
+        for (const auto& child : n.groupedNotifications) {
+            QLabel* childLabel = new QLabel(QString("↳ <b>%1</b>: %2").arg(child.type, child.title.toHtmlEscaped()), this);
+            childLabel->setTextFormat(Qt::RichText);
+            childLabel->setWordWrap(true);
+            childrenLayout->addWidget(childLabel);
+        }
+    }
+
+    childrenContainer->setVisible(false);
+    outerLayout->addWidget(childrenContainer);
+
+    connect(expandButton, &QToolButton::clicked, this, [this]() {
+        bool isVisible = childrenContainer->isVisible();
+        childrenContainer->setVisible(!isVisible);
+        expandButton->setIcon(QIcon::fromTheme(isVisible ? "go-down" : "go-up",
+                              style()->standardIcon(isVisible ? QStyle::SP_ArrowDown : QStyle::SP_ArrowUp)));
+        emit heightChanged();
+    });
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 }

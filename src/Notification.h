@@ -16,6 +16,7 @@ struct Notification {
     QString reason;
     bool unread;
     QJsonObject rawJson;
+    QList<Notification> groupedNotifications;
 
     QJsonObject toJson() const;
     static Notification fromJson(const QJsonObject& obj);

@@ -18,6 +18,8 @@ class NotificationItemWidget : public QWidget {
 
     QToolButton* doneButton;
     QToolButton* openButton;
+    QToolButton* expandButton;
+    QWidget* childrenContainer;
     QLabel* avatarLabel;
     QLabel* titleLabel;
     QLabel* repoLabel;
@@ -41,6 +43,7 @@ class NotificationItemWidget : public QWidget {
    signals:
     void doneClicked();
     void openClicked();
+    void heightChanged();
 
    private:
     bool m_isLoading;
