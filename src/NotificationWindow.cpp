@@ -19,40 +19,40 @@
 #include "PullRequestWindow.h"
 #include "RulesDialog.h"
 
-NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *client, QWidget *parent)
+NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
     setWindowTitle(tr("Notification Details - %1").arg(n.repository));
     resize(500, 400);
 
     // Menu Bar
-    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
+    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &NotificationWindow::close);
     fileMenu->addAction(closeAction);
 
-    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+    QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
 
-    QAction *copyLinkAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    QAction* copyLinkAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
     copyLinkAction->setShortcut(QKeySequence::Copy);
     connect(copyLinkAction, &QAction::triggered, this, &NotificationWindow::onCopyLink);
     editMenu->addAction(copyLinkAction);
 
-    QMenu *actionsMenu = menuBar()->addMenu(tr("&Actions"));
+    QMenu* actionsMenu = menuBar()->addMenu(tr("&Actions"));
 
-    QAction *openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
+    QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
     connect(openUrlAction, &QAction::triggered, this, &NotificationWindow::onOpenUrl);
     actionsMenu->addAction(openUrlAction);
 
-    QAction *markAsReadAction = new QAction(QIcon::fromTheme("mail-mark-read"), tr("Mark as Read"), this);
+    QAction* markAsReadAction = new QAction(QIcon::fromTheme("mail-mark-read"), tr("Mark as Read"), this);
     connect(markAsReadAction, &QAction::triggered, this, &NotificationWindow::onMarkAsRead);
     actionsMenu->addAction(markAsReadAction);
 
-    QAction *markAsDoneAction = new QAction(QIcon::fromTheme("task-complete"), tr("Mark as Done"), this);
+    QAction* markAsDoneAction = new QAction(QIcon::fromTheme("task-complete"), tr("Mark as Done"), this);
     connect(markAsDoneAction, &QAction::triggered, this, &NotificationWindow::onMarkAsDone);
     actionsMenu->addAction(markAsDoneAction);
     actionsMenu->addSeparator();
-    QAction *muteRepoAction = new QAction(QIcon::fromTheme("notifications-disabled"), tr("Mute Repository"), this);
+    QAction* muteRepoAction = new QAction(QIcon::fromTheme("notifications-disabled"), tr("Mute Repository"), this);
     connect(muteRepoAction, &QAction::triggered, this, [this]() {
         NotificationRule rule;
         rule.repoFilter = m_notification.repository;
@@ -63,7 +63,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     });
     actionsMenu->addAction(muteRepoAction);
 
-    QAction *openRulesAction =
+    QAction* openRulesAction =
         new QAction(QIcon::fromTheme("view-list-details"), tr("Manage Notification Rules..."), this);
     connect(openRulesAction, &QAction::triggered, this, [this]() {
         RulesDialog dialog(this, m_notification.repository, m_notification.repository);
@@ -73,12 +73,12 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
 
     actionsMenu->addSeparator();
 
-    QAction *viewRawAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
+    QAction* viewRawAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
     connect(viewRawAction, &QAction::triggered, this, &NotificationWindow::onViewRawJson);
     actionsMenu->addAction(viewRawAction);
 
-    QAction *viewPullRequestAction = nullptr;
-    QAction *viewActionJobAction = nullptr;
+    QAction* viewPullRequestAction = nullptr;
+    QAction* viewActionJobAction = nullptr;
 
     if (m_notification.type == "PullRequest") {
         viewPullRequestAction = new QAction(QIcon::fromTheme("vcs-merge-request"), tr("View Pull Request"), this);
@@ -91,7 +91,7 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     }
 
     // Tool Bar
-    QToolBar *toolBar = addToolBar(tr("Actions"));
+    QToolBar* toolBar = addToolBar(tr("Actions"));
     toolBar->setObjectName("NotificationActionsToolBar");
     toolBar->addAction(openUrlAction);
     toolBar->addAction(copyLinkAction);
@@ -111,38 +111,38 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     }
 
     // Central Widget
-    QWidget *centralWidget = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(centralWidget);
+    QWidget* centralWidget = new QWidget(this);
+    QVBoxLayout* layout = new QVBoxLayout(centralWidget);
 
     {
-        QLabel *lbl = new QLabel(tr("<b>ID:</b> %1").arg(n.id.toHtmlEscaped()));
+        QLabel* lbl = new QLabel(tr("<b>ID:</b> %1").arg(n.id.toHtmlEscaped()));
         lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
         layout->addWidget(lbl);
     }
     {
-        QLabel *lbl = new QLabel(tr("<b>Title:</b> %1").arg(n.title.toHtmlEscaped()));
+        QLabel* lbl = new QLabel(tr("<b>Title:</b> %1").arg(n.title.toHtmlEscaped()));
         lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
         layout->addWidget(lbl);
     }
     {
-        QLabel *lbl = new QLabel(tr("<b>Repository:</b> %1").arg(n.repository.toHtmlEscaped()));
+        QLabel* lbl = new QLabel(tr("<b>Repository:</b> %1").arg(n.repository.toHtmlEscaped()));
         lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
         layout->addWidget(lbl);
     }
     {
-        QLabel *lbl = new QLabel(tr("<b>Type:</b> %1").arg(n.type.toHtmlEscaped()));
+        QLabel* lbl = new QLabel(tr("<b>Type:</b> %1").arg(n.type.toHtmlEscaped()));
         lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
         layout->addWidget(lbl);
     }
     {
-        QLabel *lbl = new QLabel(tr("<b>Updated At:</b> %1").arg(n.updatedAt.toHtmlEscaped()));
+        QLabel* lbl = new QLabel(tr("<b>Updated At:</b> %1").arg(n.updatedAt.toHtmlEscaped()));
         lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
         layout->addWidget(lbl);
     }
 
     if (!n.lastReadAt.isEmpty()) {
         {
-            QLabel *lbl = new QLabel(tr("<b>Last Read At:</b> %1").arg(n.lastReadAt.toHtmlEscaped()));
+            QLabel* lbl = new QLabel(tr("<b>Last Read At:</b> %1").arg(n.lastReadAt.toHtmlEscaped()));
             lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
             layout->addWidget(lbl);
         }
@@ -151,13 +151,13 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     QString apiUrl = n.url;
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, n.id);
 
-    QLabel *urlLabel = new QLabel(tr("<b>API URL:</b> <a href=\"%1\">%1</a>").arg(apiUrl.toHtmlEscaped()));
+    QLabel* urlLabel = new QLabel(tr("<b>API URL:</b> <a href=\"%1\">%1</a>").arg(apiUrl.toHtmlEscaped()));
     urlLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    connect(urlLabel, &QLabel::linkActivated, this, [this](const QString &link) { emit debugApiRequested(link); });
+    connect(urlLabel, &QLabel::linkActivated, this, [this](const QString& link) { emit debugApiRequested(link); });
     layout->addWidget(urlLabel);
 
     if (!htmlUrl.isEmpty() && htmlUrl != apiUrl) {
-        QLabel *htmlUrlLabel = new QLabel(tr("<b>HTML URL:</b> <a href=\"%1\">%1</a>").arg(htmlUrl.toHtmlEscaped()));
+        QLabel* htmlUrlLabel = new QLabel(tr("<b>HTML URL:</b> <a href=\"%1\">%1</a>").arg(htmlUrl.toHtmlEscaped()));
         htmlUrlLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
         htmlUrlLabel->setOpenExternalLinks(true);
         layout->addWidget(htmlUrlLabel);
@@ -166,33 +166,33 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
     layout->addStretch();
 
     // Bottom Actions
-    QHBoxLayout *bottomLayout = new QHBoxLayout();
+    QHBoxLayout* bottomLayout = new QHBoxLayout();
     bottomLayout->addStretch();
 
-    QPushButton *closeBtn = new QPushButton(tr("Close"));
+    QPushButton* closeBtn = new QPushButton(tr("Close"));
     connect(closeBtn, &QPushButton::clicked, this, &KXmlGuiWindow::close);
     bottomLayout->addWidget(closeBtn);
 
-    QPushButton *markDoneBtn = new QPushButton(QIcon::fromTheme("task-complete"), tr("Mark as Done"));
+    QPushButton* markDoneBtn = new QPushButton(QIcon::fromTheme("task-complete"), tr("Mark as Done"));
     connect(markDoneBtn, &QPushButton::clicked, this, &NotificationWindow::onMarkAsDone);
     bottomLayout->addWidget(markDoneBtn);
 
-    QPushButton *closeAndReadBtn = new QPushButton(QIcon::fromTheme("mail-mark-read"), tr("Close and mark as read"));
+    QPushButton* closeAndReadBtn = new QPushButton(QIcon::fromTheme("mail-mark-read"), tr("Close and mark as read"));
     connect(closeAndReadBtn, &QPushButton::clicked, this, &NotificationWindow::onCloseAndMarkAsRead);
     bottomLayout->addWidget(closeAndReadBtn);
 
     if (viewPullRequestAction) {
-        QPushButton *viewPrBtn = new QPushButton(QIcon::fromTheme("vcs-merge-request"), tr("View Pull Request"));
+        QPushButton* viewPrBtn = new QPushButton(QIcon::fromTheme("vcs-merge-request"), tr("View Pull Request"));
         connect(viewPrBtn, &QPushButton::clicked, this, &NotificationWindow::onViewPullRequest);
         bottomLayout->addWidget(viewPrBtn);
     }
     if (viewActionJobAction) {
-        QPushButton *viewActionBtn = new QPushButton(QIcon::fromTheme("system-run"), tr("View Action Job"));
+        QPushButton* viewActionBtn = new QPushButton(QIcon::fromTheme("system-run"), tr("View Action Job"));
         connect(viewActionBtn, &QPushButton::clicked, this, &NotificationWindow::onViewActionJob);
         bottomLayout->addWidget(viewActionBtn);
     }
 
-    QPushButton *viewRawBtn = new QPushButton(QIcon::fromTheme("text-json"), tr("View Raw JSON"));
+    QPushButton* viewRawBtn = new QPushButton(QIcon::fromTheme("text-json"), tr("View Raw JSON"));
     connect(viewRawBtn, &QPushButton::clicked, this, [this]() {
         QJsonObject combined;
         combined["extract"] = m_notification.toJson();
@@ -201,12 +201,12 @@ NotificationWindow::NotificationWindow(const Notification &n, GitHubClient *clie
         QJsonDocument doc(combined);
         QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
-        QDialog *dialog = new QDialog(this);
+        QDialog* dialog = new QDialog(this);
         dialog->setWindowTitle(tr("Raw JSON"));
         dialog->resize(600, 400);
 
-        QVBoxLayout *layout = new QVBoxLayout(dialog);
-        QTextEdit *textEdit = new QTextEdit(dialog);
+        QVBoxLayout* layout = new QVBoxLayout(dialog);
+        QTextEdit* textEdit = new QTextEdit(dialog);
         textEdit->setReadOnly(true);
         textEdit->setPlainText(rawJson);
         layout->addWidget(textEdit);
@@ -257,12 +257,12 @@ void NotificationWindow::onViewRawJson() {
     QJsonDocument doc(combined);
     QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
-    QDialog *dialog = new QDialog(this);
+    QDialog* dialog = new QDialog(this);
     dialog->setWindowTitle(tr("Raw JSON"));
     dialog->resize(600, 400);
 
-    QVBoxLayout *layout = new QVBoxLayout(dialog);
-    QTextEdit *textEdit = new QTextEdit(dialog);
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    QTextEdit* textEdit = new QTextEdit(dialog);
     textEdit->setReadOnly(true);
     textEdit->setPlainText(rawJson);
     layout->addWidget(textEdit);
@@ -272,13 +272,13 @@ void NotificationWindow::onViewRawJson() {
 }
 
 void NotificationWindow::onViewPullRequest() {
-    PullRequestWindow *win = new PullRequestWindow(m_notification, m_client, this);
+    PullRequestWindow* win = new PullRequestWindow(m_notification, m_client, this);
     win->setAttribute(Qt::WA_DeleteOnClose);
     win->show();
 }
 
 void NotificationWindow::onViewActionJob() {
-    ActionWindow *win = new ActionWindow(m_notification, m_client, this);
+    ActionWindow* win = new ActionWindow(m_notification, m_client, this);
     win->setAttribute(Qt::WA_DeleteOnClose);
     win->show();
 }

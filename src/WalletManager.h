@@ -8,7 +8,7 @@ class WalletManager {
    public:
     static QString loadToken();
     static QFuture<QString> loadTokenAsync();
-    static void saveToken(const QString &token);
+    static void saveToken(const QString& token);
 };
 
 #endif  // WALLETMANAGER_H

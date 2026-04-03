@@ -11,7 +11,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
-NewIssueDialog::NewIssueDialog(GitHubClient *client, QWidget *parent)
+NewIssueDialog::NewIssueDialog(GitHubClient* client, QWidget* parent)
     : QDialog(parent), m_client(client), m_verifyTimer(new QTimer(this)), m_isFetchingRepos(false) {
     setupUI();
 
@@ -30,17 +30,17 @@ void NewIssueDialog::setupUI() {
     setWindowTitle(tr("New Issue"));
     resize(500, 450);
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    QLabel *instructionLabel = new QLabel(tr("Repository:"), this);
+    QLabel* instructionLabel = new QLabel(tr("Repository:"), this);
     mainLayout->addWidget(instructionLabel);
 
-    QHBoxLayout *repoLayout = new QHBoxLayout();
+    QHBoxLayout* repoLayout = new QHBoxLayout();
     m_repoComboBox = new QComboBox(this);
     m_repoComboBox->setEditable(true);
     m_repoComboBox->setInsertPolicy(QComboBox::NoInsert);
 
-    QCompleter *completer = m_repoComboBox->completer();
+    QCompleter* completer = m_repoComboBox->completer();
     if (completer) {
         completer->setCompletionMode(QCompleter::PopupCompletion);
         completer->setFilterMode(Qt::MatchContains);
@@ -56,19 +56,19 @@ void NewIssueDialog::setupUI() {
     repoLayout->addWidget(m_refreshButton);
     mainLayout->addLayout(repoLayout);
 
-    QLabel *titleLabel = new QLabel(tr("Title:"), this);
+    QLabel* titleLabel = new QLabel(tr("Title:"), this);
     mainLayout->addWidget(titleLabel);
 
     m_titleEdit = new QLineEdit(this);
     mainLayout->addWidget(m_titleEdit);
 
-    QLabel *assigneeLabel = new QLabel(tr("Assignee (username, optional):"), this);
+    QLabel* assigneeLabel = new QLabel(tr("Assignee (username, optional):"), this);
     mainLayout->addWidget(assigneeLabel);
 
     m_assigneeEdit = new QLineEdit(this);
     mainLayout->addWidget(m_assigneeEdit);
 
-    QLabel *bodyLabel = new QLabel(tr("Body:"), this);
+    QLabel* bodyLabel = new QLabel(tr("Body:"), this);
     mainLayout->addWidget(bodyLabel);
 
     m_bodyEdit = new QTextEdit(this);
@@ -80,10 +80,10 @@ void NewIssueDialog::setupUI() {
     m_statusLabel->setWordWrap(true);
     mainLayout->addWidget(m_statusLabel);
 
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
 
-    QPushButton *cancelButton = new QPushButton(tr("Cancel"), this);
+    QPushButton* cancelButton = new QPushButton(tr("Cancel"), this);
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     buttonLayout->addWidget(cancelButton);
 
@@ -152,7 +152,7 @@ void NewIssueDialog::saveCache() {
     }
 }
 
-void NewIssueDialog::onRepoTextChanged(const QString &text) {
+void NewIssueDialog::onRepoTextChanged(const QString& text) {
     m_createButton->setEnabled(false);
 
     // Basic format check
@@ -187,7 +187,7 @@ void NewIssueDialog::verifyRepo() {
     m_client->verifyRepo(m_currentVerifyRepo);
 }
 
-void NewIssueDialog::onRepoVerified(const QString &repoFullName, bool exists) {
+void NewIssueDialog::onRepoVerified(const QString& repoFullName, bool exists) {
     if (repoFullName.compare(m_currentVerifyRepo, Qt::CaseInsensitive) != 0) return;
 
     if (exists) {
@@ -220,7 +220,7 @@ void NewIssueDialog::onCreateClicked() {
     m_client->createIssue(repoName, title, body, assignee);
 }
 
-void NewIssueDialog::onIssueCreated(const QByteArray &data) {
+void NewIssueDialog::onIssueCreated(const QByteArray& data) {
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isObject() && doc.object().contains("html_url")) {
         QString url = doc.object()["html_url"].toString();
@@ -254,7 +254,7 @@ void NewIssueDialog::onRefreshClicked() {
     m_client->fetchUserRepos();
 }
 
-void NewIssueDialog::onReposReceived(const QJsonArray &repos, const QString &nextPageUrl) {
+void NewIssueDialog::onReposReceived(const QJsonArray& repos, const QString& nextPageUrl) {
     if (!m_isFetchingRepos) return;
     for (int i = 0; i < repos.size(); ++i) {
         m_allRepos.append(repos[i]);
@@ -278,7 +278,7 @@ void NewIssueDialog::onReposReceived(const QJsonArray &repos, const QString &nex
     }
 }
 
-void NewIssueDialog::onErrorOccurred(const QString &error) {
+void NewIssueDialog::onErrorOccurred(const QString& error) {
     m_refreshButton->setEnabled(true);
     m_createButton->setEnabled(true);
     QString errMsg = tr("Error: %1").arg(error);
@@ -291,7 +291,7 @@ void NewIssueDialog::onErrorOccurred(const QString &error) {
     m_statusLabel->setStyleSheet("color: red;");
 }
 
-void NewIssueDialog::setInitialRepo(const QString &repoFullName) {
+void NewIssueDialog::setInitialRepo(const QString& repoFullName) {
     int index = m_repoComboBox->findText(repoFullName, Qt::MatchExactly);
     if (index >= 0) {
         m_repoComboBox->setCurrentIndex(index);

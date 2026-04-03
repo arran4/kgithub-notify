@@ -18,7 +18,7 @@ struct Notification {
     QJsonObject rawJson;
 
     QJsonObject toJson() const;
-    static Notification fromJson(const QJsonObject &obj);
+    static Notification fromJson(const QJsonObject& obj);
 };
 
 #endif  // NOTIFICATION_H

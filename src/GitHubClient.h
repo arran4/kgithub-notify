@@ -19,64 +19,64 @@ class GitHubClient : public QObject {
     friend class TestGitHubClient;
 
    public:
-    explicit GitHubClient(QObject *parent = nullptr);
-    static QString apiToHtmlUrl(const QString &apiUrl, const QString &notificationId = "");
-    void setToken(const QString &token);
-    void setApiUrl(const QString &url);
+    explicit GitHubClient(QObject* parent = nullptr);
+    static QString apiToHtmlUrl(const QString& apiUrl, const QString& notificationId = "");
+    void setToken(const QString& token);
+    void setApiUrl(const QString& url);
     void setShowAll(bool all);
     void checkNotifications();
     void loadMore();
     void verifyToken();
-    void markAsRead(const QString &id);
-    void markAsDone(const QString &id);
-    void markAsReadAndDone(const QString &id);
-    void fetchNotificationDetails(const QString &url, const QString &notificationId);
-    void fetchImage(const QString &imageUrl, const QString &notificationId);
-    void requestRaw(const QString &endpoint, const QString &method = "GET", const QByteArray &body = QByteArray());
-    void fetchUserRepos(const QString &pageUrl = QString());
-    void verifyRepo(const QString &repoFullName);
-    void createIssue(const QString &repoFullName, const QString &title, const QString &body,
-                     const QString &assignee = "");
-    QNetworkRequest createAuthenticatedRequest(const QUrl &url) const;
+    void markAsRead(const QString& id);
+    void markAsDone(const QString& id);
+    void markAsReadAndDone(const QString& id);
+    void fetchNotificationDetails(const QString& url, const QString& notificationId);
+    void fetchImage(const QString& imageUrl, const QString& notificationId);
+    void requestRaw(const QString& endpoint, const QString& method = "GET", const QByteArray& body = QByteArray());
+    void fetchUserRepos(const QString& pageUrl = QString());
+    void verifyRepo(const QString& repoFullName);
+    void createIssue(const QString& repoFullName, const QString& title, const QString& body,
+                     const QString& assignee = "");
+    QNetworkRequest createAuthenticatedRequest(const QUrl& url) const;
 
    signals:
     void loadingStarted();
-    void notificationsReceived(const QList<Notification> &notifications, bool append, bool hasMore);
-    void detailsReceived(const QString &notificationId, const QString &authorName, const QString &avatarUrl,
-                         const QString &htmlUrl);
-    void detailsError(const QString &notificationId, const QString &error);
-    void imageReceived(const QString &notificationId, const QPixmap &avatar);
-    void rawDataReceived(const QByteArray &data);
-    void userReposReceived(const QJsonArray &repos, const QString &nextPageUrl);
-    void errorOccurred(const QString &error);
-    void authError(const QString &message);
-    void tokenVerified(bool valid, const QString &message);
-    void repoVerified(const QString &repoFullName, bool exists);
-    void issueCreated(const QByteArray &data);
+    void notificationsReceived(const QList<Notification>& notifications, bool append, bool hasMore);
+    void detailsReceived(const QString& notificationId, const QString& authorName, const QString& avatarUrl,
+                         const QString& htmlUrl);
+    void detailsError(const QString& notificationId, const QString& error);
+    void imageReceived(const QString& notificationId, const QPixmap& avatar);
+    void rawDataReceived(const QByteArray& data);
+    void userReposReceived(const QJsonArray& repos, const QString& nextPageUrl);
+    void errorOccurred(const QString& error);
+    void authError(const QString& message);
+    void tokenVerified(bool valid, const QString& message);
+    void repoVerified(const QString& repoFullName, bool exists);
+    void issueCreated(const QByteArray& data);
 
    private slots:
-    void onReplyFinished(QNetworkReply *reply);
+    void onReplyFinished(QNetworkReply* reply);
     void onRequestTimeout();
 
    private:
-    QNetworkAccessManager *manager;
+    QNetworkAccessManager* manager;
     SecureString m_token;
     QString m_apiUrl;
     bool m_showAll;
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
     QPointer<QNetworkReply> m_activeNotificationReply;
-    QTimer *m_requestTimeoutTimer;
+    QTimer* m_requestTimeoutTimer;
 
-    QNetworkRequest createRequest(const QUrl &url) const;
+    QNetworkRequest createRequest(const QUrl& url) const;
 
-    void handleDetailsReply(QNetworkReply *reply);
-    void handleImageReply(QNetworkReply *reply);
-    void handleVerificationReply(QNetworkReply *reply);
-    void handleUserReposReply(QNetworkReply *reply);
-    void handleRepoVerifyReply(QNetworkReply *reply);
-    void handlePatchReply(QNetworkReply *reply);
-    void handleNotificationsReply(QNetworkReply *reply);
+    void handleDetailsReply(QNetworkReply* reply);
+    void handleImageReply(QNetworkReply* reply);
+    void handleVerificationReply(QNetworkReply* reply);
+    void handleUserReposReply(QNetworkReply* reply);
+    void handleRepoVerifyReply(QNetworkReply* reply);
+    void handlePatchReply(QNetworkReply* reply);
+    void handleNotificationsReply(QNetworkReply* reply);
 };
 
 #endif  // GITHUBCLIENT_H

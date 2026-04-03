@@ -27,7 +27,7 @@
 
 #include "NewIssueDialog.h"
 
-RepoListWindow::RepoListWindow(GitHubClient *client, QWidget *parent)
+RepoListWindow::RepoListWindow(GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent),
       m_client(client),
       m_table(nullptr),
@@ -62,7 +62,7 @@ void RepoListWindow::setupUI() {
     m_table->setSortingEnabled(true);
     connect(m_table, &QWidget::customContextMenuRequested, this, &RepoListWindow::onCustomContextMenuRequested);
 
-    QHeaderView *header = m_table->horizontalHeader();
+    QHeaderView* header = m_table->horizontalHeader();
     header->setSectionResizeMode(QHeaderView::ResizeToContents);
     header->setStretchLastSection(true);
 
@@ -75,32 +75,32 @@ void RepoListWindow::setupUI() {
     m_toolbar->setObjectName("RepoListMainToolBar");
     m_toolbar->setMovable(false);
 
-    QAction *refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
+    QAction* refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
     connect(refreshAction, &QAction::triggered, this, &RepoListWindow::onRefreshClicked);
     m_toolbar->addAction(refreshAction);
 
-    QAction *exportAction = new QAction(QIcon::fromTheme("document-export"), tr("Export to CSV"), this);
+    QAction* exportAction = new QAction(QIcon::fromTheme("document-export"), tr("Export to CSV"), this);
     connect(exportAction, &QAction::triggered, this, &RepoListWindow::onExportClicked);
     m_toolbar->addAction(exportAction);
 
-    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &RepoListWindow::close);
 
-    QMenuBar *menuBarWidget = menuBar();
-    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
+    QMenuBar* menuBarWidget = menuBar();
+    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
     fileMenu->addAction(exportAction);
     fileMenu->addSeparator();
     fileMenu->addAction(closeAction);
 
-    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
-    QAction *copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy URL"), this);
+    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    QAction* copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy URL"), this);
     copyAction->setShortcut(QKeySequence::Copy);
     connect(copyAction, &QAction::triggered, this, [this]() {
-        QList<QTableWidgetItem *> items = m_table->selectedItems();
+        QList<QTableWidgetItem*> items = m_table->selectedItems();
         if (!items.isEmpty()) {
             int row = items.first()->row();
-            QTableWidgetItem *urlItem = m_table->item(row, 7);  // URL is column 7
+            QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
             if (urlItem) {
                 QApplication::clipboard()->setText(urlItem->text());
             }
@@ -108,7 +108,7 @@ void RepoListWindow::setupUI() {
     });
     editMenu->addAction(copyAction);
 
-    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
     refreshAction->setShortcut(QKeySequence::Refresh);
     viewMenu->addAction(refreshAction);
 
@@ -149,7 +149,7 @@ void RepoListWindow::onExportClicked() {
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QStringList rowData;
         for (int col = 0; col < m_table->columnCount(); ++col) {
-            QTableWidgetItem *item = m_table->item(row, col);
+            QTableWidgetItem* item = m_table->item(row, col);
             QString text = item ? item->text() : "";
             rowData << "\"" + text.replace("\"", "\"\"") + "\"";
         }
@@ -160,8 +160,8 @@ void RepoListWindow::onExportClicked() {
     m_statusBar->showMessage(tr("Exported to %1").arg(fileName), 5000);
 }
 
-void RepoListWindow::onReposReceived(const QJsonArray &repos, const QString &nextPageUrl) {
-    for (const QJsonValue &val : repos) {
+void RepoListWindow::onReposReceived(const QJsonArray& repos, const QString& nextPageUrl) {
+    for (const QJsonValue& val : repos) {
         m_allRepos.append(val);
     }
 
@@ -176,24 +176,24 @@ void RepoListWindow::onReposReceived(const QJsonArray &repos, const QString &nex
     }
 }
 
-void RepoListWindow::addReposToTable(const QJsonArray &repos) {
+void RepoListWindow::addReposToTable(const QJsonArray& repos) {
     m_table->setSortingEnabled(false);
     m_table->setRowCount(repos.size());
 
     for (int i = 0; i < repos.size(); ++i) {
         QJsonObject repo = repos[i].toObject();
 
-        QTableWidgetItem *nameItem = new QTableWidgetItem(repo["name"].toString());
-        QTableWidgetItem *ownerItem = new QTableWidgetItem(repo["owner"].toObject()["login"].toString());
-        QTableWidgetItem *visItem = new QTableWidgetItem(repo["visibility"].toString());
+        QTableWidgetItem* nameItem = new QTableWidgetItem(repo["name"].toString());
+        QTableWidgetItem* ownerItem = new QTableWidgetItem(repo["owner"].toObject()["login"].toString());
+        QTableWidgetItem* visItem = new QTableWidgetItem(repo["visibility"].toString());
 
-        QTableWidgetItem *starsItem = new QTableWidgetItem();
+        QTableWidgetItem* starsItem = new QTableWidgetItem();
         starsItem->setData(Qt::DisplayRole, repo["stargazers_count"].toInt());
 
-        QTableWidgetItem *forksItem = new QTableWidgetItem();
+        QTableWidgetItem* forksItem = new QTableWidgetItem();
         forksItem->setData(Qt::DisplayRole, repo["forks_count"].toInt());
 
-        QTableWidgetItem *issuesItem = new QTableWidgetItem();
+        QTableWidgetItem* issuesItem = new QTableWidgetItem();
         issuesItem->setData(Qt::DisplayRole, repo["open_issues_count"].toInt());
 
         QString updatedStr = repo["updated_at"].toString();
@@ -201,9 +201,9 @@ void RepoListWindow::addReposToTable(const QJsonArray &repos) {
 
         class DateTableItem : public QTableWidgetItem {
            public:
-            DateTableItem(const QString &text, const QDateTime &date) : QTableWidgetItem(text), m_date(date) {}
-            bool operator<(const QTableWidgetItem &other) const override {
-                const DateTableItem *otherDateItem = dynamic_cast<const DateTableItem *>(&other);
+            DateTableItem(const QString& text, const QDateTime& date) : QTableWidgetItem(text), m_date(date) {}
+            bool operator<(const QTableWidgetItem& other) const override {
+                const DateTableItem* otherDateItem = dynamic_cast<const DateTableItem*>(&other);
                 if (otherDateItem) {
                     return m_date < otherDateItem->m_date;
                 }
@@ -214,9 +214,9 @@ void RepoListWindow::addReposToTable(const QJsonArray &repos) {
             QDateTime m_date;
         };
 
-        QTableWidgetItem *updatedItem = new DateTableItem(QLocale::system().toString(dt, QLocale::ShortFormat), dt);
+        QTableWidgetItem* updatedItem = new DateTableItem(QLocale::system().toString(dt, QLocale::ShortFormat), dt);
 
-        QTableWidgetItem *urlItem = new QTableWidgetItem(repo["html_url"].toString());
+        QTableWidgetItem* urlItem = new QTableWidgetItem(repo["html_url"].toString());
 
         m_table->setItem(i, 0, nameItem);
         m_table->setItem(i, 1, ownerItem);
@@ -245,23 +245,23 @@ void RepoListWindow::updateTimerLabel() {
     }
 }
 
-void RepoListWindow::onCustomContextMenuRequested(const QPoint &pos) {
-    QTableWidgetItem *item = m_table->itemAt(pos);
+void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
+    QTableWidgetItem* item = m_table->itemAt(pos);
     if (!item) return;
 
     int row = item->row();
-    QTableWidgetItem *urlItem = m_table->item(row, 7);  // URL is col 7
+    QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is col 7
     if (!urlItem) return;
 
     QString url = urlItem->text();
 
     QMenu menu(this);
-    QAction *openAction = menu.addAction(QIcon::fromTheme("internet-web-browser"), tr("Open in Browser"));
-    QAction *copyAction = menu.addAction(QIcon::fromTheme("edit-copy"), tr("Copy URL"));
+    QAction* openAction = menu.addAction(QIcon::fromTheme("internet-web-browser"), tr("Open in Browser"));
+    QAction* copyAction = menu.addAction(QIcon::fromTheme("edit-copy"), tr("Copy URL"));
     menu.addSeparator();
-    QAction *newIssueAction = menu.addAction(QIcon::fromTheme("document-new"), tr("New Issue..."));
+    QAction* newIssueAction = menu.addAction(QIcon::fromTheme("document-new"), tr("New Issue..."));
 
-    QAction *selected = menu.exec(m_table->viewport()->mapToGlobal(pos));
+    QAction* selected = menu.exec(m_table->viewport()->mapToGlobal(pos));
 
     if (selected == openAction) {
         QDesktopServices::openUrl(QUrl(url));
@@ -269,7 +269,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint &pos) {
         QApplication::clipboard()->setText(url);
     } else if (selected == newIssueAction) {
         if (m_client) {
-            NewIssueDialog *dialog = new NewIssueDialog(m_client, this);
+            NewIssueDialog* dialog = new NewIssueDialog(m_client, this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             QString repoName = QUrl(url).path().mid(1);  // removes leading slash
             dialog->setInitialRepo(repoName);
@@ -278,7 +278,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint &pos) {
     }
 }
 
-void RepoListWindow::onError(const QString &error) {
+void RepoListWindow::onError(const QString& error) {
     if (m_statusBar) {
         m_statusBar->showMessage(tr("Error fetching repositories: %1").arg(error), 5000);
     }
