@@ -518,8 +518,6 @@ void MainWindow::createTrayIcon() {
     trayIcon->show();
 }
 
-
-
 void MainWindow::updateTrayMenu() {
     if (!trayIconMenu) return;
     trayIconMenu->clear();
@@ -532,7 +530,7 @@ void MainWindow::updateTrayMenu() {
     connect(openAppAction, &QAction::triggered, this, &QWidget::showNormal);
     trayIconMenu->addAction(openAppAction);
 
-        trayIconMenu->addSeparator();
+    trayIconMenu->addSeparator();
 
     int unreadCount = m_lastUnreadCount;
     QList<Notification> unreadNotifications =
@@ -898,14 +896,13 @@ void MainWindow::setupMenus() {
     KStandardAction::deselect(this, &MainWindow::onSelectNoneClicked, actionCollection());
     KStandardAction::redisplay(this, &MainWindow::onRefreshClicked, actionCollection());
     KStandardAction::aboutApp(this, &MainWindow::showAboutDialog, actionCollection());
-    QAction *notificationRulesAction = new QAction(themedIcon({QStringLiteral("view-list-details")}),
-                                                       tr("Notification &Rules..."), this);
+    QAction *notificationRulesAction =
+        new QAction(themedIcon({QStringLiteral("view-list-details")}), tr("Notification &Rules..."), this);
     connect(notificationRulesAction, &QAction::triggered, this, []() {
         RulesDialog dialog;
         dialog.exec();
     });
     actionCollection()->addAction(QStringLiteral("notification_rules"), notificationRulesAction);
-
 
     QAction *notificationsSettingsAction = new QAction(themedIcon({QStringLiteral("preferences-desktop-notification")}),
                                                        tr("Configure &Notifications..."), this);
@@ -1170,7 +1167,8 @@ void MainWindow::updateTrayIconState(int unreadCount, int newNotifications,
         // Send summarize notifications if they exceed the threshold or if they explicitly asked to summarize
         bool hasAlwaysSummarize = false;
         for (const Notification &n : summarizedNotifications) {
-            if (NotificationRuleEngine::evaluate(n) == "AlwaysSummarize" || NotificationRuleEngine::evaluate(n) == "NeverIndividual") {
+            if (NotificationRuleEngine::evaluate(n) == "AlwaysSummarize" ||
+                NotificationRuleEngine::evaluate(n) == "NeverIndividual") {
                 hasAlwaysSummarize = true;
                 break;
             }
