@@ -23,18 +23,18 @@
 #include "../GitHubClient.h"
 #include "../NewIssueDialog.h"
 
-TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
+TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
     setWindowTitle(tr("Trending Repos & Devs"));
     resize(800, 600);  // make it a bit larger to fit columns
 
-    QWidget *centralWidget = new QWidget(this);
+    QWidget* centralWidget = new QWidget(this);
     setObjectName("TrendingWindow");
     setCentralWidget(centralWidget);
     setupGUI(Default, ":/kgithub-notifyui.rc");
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
 
-    QHBoxLayout *topLayout = new QHBoxLayout();
+    QHBoxLayout* topLayout = new QHBoxLayout();
 
     modeComboBox = new QComboBox(this);
     modeComboBox->addItem(tr("Repositories"));
@@ -88,20 +88,20 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(tableWidget);
 
-    QMenuBar *menuBarWidget = menuBar();
-    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
-    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    QMenuBar* menuBarWidget = menuBar();
+    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
+    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &TrendingWindow::close);
     fileMenu->addAction(closeAction);
 
-    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
-    QAction *copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
+    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    QAction* copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
     copyAction->setShortcut(QKeySequence::Copy);
     connect(copyAction, &QAction::triggered, this, [this]() {
-        QList<QTableWidgetItem *> items = tableWidget->selectedItems();
+        QList<QTableWidgetItem*> items = tableWidget->selectedItems();
         if (!items.isEmpty()) {
-            QTableWidgetItem *item = items.first();
+            QTableWidgetItem* item = items.first();
             if (item) {
                 QString url = item->data(Qt::UserRole).toString();
                 if (!url.isEmpty()) {
@@ -112,8 +112,8 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
     });
     editMenu->addAction(copyAction);
 
-    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
-    QAction *refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
+    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
+    QAction* refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
     refreshAction->setShortcut(QKeySequence::Refresh);
     connect(refreshAction, &QAction::triggered, this, &TrendingWindow::onRefreshClicked);
     viewMenu->addAction(refreshAction);
@@ -130,19 +130,19 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
             &TrendingWindow::onRefreshClicked);
     connect(tableWidget, &QTableWidget::itemActivated, this, &TrendingWindow::onItemActivated);
     connect(tableWidget, &QTableWidget::itemSelectionChanged, this, &TrendingWindow::onItemSelectionChanged);
-    connect(tableWidget, &QTableWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
-        QTableWidgetItem *item = tableWidget->itemAt(pos);
+    connect(tableWidget, &QTableWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        QTableWidgetItem* item = tableWidget->itemAt(pos);
         if (!item) return;
 
         QMenu menu(this);
-        QAction *openAction = menu.addAction(tr("Open in Browser"));
-        QAction *copyAction = menu.addAction(tr("Copy Link"));
+        QAction* openAction = menu.addAction(tr("Open in Browser"));
+        QAction* copyAction = menu.addAction(tr("Copy Link"));
         menu.addSeparator();
-        QAction *newIssueAction = menu.addAction(tr("New Issue..."));
+        QAction* newIssueAction = menu.addAction(tr("New Issue..."));
         menu.addSeparator();
-        QAction *viewRawAction = menu.addAction(tr("View Raw JSON"));
+        QAction* viewRawAction = menu.addAction(tr("View Raw JSON"));
 
-        QAction *selectedAction = menu.exec(tableWidget->mapToGlobal(pos));
+        QAction* selectedAction = menu.exec(tableWidget->mapToGlobal(pos));
         if (selectedAction == openAction) {
             onItemActivated(item);
         } else if (selectedAction == copyAction) {
@@ -151,7 +151,7 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
         } else if (selectedAction == newIssueAction) {
             QString url = item->data(Qt::UserRole).toString();
             if (m_client) {
-                NewIssueDialog *dialog = new NewIssueDialog(m_client, this);
+                NewIssueDialog* dialog = new NewIssueDialog(m_client, this);
                 dialog->setAttribute(Qt::WA_DeleteOnClose);
                 QString repoName = QUrl(url).path().mid(1);  // removes leading slash
                 dialog->setInitialRepo(repoName);
@@ -161,11 +161,11 @@ TrendingWindow::TrendingWindow(GitHubClient *client, QWidget *parent)
             QString rawJson = item->data(Qt::UserRole + 1).toString();
             // Display raw JSON in a simple widget or dialog
             if (!rawJson.isEmpty()) {
-                QDialog *dialog = new QDialog(this);
+                QDialog* dialog = new QDialog(this);
                 dialog->setWindowTitle(tr("Raw JSON"));
                 dialog->resize(400, 300);
-                QVBoxLayout *layout = new QVBoxLayout(dialog);
-                QTextEdit *textEdit = new QTextEdit(dialog);
+                QVBoxLayout* layout = new QVBoxLayout(dialog);
+                QTextEdit* textEdit = new QTextEdit(dialog);
                 textEdit->setReadOnly(true);
                 textEdit->setPlainText(rawJson);
                 layout->addWidget(textEdit);
@@ -241,7 +241,7 @@ void TrendingWindow::onRefreshClicked() {
     m_client->requestRaw(endpoint);
 }
 
-void TrendingWindow::onRawDataReceived(const QByteArray &data) {
+void TrendingWindow::onRawDataReceived(const QByteArray& data) {
     // Only process if it looks like a search response. We use lastRequestedUrl to match loosely if possible.
     // In our client, requestRaw doesn't pass back the endpoint it requested.
     // So we'll try to parse and check if it's the right format.
@@ -315,33 +315,33 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
             QString stars = QString::number(itemObj["stargazers_count"].toInt());
             QString lang = itemObj["language"].toString();
 
-            QTableWidgetItem *starItem = new QTableWidgetItem("");
+            QTableWidgetItem* starItem = new QTableWidgetItem("");
             starItem->setTextAlignment(Qt::AlignCenter);
             starItem->setData(Qt::UserRole, htmlUrl);
             starItem->setData(Qt::UserRole + 2, name);
             starItem->setFont(font);
 
-            QTableWidgetItem *nameItem = new QTableWidgetItem(name);
+            QTableWidgetItem* nameItem = new QTableWidgetItem(name);
             nameItem->setData(Qt::UserRole, htmlUrl);
             nameItem->setData(Qt::UserRole + 1, rawJson);
             nameItem->setFont(font);
-            QTableWidgetItem *starsItem = new QTableWidgetItem(stars);
+            QTableWidgetItem* starsItem = new QTableWidgetItem(stars);
             starsItem->setData(Qt::UserRole, htmlUrl);
             starsItem->setData(Qt::UserRole + 1, rawJson);
             starsItem->setFont(font);
-            QTableWidgetItem *langItem = new QTableWidgetItem(lang);
+            QTableWidgetItem* langItem = new QTableWidgetItem(lang);
             langItem->setData(Qt::UserRole, htmlUrl);
             langItem->setData(Qt::UserRole + 1, rawJson);
             langItem->setFont(font);
-            QTableWidgetItem *descItem = new QTableWidgetItem(desc);
+            QTableWidgetItem* descItem = new QTableWidgetItem(desc);
             descItem->setData(Qt::UserRole, htmlUrl);
             descItem->setData(Qt::UserRole + 1, rawJson);
             descItem->setFont(font);
 
-            QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
+            QLabel* linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
             linkLabel->setOpenExternalLinks(true);
             linkLabel->setFont(font);
-            QTableWidgetItem *urlItem = new QTableWidgetItem();  // Empty item to hold the widget's place and data
+            QTableWidgetItem* urlItem = new QTableWidgetItem();  // Empty item to hold the widget's place and data
             urlItem->setData(Qt::UserRole, htmlUrl);
             urlItem->setData(Qt::UserRole + 1, rawJson);
 
@@ -356,22 +356,22 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
             // Fetch starred status
             QUrl url("https://api.github.com/user/starred/" + name);
             QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-            QNetworkReply *reply = m_netManager->get(request);
+            QNetworkReply* reply = m_netManager->get(request);
             reply->setProperty("fullName", name);
 
         } else {
             // Developers
             QString login = itemObj["login"].toString();
 
-            QTableWidgetItem *loginItem = new QTableWidgetItem(login);
+            QTableWidgetItem* loginItem = new QTableWidgetItem(login);
             loginItem->setData(Qt::UserRole, htmlUrl);
             loginItem->setData(Qt::UserRole + 1, rawJson);
             loginItem->setFont(font);
 
-            QLabel *linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
+            QLabel* linkLabel = new QLabel(QString("<a href='%1'>%1</a>").arg(htmlUrl));
             linkLabel->setOpenExternalLinks(true);
             linkLabel->setFont(font);
-            QTableWidgetItem *urlItem = new QTableWidgetItem();
+            QTableWidgetItem* urlItem = new QTableWidgetItem();
             urlItem->setData(Qt::UserRole, htmlUrl);
             urlItem->setData(Qt::UserRole + 1, rawJson);
 
@@ -398,7 +398,7 @@ void TrendingWindow::onRawDataReceived(const QByteArray &data) {
     tableWidget->resizeRowsToContents();
 }
 
-void TrendingWindow::onItemActivated(QTableWidgetItem *item) {
+void TrendingWindow::onItemActivated(QTableWidgetItem* item) {
     if (!item) return;
     QString url = item->data(Qt::UserRole).toString();
     if (!url.isEmpty()) {
@@ -406,14 +406,14 @@ void TrendingWindow::onItemActivated(QTableWidgetItem *item) {
     }
 }
 
-void TrendingWindow::onRepoStarredCheckFinished(QNetworkReply *reply) {
+void TrendingWindow::onRepoStarredCheckFinished(QNetworkReply* reply) {
     if (!reply) return;
 
     QString fullName = reply->property("fullName").toString();
     if (!fullName.isEmpty() && (reply->error() == QNetworkReply::NoError ||
                                 reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 204)) {
         for (int r = 0; r < tableWidget->rowCount(); ++r) {
-            QTableWidgetItem *item = tableWidget->item(r, 0);
+            QTableWidgetItem* item = tableWidget->item(r, 0);
             if (item && item->data(Qt::UserRole + 2).toString() == fullName) {
                 item->setText("★");
                 break;
@@ -424,23 +424,23 @@ void TrendingWindow::onRepoStarredCheckFinished(QNetworkReply *reply) {
 }
 
 void TrendingWindow::onItemSelectionChanged() {
-    QList<QTableWidgetItem *> selected = tableWidget->selectedItems();
+    QList<QTableWidgetItem*> selected = tableWidget->selectedItems();
     bool changed = false;
-    for (QTableWidgetItem *item : selected) {
+    for (QTableWidgetItem* item : selected) {
         QString url = item->data(Qt::UserRole).toString();
         if (!url.isEmpty() && !m_selectedUrls.contains(url)) {
             m_selectedUrls.insert(url);
             changed = true;
             int row = item->row();
             for (int col = 0; col < tableWidget->columnCount(); ++col) {
-                QTableWidgetItem *colItem = tableWidget->item(row, col);
+                QTableWidgetItem* colItem = tableWidget->item(row, col);
                 if (colItem) {
                     QFont font = colItem->font();
                     font.setBold(false);
                     colItem->setFont(font);
                 }
             }
-            QWidget *w = tableWidget->cellWidget(row, tableWidget->columnCount() - 1);
+            QWidget* w = tableWidget->cellWidget(row, tableWidget->columnCount() - 1);
             if (w) {
                 QFont font = w->font();
                 font.setBold(false);

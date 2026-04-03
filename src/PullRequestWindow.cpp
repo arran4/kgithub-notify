@@ -7,7 +7,7 @@
 #include <QJsonObject>
 #include <QMessageBox>
 
-PullRequestWindow::PullRequestWindow(const Notification &n, GitHubClient *client, QWidget *parent)
+PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
       m_notification(n),
       m_client(client),
@@ -97,11 +97,11 @@ void PullRequestWindow::setupUi() {
 void PullRequestWindow::fetchPrDetails() {
     QUrl url(m_notification.url);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPrDetailsReply(reply); });
 }
 
-void PullRequestWindow::onPrDetailsReply(QNetworkReply *reply) {
+void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -123,14 +123,14 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply *reply) {
         // Update Metadata
         QStringList labels;
         QJsonArray labelsArray = obj["labels"].toArray();
-        for (const QJsonValue &val : labelsArray) {
+        for (const QJsonValue& val : labelsArray) {
             labels << val.toObject()["name"].toString();
         }
         m_labelsLabel->setText(tr("<b>Labels:</b> %1").arg(labels.isEmpty() ? "None" : labels.join(", ")));
 
         QStringList assignees;
         QJsonArray assigneesArray = obj["assignees"].toArray();
-        for (const QJsonValue &val : assigneesArray) {
+        for (const QJsonValue& val : assigneesArray) {
             assignees << val.toObject()["login"].toString();
         }
         m_assigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assignees.isEmpty() ? "None" : assignees.join(", ")));
@@ -156,17 +156,17 @@ void PullRequestWindow::fetchComments() {
     if (m_issueCommentsUrl.isEmpty()) return;
     QUrl url(m_issueCommentsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onCommentsReply(reply); });
 }
 
-void PullRequestWindow::onCommentsReply(QNetworkReply *reply) {
+void PullRequestWindow::onCommentsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
 
-        for (const QJsonValue &val : array) {
+        for (const QJsonValue& val : array) {
             QJsonObject obj = val.toObject();
             QString author = obj["user"].toObject()["login"].toString();
             QString body = obj["body"].toString();
@@ -181,17 +181,17 @@ void PullRequestWindow::fetchReviewComments() {
     if (m_reviewCommentsUrl.isEmpty()) return;
     QUrl url(m_reviewCommentsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onReviewCommentsReply(reply); });
 }
 
-void PullRequestWindow::onReviewCommentsReply(QNetworkReply *reply) {
+void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
 
-        for (const QJsonValue &val : array) {
+        for (const QJsonValue& val : array) {
             QJsonObject obj = val.toObject();
             QString author = obj["user"].toObject()["login"].toString();
             QString body = obj["body"].toString();
@@ -211,11 +211,11 @@ void PullRequestWindow::fetchCommits() {
     if (m_commitsUrl.isEmpty()) return;
     QUrl url(m_commitsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onCommitsReply(reply); });
 }
 
-void PullRequestWindow::onCommitsReply(QNetworkReply *reply) {
+void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -243,11 +243,11 @@ void PullRequestWindow::onCommitsReply(QNetworkReply *reply) {
 void PullRequestWindow::fetchFiles() {
     QUrl url(m_notification.url + "/files");
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onFilesReply(reply); });
 }
 
-void PullRequestWindow::onFilesReply(QNetworkReply *reply) {
+void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -264,11 +264,11 @@ void PullRequestWindow::onFilesReply(QNetworkReply *reply) {
             m_filesTable->insertRow(i);
             m_filesTable->setItem(i, 0, new QTableWidgetItem(filename));
 
-            QTableWidgetItem *addItem = new QTableWidgetItem(QString::number(additions));
+            QTableWidgetItem* addItem = new QTableWidgetItem(QString::number(additions));
             addItem->setForeground(QBrush(Qt::darkGreen));
             m_filesTable->setItem(i, 1, addItem);
 
-            QTableWidgetItem *delItem = new QTableWidgetItem(QString::number(deletions));
+            QTableWidgetItem* delItem = new QTableWidgetItem(QString::number(deletions));
             delItem->setForeground(QBrush(Qt::darkRed));
             m_filesTable->setItem(i, 2, delItem);
 
@@ -278,11 +278,11 @@ void PullRequestWindow::onFilesReply(QNetworkReply *reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::addCommentToUI(const QString &author, const QString &body, const QString &createdAt) {
+void PullRequestWindow::addCommentToUI(const QString& author, const QString& body, const QString& createdAt) {
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QLabel *label = new QLabel(tr("<b>%1</b> on %2<br>%3<hr>").arg(author, formattedDate, body));
+    QLabel* label = new QLabel(tr("<b>%1</b> on %2<br>%3<hr>").arg(author, formattedDate, body));
     label->setWordWrap(true);
     label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     label->setOpenExternalLinks(true);
@@ -304,11 +304,11 @@ void PullRequestWindow::onCommentButtonClicked() {
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    QNetworkReply *reply = m_manager->post(request, data);
+    QNetworkReply* reply = m_manager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPostCommentReply(reply); });
 }
 
-void PullRequestWindow::onPostCommentReply(QNetworkReply *reply) {
+void PullRequestWindow::onPostCommentReply(QNetworkReply* reply) {
     m_commentButton->setEnabled(true);
     if (reply->error() == QNetworkReply::NoError) {
         m_replyEdit->clear();

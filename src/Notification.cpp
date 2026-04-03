@@ -16,7 +16,7 @@ QJsonObject Notification::toJson() const {
     return obj;
 }
 
-Notification Notification::fromJson(const QJsonObject &obj) {
+Notification Notification::fromJson(const QJsonObject& obj) {
     Notification n;
     n.id = obj["id"].toString();
     n.title = obj["title"].toString();

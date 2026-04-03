@@ -20,8 +20,8 @@
 #include <QToolBar>
 #include <QUrl>
 
-WorkItemWindow::WorkItemWindow(GitHubClient *client, const QString &windowTitle, EndpointType endpointType,
-                               const QString &baseQuery, QWidget *parent)
+WorkItemWindow::WorkItemWindow(GitHubClient* client, const QString& windowTitle, EndpointType endpointType,
+                               const QString& baseQuery, QWidget* parent)
     : KXmlGuiWindow(parent),
       m_client(client),
       m_windowTitle(windowTitle),
@@ -63,39 +63,39 @@ void WorkItemWindow::setupUi() {
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Actions
-    QAction *exportCsvAction = new QAction(tr("Export to CSV"), this);
+    QAction* exportCsvAction = new QAction(tr("Export to CSV"), this);
     connect(exportCsvAction, &QAction::triggered, this, &WorkItemWindow::exportToCsv);
-    QAction *exportJsonAction = new QAction(tr("Export to JSON"), this);
+    QAction* exportJsonAction = new QAction(tr("Export to JSON"), this);
     connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
-    QAction *refreshAction = new QAction(tr("Refresh"), this);
+    QAction* refreshAction = new QAction(tr("Refresh"), this);
     connect(refreshAction, &QAction::triggered, this, [this]() {
         m_table->setRowCount(0);  // Give immediate visual feedback of refresh
         loadData(1);
     });
-    QAction *closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
+    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
     closeAction->setShortcut(QKeySequence::Close);
     connect(closeAction, &QAction::triggered, this, &WorkItemWindow::close);
 
     // Menu Bar
-    QMenuBar *menuBarWidget = menuBar();
-    QMenu *fileMenu = menuBarWidget->addMenu(tr("&File"));
+    QMenuBar* menuBarWidget = menuBar();
+    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
     fileMenu->addAction(exportCsvAction);
     fileMenu->addAction(exportJsonAction);
     fileMenu->addSeparator();
     fileMenu->addAction(closeAction);
 
-    QMenu *editMenu = menuBarWidget->addMenu(tr("&Edit"));
+    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
     m_copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
     m_copyAction->setShortcut(QKeySequence::Copy);
     connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
     editMenu->addAction(m_copyAction);
 
-    QMenu *viewMenu = menuBarWidget->addMenu(tr("&View"));
+    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
     refreshAction->setShortcut(QKeySequence::Refresh);
     viewMenu->addAction(refreshAction);
 
     // Tool Bar
-    QToolBar *toolBar = addToolBar(tr("Main Toolbar"));
+    QToolBar* toolBar = addToolBar(tr("Main Toolbar"));
     toolBar->setObjectName("WorkItemMainToolBar");
     toolBar->addAction(refreshAction);
     toolBar->addSeparator();
@@ -157,7 +157,7 @@ void WorkItemWindow::loadData(int page) {
     m_manager->get(request);
 }
 
-void WorkItemWindow::onReplyFinished(QNetworkReply *reply) {
+void WorkItemWindow::onReplyFinished(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -198,7 +198,7 @@ void WorkItemWindow::onReplyFinished(QNetworkReply *reply) {
     reply->deleteLater();
 }
 
-void WorkItemWindow::appendRow(const QJsonObject &item) {
+void WorkItemWindow::appendRow(const QJsonObject& item) {
     int row = m_table->rowCount();
     m_table->insertRow(row);
 
@@ -215,11 +215,11 @@ void WorkItemWindow::appendRow(const QJsonObject &item) {
         QString repoUrl = item["repository_url"].toString();
         QString repo = repoUrl.section('/', -2);  // Gets owner/repo
 
-        QTableWidgetItem *repoItem = new QTableWidgetItem(repo);
-        QTableWidgetItem *titleItem = new QTableWidgetItem(title);
-        QTableWidgetItem *stateItem = new QTableWidgetItem(state);
-        QTableWidgetItem *authorItem = new QTableWidgetItem(author);
-        QTableWidgetItem *createdItem = new QTableWidgetItem(createdAt);
+        QTableWidgetItem* repoItem = new QTableWidgetItem(repo);
+        QTableWidgetItem* titleItem = new QTableWidgetItem(title);
+        QTableWidgetItem* stateItem = new QTableWidgetItem(state);
+        QTableWidgetItem* authorItem = new QTableWidgetItem(author);
+        QTableWidgetItem* createdItem = new QTableWidgetItem(createdAt);
 
         // Store the URL in the title item for easy access later
         titleItem->setData(Qt::UserRole, htmlUrl);
@@ -237,11 +237,11 @@ void WorkItemWindow::appendRow(const QJsonObject &item) {
         QString owner = item["owner"].toObject()["login"].toString();
         QString createdAt = item["created_at"].toString();
 
-        QTableWidgetItem *repoItem = new QTableWidgetItem(fullName);
-        QTableWidgetItem *descItem = new QTableWidgetItem(description);
-        QTableWidgetItem *langItem = new QTableWidgetItem(language);
-        QTableWidgetItem *ownerItem = new QTableWidgetItem(owner);
-        QTableWidgetItem *createdItem = new QTableWidgetItem(createdAt);
+        QTableWidgetItem* repoItem = new QTableWidgetItem(fullName);
+        QTableWidgetItem* descItem = new QTableWidgetItem(description);
+        QTableWidgetItem* langItem = new QTableWidgetItem(language);
+        QTableWidgetItem* ownerItem = new QTableWidgetItem(owner);
+        QTableWidgetItem* createdItem = new QTableWidgetItem(createdAt);
 
         // Store the URL in the repo item
         repoItem->setData(Qt::UserRole, htmlUrl);
@@ -278,7 +278,7 @@ void WorkItemWindow::exportToCsv() {
     for (int row = 0; row < m_table->rowCount(); ++row) {
         QStringList rowData;
         for (int col = 0; col < m_table->columnCount(); ++col) {
-            QTableWidgetItem *item = m_table->item(row, col);
+            QTableWidgetItem* item = m_table->item(row, col);
             QString text = item ? item->text() : "";
             text.replace("\"", "\"\"");  // Escape quotes
             rowData << QString("\"%1\"").arg(text);
@@ -307,7 +307,7 @@ void WorkItemWindow::exportToJson() {
         QJsonObject jsonObj;
         for (int col = 0; col < m_table->columnCount(); ++col) {
             QString header = m_table->horizontalHeaderItem(col)->text();
-            QTableWidgetItem *item = m_table->item(row, col);
+            QTableWidgetItem* item = m_table->item(row, col);
             jsonObj[header] = item ? item->text() : "";
         }
         jsonObj["URL"] = getHtmlUrlForRow(row);
@@ -319,7 +319,7 @@ void WorkItemWindow::exportToJson() {
     file.close();
 }
 
-void WorkItemWindow::onCustomContextMenuRequested(const QPoint &pos) {
+void WorkItemWindow::onCustomContextMenuRequested(const QPoint& pos) {
     QModelIndex index = m_table->indexAt(pos);
     if (!index.isValid()) return;
 
@@ -329,7 +329,7 @@ void WorkItemWindow::onCustomContextMenuRequested(const QPoint &pos) {
     menu.exec(m_table->viewport()->mapToGlobal(pos));
 }
 
-void WorkItemWindow::onItemDoubleClicked(QTableWidgetItem *item) {
+void WorkItemWindow::onItemDoubleClicked(QTableWidgetItem* item) {
     if (item) {
         openInBrowser();
     }
@@ -358,7 +358,7 @@ void WorkItemWindow::copyLink() {
 }
 
 QString WorkItemWindow::getHtmlUrlForRow(int row) const {
-    QTableWidgetItem *item = m_table->item(row, (m_endpointType == EndpointIssues) ? 1 : 0);
+    QTableWidgetItem* item = m_table->item(row, (m_endpointType == EndpointIssues) ? 1 : 0);
     if (item) {
         return item->data(Qt::UserRole).toString();
     }

@@ -12,7 +12,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 
-GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
+GitHubClient::GitHubClient(QObject* parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
     m_apiUrl = "https://api.github.com";
@@ -25,7 +25,7 @@ GitHubClient::GitHubClient(QObject *parent) : QObject(parent) {
     connect(m_requestTimeoutTimer, &QTimer::timeout, this, &GitHubClient::onRequestTimeout);
 }
 
-QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notificationId) {
+QString GitHubClient::apiToHtmlUrl(const QString& apiUrl, const QString& notificationId) {
     QString htmlUrl = apiUrl;
     htmlUrl.replace("api.github.com/repos", "github.com");
     htmlUrl.replace("/pulls/", "/pull/");
@@ -41,9 +41,9 @@ QString GitHubClient::apiToHtmlUrl(const QString &apiUrl, const QString &notific
     return htmlUrl;
 }
 
-void GitHubClient::setToken(const QString &token) { m_token.set(token); }
+void GitHubClient::setToken(const QString& token) { m_token.set(token); }
 
-void GitHubClient::setApiUrl(const QString &url) { m_apiUrl = url; }
+void GitHubClient::setApiUrl(const QString& url) { m_apiUrl = url; }
 
 void GitHubClient::setShowAll(bool all) { m_showAll = all; }
 
@@ -69,7 +69,7 @@ void GitHubClient::checkNotifications() {
         m_activeNotificationReply->abort();
     }
 
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", false);
     m_activeNotificationReply = reply;
@@ -89,7 +89,7 @@ void GitHubClient::loadMore() {
     QUrl url(m_nextPageUrl);
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", true);
     m_activeNotificationReply = reply;
@@ -106,11 +106,11 @@ void GitHubClient::verifyToken() {
     QUrl url(m_apiUrl + "/user");
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "verification");
 }
 
-void GitHubClient::markAsRead(const QString &id) {
+void GitHubClient::markAsRead(const QString& id) {
     if (m_token.isEmpty()) return;
 
     m_pendingPatchRequests++;
@@ -118,11 +118,11 @@ void GitHubClient::markAsRead(const QString &id) {
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    QNetworkReply *reply = manager->sendCustomRequest(request, "PATCH");
+    QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
     reply->setProperty("type", "patch");
 }
 
-void GitHubClient::markAsDone(const QString &id) {
+void GitHubClient::markAsDone(const QString& id) {
     if (m_token.isEmpty()) return;
 
     m_pendingPatchRequests++;
@@ -130,11 +130,11 @@ void GitHubClient::markAsDone(const QString &id) {
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    QNetworkReply *reply = manager->deleteResource(request);
+    QNetworkReply* reply = manager->deleteResource(request);
     reply->setProperty("type", "delete");
 }
 
-void GitHubClient::markAsReadAndDone(const QString &id) {
+void GitHubClient::markAsReadAndDone(const QString& id) {
     if (m_token.isEmpty()) return;
 
     m_pendingPatchRequests++;
@@ -142,34 +142,34 @@ void GitHubClient::markAsReadAndDone(const QString &id) {
     QUrl url(m_apiUrl + "/notifications/threads/" + id);
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    QNetworkReply *reply = manager->sendCustomRequest(request, "PATCH");
+    QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
     reply->setProperty("type", "read_and_done");
     reply->setProperty("notificationId", id);
 }
 
-void GitHubClient::fetchNotificationDetails(const QString &url, const QString &notificationId) {
+void GitHubClient::fetchNotificationDetails(const QString& url, const QString& notificationId) {
     if (m_token.isEmpty() || url.isEmpty()) return;
     QUrl qUrl(url);
     if (!qUrl.isValid()) return;
     QNetworkRequest request = createRequest(qUrl);
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "details");
     reply->setProperty("notificationId", notificationId);
 }
 
-void GitHubClient::fetchImage(const QString &imageUrl, const QString &notificationId) {
+void GitHubClient::fetchImage(const QString& imageUrl, const QString& notificationId) {
     QUrl qUrl(imageUrl);
     QNetworkRequest request(qUrl);
     // Images (avatars) are usually public, so no auth header needed.
     // Also, User-Agent is good practice.
     request.setRawHeader("User-Agent", "Kgithub-notify");
 
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "image");
     reply->setProperty("notificationId", notificationId);
 }
 
-void GitHubClient::requestRaw(const QString &endpoint, const QString &method, const QByteArray &body) {
+void GitHubClient::requestRaw(const QString& endpoint, const QString& method, const QByteArray& body) {
     if (m_token.isEmpty()) return;
     QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
     QUrl url(urlStr);
@@ -179,7 +179,7 @@ void GitHubClient::requestRaw(const QString &endpoint, const QString &method, co
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     }
 
-    QNetworkReply *reply = nullptr;
+    QNetworkReply* reply = nullptr;
     QString m = method.toUpper();
 
     if (m == "GET") {
@@ -199,7 +199,7 @@ void GitHubClient::requestRaw(const QString &endpoint, const QString &method, co
     }
 }
 
-void GitHubClient::fetchUserRepos(const QString &pageUrl) {
+void GitHubClient::fetchUserRepos(const QString& pageUrl) {
     if (m_token.isEmpty()) return;
 
     QUrl url;
@@ -214,13 +214,13 @@ void GitHubClient::fetchUserRepos(const QString &pageUrl) {
     }
 
     QNetworkRequest request = createAuthenticatedRequest(url);
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "repos");
 }
 
-QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl &url) const { return createRequest(url); }
+QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url) const { return createRequest(url); }
 
-QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
+QNetworkRequest GitHubClient::createRequest(const QUrl& url) const {
     QNetworkRequest request(url);
 
     // Add Authorization header
@@ -233,12 +233,12 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
 
     // Explicitly zero out sensitive data
     if (!tokenBytes.isEmpty()) {
-        volatile char *p = tokenBytes.data();
+        volatile char* p = tokenBytes.data();
         size_t s = tokenBytes.size();
         while (s--) *p++ = 0;
     }
     if (!authHeader.isEmpty()) {
-        volatile char *p = authHeader.data();
+        volatile char* p = authHeader.data();
         size_t s = authHeader.size();
         while (s--) *p++ = 0;
     }
@@ -249,7 +249,7 @@ QNetworkRequest GitHubClient::createRequest(const QUrl &url) const {
     return request;
 }
 
-void GitHubClient::onReplyFinished(QNetworkReply *reply) {
+void GitHubClient::onReplyFinished(QNetworkReply* reply) {
     if (reply == m_activeNotificationReply) {
         m_requestTimeoutTimer->stop();
         m_activeNotificationReply = nullptr;
@@ -313,7 +313,7 @@ void GitHubClient::onReplyFinished(QNetworkReply *reply) {
     reply->deleteLater();
 }
 
-void GitHubClient::handleDetailsReply(QNetworkReply *reply) {
+void GitHubClient::handleDetailsReply(QNetworkReply* reply) {
     QString notificationId = reply->property("notificationId").toString();
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Error fetching details:" << reply->errorString();
@@ -344,7 +344,7 @@ void GitHubClient::handleDetailsReply(QNetworkReply *reply) {
     }
 }
 
-void GitHubClient::handleImageReply(QNetworkReply *reply) {
+void GitHubClient::handleImageReply(QNetworkReply* reply) {
     QString notificationId = reply->property("notificationId").toString();
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Error fetching image:" << reply->errorString();
@@ -358,7 +358,7 @@ void GitHubClient::handleImageReply(QNetworkReply *reply) {
     }
 }
 
-void GitHubClient::handleVerificationReply(QNetworkReply *reply) {
+void GitHubClient::handleVerificationReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -376,7 +376,7 @@ void GitHubClient::handleVerificationReply(QNetworkReply *reply) {
     }
 }
 
-void GitHubClient::handleUserReposReply(QNetworkReply *reply) {
+void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
             emit authError("Invalid Token");
@@ -407,7 +407,7 @@ void GitHubClient::handleUserReposReply(QNetworkReply *reply) {
     emit userReposReceived(doc.array(), nextPageUrl);
 }
 
-void GitHubClient::handlePatchReply(QNetworkReply *reply) {
+void GitHubClient::handlePatchReply(QNetworkReply* reply) {
     m_pendingPatchRequests--;
     if (m_pendingPatchRequests < 0) {
         m_pendingPatchRequests = 0;
@@ -427,7 +427,7 @@ void GitHubClient::handlePatchReply(QNetworkReply *reply) {
     }
 }
 
-void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
+void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
             emit authError("Invalid Token");
@@ -448,7 +448,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply *reply) {
     QJsonArray array = doc.array();
 
     QList<Notification> notifications;
-    for (const QJsonValue &value : array) {
+    for (const QJsonValue& value : array) {
         if (!value.isObject()) continue;
 
         QJsonObject obj = value.toObject();
@@ -497,17 +497,17 @@ void GitHubClient::onRequestTimeout() {
     }
 }
 
-void GitHubClient::verifyRepo(const QString &repoFullName) {
+void GitHubClient::verifyRepo(const QString& repoFullName) {
     if (m_token.isEmpty()) return;
 
     QUrl url(m_apiUrl + "/repos/" + repoFullName);
     QNetworkRequest request = createAuthenticatedRequest(url);
-    QNetworkReply *reply = manager->get(request);
+    QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "verifyRepo");
     reply->setProperty("repoFullName", repoFullName);
 }
 
-void GitHubClient::handleRepoVerifyReply(QNetworkReply *reply) {
+void GitHubClient::handleRepoVerifyReply(QNetworkReply* reply) {
     QString repoFullName = reply->property("repoFullName").toString();
     if (reply->error() == QNetworkReply::NoError) {
         emit repoVerified(repoFullName, true);
@@ -516,8 +516,8 @@ void GitHubClient::handleRepoVerifyReply(QNetworkReply *reply) {
     }
 }
 
-void GitHubClient::createIssue(const QString &repoFullName, const QString &title, const QString &body,
-                               const QString &assignee) {
+void GitHubClient::createIssue(const QString& repoFullName, const QString& title, const QString& body,
+                               const QString& assignee) {
     if (m_token.isEmpty()) return;
 
     QUrl url(m_apiUrl + "/repos/" + repoFullName + "/issues");
@@ -538,6 +538,6 @@ void GitHubClient::createIssue(const QString &repoFullName, const QString &title
     QJsonDocument doc(obj);
     QByteArray postData = doc.toJson(QJsonDocument::Compact);
 
-    QNetworkReply *reply = manager->post(request, postData);
+    QNetworkReply* reply = manager->post(request, postData);
     reply->setProperty("type", "createIssue");
 }

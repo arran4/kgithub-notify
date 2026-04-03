@@ -20,7 +20,7 @@
 #define KGHN_APP_VERSION "dev"
 #endif
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     QCoreApplication::setOrganizationName("arran4");
     QCoreApplication::setOrganizationDomain("arran4.com");
     QCoreApplication::setApplicationName("kgithub-notify");
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     QString desktopFileName = QGuiApplication::desktopFileName() + ".desktop";
     bool desktopFileFound = false;
     QStringList appPaths = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
-    for (const QString &path : appPaths) {
+    for (const QString& path : appPaths) {
         if (QFileInfo::exists(path + "/" + desktopFileName)) {
             desktopFileFound = true;
             break;

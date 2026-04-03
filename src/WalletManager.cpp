@@ -48,12 +48,12 @@ class WalletLoader : public QObject {
     }
 
    private:
-    KWallet::Wallet *wallet = nullptr;
+    KWallet::Wallet* wallet = nullptr;
     QFutureInterface<QString> interface;
 };
 
 QString WalletManager::loadToken() {
-    KWallet::Wallet *wallet =
+    KWallet::Wallet* wallet =
         KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
     if (wallet) {
         if (!wallet->hasFolder(FOLDER_NAME)) {
@@ -69,12 +69,12 @@ QString WalletManager::loadToken() {
 }
 
 QFuture<QString> WalletManager::loadTokenAsync() {
-    WalletLoader *loader = new WalletLoader();
+    WalletLoader* loader = new WalletLoader();
     return loader->start();
 }
 
-void WalletManager::saveToken(const QString &token) {
-    KWallet::Wallet *wallet =
+void WalletManager::saveToken(const QString& token) {
+    KWallet::Wallet* wallet =
         KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
     if (wallet) {
         if (!wallet->hasFolder(FOLDER_NAME)) {
