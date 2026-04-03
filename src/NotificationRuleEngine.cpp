@@ -66,7 +66,7 @@ bool NotificationRule::matches(const Notification& n) const {
         } else {
             isMatch = value.contains(actualFilter, Qt::CaseInsensitive);
             // exact match for type/reason if not using wildcard logic natively
-            if (!isWildcard && (actualFilter.compare(value, Qt::CaseInsensitive) == 0)) {
+            if (actualFilter.compare(value, Qt::CaseInsensitive) == 0) {
                 isMatch = true;
             }
         }
