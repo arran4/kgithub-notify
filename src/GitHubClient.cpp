@@ -482,7 +482,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
                     notifications[i].groupedNotifications.append(notifications[j]);
                     notifications.removeAt(j);
                     if (j < i) {
-                        --i; // Adjust index if a preceding element was removed
+                        --i;  // Adjust index if a preceding element was removed
                     }
                 }
             }

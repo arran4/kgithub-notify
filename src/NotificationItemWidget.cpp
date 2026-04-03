@@ -21,7 +21,6 @@ static QIcon getThemedIcon(const QStringList& names, QStyle* style, QStyle::Stan
 
 NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* parent)
     : QWidget(parent), m_isLoading(false) {
-
     QVBoxLayout* outerLayout = new QVBoxLayout(this);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->setSpacing(0);
@@ -163,12 +162,13 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
 
     childrenContainer = new QWidget(this);
     QVBoxLayout* childrenLayout = new QVBoxLayout(childrenContainer);
-    childrenLayout->setContentsMargins(40, 0, 5, 5); // Indent children
+    childrenLayout->setContentsMargins(40, 0, 5, 5);  // Indent children
     childrenLayout->setSpacing(2);
 
     if (!n.groupedNotifications.isEmpty()) {
         for (const auto& child : n.groupedNotifications) {
-            QLabel* childLabel = new QLabel(QString("↳ <b>%1</b>: %2").arg(child.type, child.title.toHtmlEscaped()), this);
+            QLabel* childLabel =
+                new QLabel(QString("↳ <b>%1</b>: %2").arg(child.type, child.title.toHtmlEscaped()), this);
             childLabel->setTextFormat(Qt::RichText);
             childLabel->setWordWrap(true);
             childrenLayout->addWidget(childLabel);
@@ -181,8 +181,9 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
     connect(expandButton, &QToolButton::clicked, this, [this]() {
         bool isVisible = childrenContainer->isVisible();
         childrenContainer->setVisible(!isVisible);
-        expandButton->setIcon(QIcon::fromTheme(isVisible ? "go-down" : "go-up",
-                              style()->standardIcon(isVisible ? QStyle::SP_ArrowDown : QStyle::SP_ArrowUp)));
+        expandButton->setIcon(
+            QIcon::fromTheme(isVisible ? "go-down" : "go-up",
+                             style()->standardIcon(isVisible ? QStyle::SP_ArrowDown : QStyle::SP_ArrowUp)));
         emit heightChanged();
     });
 

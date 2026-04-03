@@ -106,21 +106,7 @@ NotificationListWidget::NotificationListWidget(QWidget* parent)
     contextMenu->addAction(markAsReadAction);
 
     markAsDoneAction = new QAction(tr("Done"), this);
-    connect(markAsDoneAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem* item = listWidget->currentItem();
-        if (item) {
-            QString currentId = item->data(Qt::UserRole + 1).toString();
-            for (const Notification& notif : m_allNotifications) {
-                if (notif.id == currentId) {
-                    for (const auto& child : notif.groupedNotifications) {
-                        m_client->markAsDone(child.id);
-                    }
-                    break;
-                }
-            }
-            dismissCurrentItem();
-        }
-    });
+    connect(markAsDoneAction, &QAction::triggered, this, &NotificationListWidget::dismissCurrentItem);
     contextMenu->addAction(markAsDoneAction);
 
     contextMenu->addSeparator();
