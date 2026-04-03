@@ -7,7 +7,7 @@
 class MockNetworkReply : public QNetworkReply {
     Q_OBJECT
    public:
-    MockNetworkReply(const QByteArray& data, QObject* parent = nullptr) : QNetworkReply(parent) {
+    explicit MockNetworkReply(const QByteArray& data, QObject* parent = nullptr) : QNetworkReply(parent) {
         setOpenMode(QIODevice::ReadOnly);
         m_buffer.setData(data);
         m_buffer.open(QIODevice::ReadOnly);
