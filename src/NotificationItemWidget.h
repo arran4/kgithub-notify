@@ -44,6 +44,7 @@ class NotificationItemWidget : public QWidget {
     void doneClicked();
     void openClicked();
     void heightChanged();
+    void childOpenClicked(const QString& url);
 
    private:
     bool m_isLoading;

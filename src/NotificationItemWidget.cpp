@@ -167,10 +167,18 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
 
     if (!n.groupedNotifications.isEmpty()) {
         for (const auto& child : n.groupedNotifications) {
-            QLabel* childLabel =
-                new QLabel(QString("↳ <b>%1</b>: %2").arg(child.type, child.title.toHtmlEscaped()), this);
+            QString htmlUrl = GitHubClient::apiToHtmlUrl(child.url);
+            if (!child.htmlUrl.isEmpty()) {
+                htmlUrl = child.htmlUrl;
+            }
+            QLabel* childLabel = new QLabel(QString("↳ <a href=\"%1\"><b>%2</b>: %3</a>")
+                                                .arg(htmlUrl.toHtmlEscaped(), child.type, child.title.toHtmlEscaped()),
+                                            this);
             childLabel->setTextFormat(Qt::RichText);
             childLabel->setWordWrap(true);
+            childLabel->setOpenExternalLinks(false);
+            connect(childLabel, &QLabel::linkActivated, this,
+                    [this](const QString& link) { emit childOpenClicked(link); });
             childrenLayout->addWidget(childLabel);
         }
     }

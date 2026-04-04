@@ -499,6 +499,9 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
 
     connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() { openUrlForItem(item); });
 
+    connect(widget, &NotificationItemWidget::childOpenClicked, this,
+            [this](const QString& url) { QDesktopServices::openUrl(QUrl(url)); });
+
     connect(
         widget, &NotificationItemWidget::doneClicked, this,
         [this, item, safeWidget]() {
