@@ -43,6 +43,7 @@ void WorkItemWindow::setupUi() {
 
     // Table
     m_table = new QTableWidget(this);
+    m_table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_table->setColumnCount(5);
     if (m_endpointType == EndpointIssues) {
         m_table->setHorizontalHeaderLabels(

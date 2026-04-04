@@ -55,6 +55,7 @@ void PullRequestWindow::setupUi() {
     m_commitsTab = new QWidget();
     m_commitsLayout = new QVBoxLayout(m_commitsTab);
     m_commitsTable = new QTableWidget();
+    m_commitsTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_commitsTable->setColumnCount(4);
     m_commitsTable->setHorizontalHeaderLabels({tr("SHA"), tr("Author"), tr("Message"), tr("Date")});
     m_commitsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
@@ -67,6 +68,7 @@ void PullRequestWindow::setupUi() {
     m_filesTab = new QWidget();
     m_filesLayout = new QVBoxLayout(m_filesTab);
     m_filesTable = new QTableWidget();
+    m_filesTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_filesTable->setColumnCount(4);
     m_filesTable->setHorizontalHeaderLabels({tr("Filename"), tr("Additions"), tr("Deletions"), tr("Changes")});
     m_filesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);

@@ -78,6 +78,7 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
     topLayout->addWidget(refreshButton);
 
     tableWidget = new QTableWidget(this);
+    tableWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     tableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tableWidget->setWordWrap(true);

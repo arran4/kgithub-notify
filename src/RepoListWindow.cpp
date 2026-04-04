@@ -52,6 +52,7 @@ void RepoListWindow::setupUI() {
 
     // Table
     m_table = new QTableWidget(this);
+    m_table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_table->setColumnCount(8);
     m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"),
                                         tr("Open Issues"), tr("Updated"), tr("URL")});
