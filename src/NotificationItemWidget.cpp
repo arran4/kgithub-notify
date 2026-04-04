@@ -171,6 +171,27 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             if (!child.htmlUrl.isEmpty()) {
                 htmlUrl = child.htmlUrl;
             }
+
+            QWidget* childWidget = new QWidget(this);
+            QHBoxLayout* childLayout = new QHBoxLayout(childWidget);
+            childLayout->setContentsMargins(0, 0, 0, 0);
+
+            QLabel* childUnread = new QLabel(this);
+            childUnread->setFixedSize(6, 6);
+            if (child.unread) {
+                QPixmap dot(6, 6);
+                dot.fill(Qt::transparent);
+                QPainter p(&dot);
+                p.setRenderHint(QPainter::Antialiasing);
+                p.setBrush(QColor(0, 122, 255));
+                p.setPen(Qt::NoPen);
+                p.drawEllipse(0, 0, 6, 6);
+                childUnread->setPixmap(dot);
+            } else {
+                childUnread->setVisible(false);
+            }
+            childLayout->addWidget(childUnread);
+
             QLabel* childLabel = new QLabel(QString("↳ <a href=\"%1\"><b>%2</b>: %3</a>")
                                                 .arg(htmlUrl.toHtmlEscaped(), child.type, child.title.toHtmlEscaped()),
                                             this);
@@ -179,7 +200,42 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             childLabel->setOpenExternalLinks(false);
             connect(childLabel, &QLabel::linkActivated, this,
                     [this](const QString& link) { emit childOpenClicked(link); });
-            childrenLayout->addWidget(childLabel);
+            childLayout->addWidget(childLabel, 1);
+
+            QToolButton* copyBtn = new QToolButton(this);
+            copyBtn->setIcon(QIcon::fromTheme("edit-copy"));
+            copyBtn->setToolTip(tr("Copy Link"));
+            copyBtn->setIconSize(QSize(16, 16));
+            copyBtn->setAutoRaise(true);
+            connect(copyBtn, &QToolButton::clicked, this, [this, htmlUrl]() { emit childCopyClicked(htmlUrl); });
+            childLayout->addWidget(copyBtn);
+
+            QToolButton* readBtn = new QToolButton(this);
+            readBtn->setIcon(QIcon::fromTheme("mail-mark-read"));
+            readBtn->setToolTip(tr("Mark as Read"));
+            readBtn->setIconSize(QSize(16, 16));
+            readBtn->setAutoRaise(true);
+            readBtn->setVisible(child.unread);
+            connect(readBtn, &QToolButton::clicked, this, [this, child, childUnread, readBtn]() {
+                emit childMarkAsReadClicked(child.id);
+                childUnread->setVisible(false);
+                readBtn->setVisible(false);
+            });
+            childLayout->addWidget(readBtn);
+
+            QToolButton* doneBtn = new QToolButton(this);
+            doneBtn->setIcon(QIcon::fromTheme("task-complete"));
+            doneBtn->setToolTip(tr("Mark as Done"));
+            doneBtn->setIconSize(QSize(16, 16));
+            doneBtn->setAutoRaise(true);
+            connect(doneBtn, &QToolButton::clicked, this, [this, child, childWidget]() {
+                emit childMarkAsDoneClicked(child.id);
+                childWidget->setVisible(false);
+                emit heightChanged();
+            });
+            childLayout->addWidget(doneBtn);
+
+            childrenLayout->addWidget(childWidget);
         }
     }
 

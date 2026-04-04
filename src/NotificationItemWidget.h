@@ -45,6 +45,9 @@ class NotificationItemWidget : public QWidget {
     void openClicked();
     void heightChanged();
     void childOpenClicked(const QString& url);
+    void childCopyClicked(const QString& url);
+    void childMarkAsReadClicked(const QString& id);
+    void childMarkAsDoneClicked(const QString& id);
 
    private:
     bool m_isLoading;

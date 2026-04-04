@@ -502,6 +502,51 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
     connect(widget, &NotificationItemWidget::childOpenClicked, this,
             [this](const QString& url) { QDesktopServices::openUrl(QUrl(url)); });
 
+    connect(widget, &NotificationItemWidget::childCopyClicked, this,
+            [this](const QString& url) { QApplication::clipboard()->setText(url); });
+
+    connect(widget, &NotificationItemWidget::childMarkAsReadClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsRead(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications[i].unread = false;
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
+
+    connect(widget, &NotificationItemWidget::childMarkAsDoneClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsDone(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications.removeAt(i);
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
+
     connect(
         widget, &NotificationItemWidget::doneClicked, this,
         [this, item, safeWidget]() {
