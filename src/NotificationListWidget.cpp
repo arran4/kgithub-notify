@@ -488,7 +488,64 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
+
+    connect(widget, &NotificationItemWidget::heightChanged, this, [item, safeWidget]() {
+        if (safeWidget) {
+            QSize hint = safeWidget->sizeHint();
+            if (hint.height() < 60) hint.setHeight(60);
+            item->setSizeHint(hint);
+        }
+    });
+
     connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() { openUrlForItem(item); });
+
+    connect(widget, &NotificationItemWidget::childOpenClicked, this,
+            [this](const QString& url) { QDesktopServices::openUrl(QUrl(url)); });
+
+    connect(widget, &NotificationItemWidget::childCopyClicked, this,
+            [this](const QString& url) { QApplication::clipboard()->setText(url); });
+
+    connect(widget, &NotificationItemWidget::childMarkAsReadClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsRead(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications[i].unread = false;
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
+
+    connect(widget, &NotificationItemWidget::childMarkAsDoneClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsDone(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications.removeAt(i);
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
 
     connect(
         widget, &NotificationItemWidget::doneClicked, this,
@@ -797,6 +854,9 @@ void NotificationListWidget::dismissCurrentItem() {
     item->setFont(font);
 
     emit markAsDone(id);
+    for (const auto& child : n.groupedNotifications) {
+        emit markAsDone(child.id);
+    }
     knownNotificationIds.remove(id);
     removeKnownNotification(id);
 
@@ -822,13 +882,17 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem* item) {
 
     emit markAsRead(id);
 
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    for (const auto& child : n.groupedNotifications) {
+        emit markAsRead(child.id);
+    }
+
     NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
     if (widget) {
         widget->setRead(true);
     }
-
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
     n.unread = false;
     item->setData(Qt::UserRole + 4, n.toJson());
 

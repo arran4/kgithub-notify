@@ -1076,7 +1076,12 @@ void MainWindow::sendNotification(const Notification& n) {
     KNotification* notification = new KNotification("NewNotification");
     notification->setComponentName(QStringLiteral("kgithub-notify"));
     notification->setTitle(n.repository);
-    notification->setText(n.title);
+
+    QString text = n.title;
+    if (!n.groupedNotifications.isEmpty()) {
+        text += tr("\n+ %1 Grouped Actions").arg(n.groupedNotifications.size());
+    }
+    notification->setText(text);
 
     // Actions
     auto action1 = notification->addAction(tr("Open in GitHub"));
