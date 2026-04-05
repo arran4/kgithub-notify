@@ -519,26 +519,26 @@ void MainWindow::createTrayIcon() {
 }
 
 void MainWindow::updateTrayMenu() {
-    if (!trayIconMenu) return;
-    trayIconMenu->clear();
+    if (!trayIcon) return;
+    QMenu *newTrayIconMenu = new QMenu(this);
 
     QAction* openAppAction =
-        new QAction(themedIcon({QStringLiteral("kgithub-notify")}), tr("Open Kgithub-notify"), trayIconMenu);
+        new QAction(themedIcon({QStringLiteral("kgithub-notify")}), tr("Open Kgithub-notify"), newTrayIconMenu);
     QFont font = openAppAction->font();
     font.setBold(true);
     openAppAction->setFont(font);
     connect(openAppAction, &QAction::triggered, this, &QWidget::showNormal);
-    trayIconMenu->addAction(openAppAction);
+    newTrayIconMenu->addAction(openAppAction);
 
-    trayIconMenu->addSeparator();
+    newTrayIconMenu->addSeparator();
 
     int unreadCount = m_lastUnreadCount;
     QList<Notification> unreadNotifications =
         notificationListWidget ? notificationListWidget->getUnreadNotifications() : QList<Notification>();
 
     if (unreadCount > 0) {
-        QMenu* unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), trayIconMenu);
-        trayIconMenu->addMenu(unreadMenu);
+        QMenu* unreadMenu = new QMenu(tr("%1 Unread Notifications").arg(unreadCount), newTrayIconMenu);
+        newTrayIconMenu->addMenu(unreadMenu);
 
         int limit = qMin(static_cast<int>(unreadNotifications.size()), SettingsDialog::getTrayUnreadLimit());
         for (int i = 0; i < limit; ++i) {
@@ -572,27 +572,34 @@ void MainWindow::updateTrayMenu() {
         });
         unreadMenu->addAction(dismissAllAction);
     } else {
-        QAction* empty = new QAction(tr("No new notifications"), trayIconMenu);
+        QAction* empty = new QAction(tr("No new notifications"), newTrayIconMenu);
         empty->setEnabled(false);
-        trayIconMenu->addAction(empty);
+        newTrayIconMenu->addAction(empty);
     }
 
-    trayIconMenu->addSeparator();
+    newTrayIconMenu->addSeparator();
 
     QAction* trayRefreshAction =
-        new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), trayIconMenu);
+        new QAction(themedIcon({QStringLiteral("view-refresh")}), tr("Force Refresh"), newTrayIconMenu);
     connect(trayRefreshAction, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    trayIconMenu->addAction(trayRefreshAction);
+    newTrayIconMenu->addAction(trayRefreshAction);
 
-    QAction* newIssueTrayAction = new QAction(tr("New Issue..."), trayIconMenu);
+    QAction* newIssueTrayAction = new QAction(tr("New Issue..."), newTrayIconMenu);
     connect(newIssueTrayAction, &QAction::triggered, this, &MainWindow::showNewIssueDialog);
-    trayIconMenu->addAction(newIssueTrayAction);
+    newTrayIconMenu->addAction(newIssueTrayAction);
 
-    trayIconMenu->addSeparator();
+    newTrayIconMenu->addSeparator();
 
-    QAction* quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), trayIconMenu);
+    QAction* quitAction = new QAction(themedIcon({QStringLiteral("application-exit")}), tr("Quit"), newTrayIconMenu);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
-    trayIconMenu->addAction(quitAction);
+    newTrayIconMenu->addAction(quitAction);
+
+    trayIcon->setContextMenu(newTrayIconMenu);
+
+    if (trayIconMenu) {
+        trayIconMenu->deleteLater();
+    }
+    trayIconMenu = newTrayIconMenu;
 
     updateTrayToolTip();
 }
