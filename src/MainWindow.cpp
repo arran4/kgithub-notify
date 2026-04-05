@@ -520,7 +520,7 @@ void MainWindow::createTrayIcon() {
 
 void MainWindow::updateTrayMenu() {
     if (!trayIcon) return;
-    QMenu *newTrayIconMenu = new QMenu(this);
+    QMenu* newTrayIconMenu = new QMenu(this);
 
     QAction* openAppAction =
         new QAction(themedIcon({QStringLiteral("kgithub-notify")}), tr("Open Kgithub-notify"), newTrayIconMenu);
