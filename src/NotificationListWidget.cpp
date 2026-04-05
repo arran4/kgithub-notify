@@ -42,6 +42,7 @@ NotificationListWidget::NotificationListWidget(QWidget* parent)
     layout->setContentsMargins(0, 0, 0, 0);
 
     listWidget = new QListWidget(this);
+    listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     listWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
     listWidget->setAlternatingRowColors(true);
 

@@ -20,6 +20,7 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     rulesTable = new QTableWidget(0, 2, this);
+    rulesTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     rulesTable->setHorizontalHeaderLabels({tr("Rule Matcher"), tr("Action")});
     rulesTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     rulesTable->setSelectionBehavior(QAbstractItemView::SelectRows);

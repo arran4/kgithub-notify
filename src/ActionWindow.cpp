@@ -32,6 +32,7 @@ void ActionWindow::setupUi() {
     layout->addWidget(m_statusLabel);
 
     m_jobsTable = new QTableWidget();
+    m_jobsTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_jobsTable->setColumnCount(4);
     m_jobsTable->setHorizontalHeaderLabels({tr("Job Name"), tr("Status"), tr("Conclusion"), tr("Started At")});
     m_jobsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
