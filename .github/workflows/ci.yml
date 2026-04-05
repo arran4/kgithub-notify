@@ -1,4 +1,4 @@
-name: Qt C++ CI/CD
+name: CI/CD
 
 on:
   push:
@@ -23,11 +23,13 @@ on:
         type: choice
         options:
           - lint-fix
-          - build-test
-          - snapshot
+          - build
           - release-major
           - release-minor
           - release-patch
+          - release-test
+          - release-rc
+          - release-alpha
           - monthly-maintenance
       release_version_override:
         description: "Optional explicit release version (for example 2.4.0 or 2.4.0-rc.2)"
@@ -49,11 +51,11 @@ concurrency:
 
 permissions:
   contents: write
+  discussions: write
   pull-requests: write
   checks: write
   packages: write
   security-events: write
-  discussions: write
 
 jobs:
   route:
@@ -82,18 +84,13 @@ jobs:
           case "${{ github.event_name }}" in
             push)
               run_code_checks=true
-              if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-                run_release=true
-              fi
               ;;
             pull_request)
               if [[ "${{ github.event.action }}" == "closed" ]]; then
                 run_cleanup=true
               else
                 run_pr_meta_checks=true
-                if [[ "${{ github.event.pull_request.head.repo.full_name || '' }}" != "${{ github.repository }}" ]]; then
-                  run_code_checks=true
-                fi
+                run_code_checks=true
               fi
               ;;
             release)
@@ -129,172 +126,292 @@ jobs:
           echo "is_monthly=$is_monthly" >> "$GITHUB_OUTPUT"
           echo "is_nightly=$is_nightly" >> "$GITHUB_OUTPUT"
 
-  lint-check:
-    name: Lint Check
+  discover:
+    name: Discover capabilities and cost profile
     needs: route
-    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
     runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.profile.outputs.profile }}
+      has_qt_cpp: ${{ steps.detect.outputs.has_qt_cpp }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Lint Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cppcheck
 
-      - name: Run cppcheck
+      - id: detect
+        shell: bash
         run: |
-          cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/
+          set -euo pipefail
+          echo "has_qt_cpp=true" >> "$GITHUB_OUTPUT"
 
-  fmt-check:
-    name: Format Check
-    needs: route
-    if: ${{ needs.route.outputs.run_code_checks == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Format Tools
+      - id: profile
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format
-
-      - name: Run clang-format
-        run: |
-          find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i -style=file || true
-
-      - name: Check for changes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! git diff --exit-code; then
-            echo "clang-format found changes."
-            if [ "${{ github.event_name }}" == "workflow_dispatch" ] && { [ "${{ inputs.mode }}" == "lint-fix" ] || [[ "${{ inputs.mode }}" == release-* ]]; } && [ "${{ inputs.allow_prs }}" == 'true' ]; then
-              # Create PR if manually triggered for lint-fix
-              git config --global user.email "actions@github.com"
-              git config --global user.name "GitHub Actions"
-              BRANCH_NAME="fix-lint-${{ github.run_id }}-${{ github.run_attempt }}"
-              git checkout -b $BRANCH_NAME
-              git add .
-              git commit -m "fix: clang-format"
-              git push origin $BRANCH_NAME
-              gh pr create --title "fix: auto-linting" --body "Automated lint fixes triggered by workflow_dispatch" --base main --head $BRANCH_NAME
-              exit 1
-            else
-              # Fail if not manual fix request
-              exit 1
-            fi
+          set -euo pipefail
+          if [[ "${{ github.event.repository.private }}" == "true" ]]; then
+            echo "profile=private" >> "$GITHUB_OUTPUT"
+          else
+            echo "profile=public" >> "$GITHUB_OUTPUT"
           fi
 
-  bump-version:
-    name: Bump Version
-    needs: [route, lint-check, fmt-check]
+  prepare-release-tag:
+    name: Prepare release tag
+    needs: [route]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-') }}
     runs-on: ubuntu-latest
     outputs:
-      new_tag: ${{ steps.bump.outputs.new_tag }}
+      release_tag: ${{ steps.tag.outputs.release_tag }}
+      next_version: ${{ steps.tag.outputs.next_version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Bump Version
-        id: bump
+          fetch-depth: 0
+      - name: Setup git-tag-inc
+        uses: arran4/git-tag-inc-action@v1
+        with:
+          mode: install
+      - id: tag
         shell: bash
+        env:
+          OVERRIDE_INPUT: ${{ inputs.release_version_override }}
+          MODE_INPUT: ${{ inputs.mode }}
         run: |
-          git fetch --tags
-          CMAKE_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
-          TAG_VERSION=$(git tag -l "v*" | sort -V | tail -n 1 | sed 's/^v//')
-          CURRENT_VERSION=$CMAKE_VERSION
-          if [ -n "$TAG_VERSION" ] && [ "$(printf '%s\n' "$CURRENT_VERSION" "$TAG_VERSION" | sort -V | tail -n1)" == "$TAG_VERSION" ]; then
-            CURRENT_VERSION=$TAG_VERSION
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          MODE="$MODE_INPUT"
+          OVERRIDE="$OVERRIDE_INPUT"
+
+          if [[ -n "$OVERRIDE" ]]; then
+            OVERRIDE="${OVERRIDE#v}"
+            next_tag="v$OVERRIDE"
+          else
+            case "$MODE" in
+              release-major) level="major"; suffix="" ;;
+              release-minor) level="minor"; suffix="" ;;
+              release-patch) level="patch"; suffix="" ;;
+              release-test)  level="patch"; suffix="test" ;;
+              release-rc)    level="patch"; suffix="rc" ;;
+              release-alpha) level="patch"; suffix="alpha" ;;
+              *) echo "Unsupported release mode: $MODE"; exit 1 ;;
+            esac
+            if command -v git-tag-inc >/dev/null 2>&1; then
+              level="${level#-}"
+              args=(-print-version-only "$level")
+              [[ -n "$suffix" ]] && args+=("$suffix")
+              next_tag=$(git-tag-inc "${args[@]}")
+            else
+              git fetch --tags --force
+              latest=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -n 1)
+              [[ -z "$latest" ]] && latest='0.0.0'
+
+              if command -v npx >/dev/null 2>&1; then
+                case "$level" in
+                  major) bumped=$(npx --yes semver "$latest" -i major) ;;
+                  minor) bumped=$(npx --yes semver "$latest" -i minor) ;;
+                  *) bumped=$(npx --yes semver "$latest" -i patch) ;;
+                esac
+                next_tag="v${bumped}"
+              else
+                base="${latest%%-*}"
+                IFS='.' read -r maj min pat <<< "$base"
+                case "$level" in
+                  major) maj=$((maj+1)); min=0; pat=0 ;;
+                  minor) min=$((min+1)); pat=0 ;;
+                  *) pat=$((pat+1)) ;;
+                esac
+                next_tag="v${maj}.${min}.${pat}"
+              fi
+
+              if [[ -n "$suffix" ]]; then
+                next_tag="${next_tag}-${suffix}.1"
+              fi
+            fi
           fi
-          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
-          if [ "${{ inputs.mode }}" == "release-major" ]; then
-            major=$((major + 1))
-            minor=0
-            patch=0
-          elif [ "${{ inputs.mode }}" == "release-minor" ]; then
-            minor=$((minor + 1))
-            patch=0
-          elif [ "${{ inputs.mode }}" == "release-patch" ]; then
-            patch=$((patch + 1))
+
+          [[ "$next_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] || {
+            echo "Invalid tag format: $next_tag" >&2
+            exit 1
+          }
+          git fetch --tags --force
+          if git rev-parse "$next_tag" >/dev/null 2>&1; then
+            echo "Tag already exists: $next_tag" >&2
+            echo "Choose a new mode or set release_version_override." >&2
+            exit 1
           fi
-          NEW_VERSION="${major}.${minor}.${patch}"
-          sed -i "s/project(kgithub-notify VERSION $CMAKE_VERSION)/project(kgithub-notify VERSION $NEW_VERSION)/" CMakeLists.txt
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add CMakeLists.txt
-          git commit -m "chore: bump version to $NEW_VERSION"
-          git tag "v$NEW_VERSION"
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v$NEW_VERSION"
-          echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
-  build-and-test:
-    name: Build & Test on ${{ matrix.os }}
-    needs: [route, lint-check, fmt-check, bump-version]
-    if: ${{ always() && needs.route.outputs.run_code_checks == 'true' && needs.lint-check.result == 'success' && needs.fmt-check.result == 'success' && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped') && (github.event_name != 'workflow_dispatch' || inputs.mode != 'lint-fix') }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-      fail-fast: false
-    container:
-      image: debian:testing
+          # Sync version source with highest existing tag first
+          CMAKE_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt || echo "0.0.0")
+          TAG_VERSION=$(git tag -l "v*" | sed 's/^v//' | sort -V | tail -n 1 || echo "0.0.0")
+          CURRENT_VERSION=$(echo -e "$CMAKE_VERSION\n$TAG_VERSION" | sort -V | tail -n 1)
 
-    steps:
-    - name: Pre-install core tools for container
-      run: |
-        apt-get update
-        apt-get install -y git sudo curl jq ca-certificates
-        git config --global --add safe.directory /__w/kgithub-notify/kgithub-notify
+          if [[ "$next_tag" != "v$CURRENT_VERSION" ]]; then
+            CLEAN_NEXT="${next_tag#v}"
+            # Extract just major.minor.patch for CMake
+            CMAKE_NEXT_VERSION="${CLEAN_NEXT%%-*}"
+            sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
+            git add CMakeLists.txt
+            git commit -m "chore: bump version to $CMAKE_NEXT_VERSION"
+            git tag "$next_tag"
+            git push origin HEAD:${{ github.ref_name }}
+            git push origin "$next_tag"
+          else
+            git tag "$next_tag"
+            git push origin "$next_tag"
+          fi
 
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ needs.bump-version.outputs.new_tag || github.ref }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+          echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
+          clean_tag="${next_tag#v}"; clean_tag="${clean_tag%%-*}"
+          IFS='.' read -r maj min pat <<< "$clean_tag"
+          echo "next_version=${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))-SNAPSHOT" >> "$GITHUB_OUTPUT"
 
-    - name: Install Dependencies (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y qt6-base-dev qt6-svg-dev qt6-tools-dev qt6-tools-dev-tools \
-          libkf6wallet-dev libkf6notifications-dev libkf6coreaddons-dev libkf6xmlgui-dev \
-          libkf6configwidgets-dev libkf6i18n-dev build-essential cmake
-
-    - name: Configure CMake
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --config Release -j$(nproc)
-
-    - name: Test
-      run: |
-        cd build
-        QT_QPA_PLATFORM=offscreen ctest --output-on-failure
-
-    - name: Verify Binary
-      run: |
-        if [ -f build/kgithub-notify ]; then
-          echo "Binary built successfully"
-        else
-          echo "Binary not found"
-          exit 1
-        fi
-
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts-${{ matrix.os }}
-        path: build/kgithub-notify
-
-  release:
-    name: Release
-    needs: [route, build-and-test, bump-version]
-    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'snapshot')) && needs.build-and-test.result == 'success' && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped') }}
+  gitleaks:
+    name: Secret scan
+    needs: [route, discover]
+    if: ${{ needs.route.outputs.run_cleanup != 'true' && (needs.route.outputs.is_nightly == 'true' || needs.route.outputs.is_monthly == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.bump-version.outputs.new_tag || github.ref }}
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cpp-qt-build-test:
+    name: Qt/C++ build
+    needs: [route, discover, prepare-release-tag]
+    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (github.event_name != 'workflow_dispatch' || inputs.mode != 'lint-fix') }}
+    runs-on: ubuntu-latest
+    container:
+      image: debian:testing
+    steps:
+      - name: Pre-install core tools for container
+        run: |
+          apt-get update
+          apt-get install -y git sudo curl jq ca-certificates
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev qt6-svg-dev qt6-tools-dev qt6-tools-dev-tools \
+            libkf6wallet-dev libkf6notifications-dev libkf6coreaddons-dev libkf6xmlgui-dev \
+            libkf6configwidgets-dev libkf6i18n-dev build-essential cmake clang-format cppcheck
+
+      - name: Lint style and static checks
+        run: |
+          find src tests \( -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) -print0 | xargs -0 -r clang-format --dry-run --Werror
+          cppcheck --enable=warning,style,performance,portability --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unusedFunction --suppress=constVariablePointer --suppress=unknownMacro --error-exitcode=1 src/ tests/
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j$(nproc)
+
+      - name: Test
+        run: |
+          cd build
+          QT_QPA_PLATFORM=offscreen ctest --output-on-failure
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-ubuntu-latest
+          path: build/kgithub-notify
+          retention-days: 1
+
+  autofix:
+    name: Auto-format and open PR
+    needs: [route, discover]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'lint-fix' && inputs.allow_prs == true }}
+    runs-on: ubuntu-latest
+    container:
+      image: debian:testing
+    steps:
+      - name: Pre-install core tools for container
+        run: |
+          apt-get update
+          apt-get install -y git sudo curl jq ca-certificates clang-format
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      - name: Run autofix formatters
+        shell: bash
+        run: |
+          set -euo pipefail
+          find src tests \( -name '*.cpp' -o -name '*.cc' -o -name '*.h' -o -name '*.hpp' \) -print0 | xargs -0 -r clang-format -i
+
+      - name: Create PR if changes exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No changes; exiting."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          PARENT_PR="${{ github.event.pull_request.number || 'none' }}"
+          BRANCH="ci/autofix/${{ github.run_id }}-parent-${PARENT_PR}"
+
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "ci: automated formatting fixes"
+          git push origin "$BRANCH"
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+
+          gh pr create \
+            --title "ci: automated formatting fixes" \
+            --body "Automated formatting pass. Parent-PR: ${PARENT_PR}" \
+            --base main \
+            --head "$BRANCH" \
+            --label "ci-autofix"
+
+  cleanup-autofix-prs:
+    name: Cleanup autofix PRs on parent close
+    needs: [route]
+    if: ${{ needs.route.outputs.run_cleanup == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PARENT_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr list --state open --search "label:ci-autofix in:title" --json number,headRefName,body | \
+            jq -r '.[] | select(.body | contains("Parent-PR: '"$PARENT_PR"'")) | [.number, .headRefName] | @tsv' | \
+            while IFS=$'\t' read -r pr branch; do
+              gh pr close "$pr" --comment "Closing auto-fix PR because parent PR #$PARENT_PR was closed."
+              git push origin --delete "$branch" || true
+            done
+
+  publish-release:
+    name: Publish Release
+    needs: [route, cpp-qt-build-test, prepare-release-tag]
+    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      discussions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -302,26 +419,11 @@ jobs:
           name: build-artifacts-ubuntu-latest
           path: build
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        if: ${{ needs.route.outputs.run_release == 'true' }}
-        with:
-          tag_name: ${{ needs.bump-version.outputs.new_tag || github.ref_name }}
-          name: Release ${{ needs.bump-version.outputs.new_tag || github.ref_name }}
-          files: build/kgithub-notify
-          generate_release_notes: true
-          discussion_category_name: Announcements
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Snapshot Release (Manual)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'snapshot' }}
+      - name: Publish draft GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: snapshot-${{ github.run_id }}
-          name: Snapshot ${{ github.run_id }}
-          draft: false
-          prerelease: true
+          tag_name: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
+          name: Release ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
           files: build/kgithub-notify
           generate_release_notes: true
           discussion_category_name: Announcements
@@ -330,8 +432,8 @@ jobs:
 
   update-ebuild:
     name: Update Ebuild in arrans_overlay
-    needs: [route, release, bump-version]
-    if: ${{ always() && needs.route.outputs.run_release == 'true' && needs.release.result == 'success' && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped') }}
+    needs: [route, publish-release, prepare-release-tag]
+    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.publish-release.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout arrans_overlay
@@ -359,15 +461,13 @@ jobs:
       - name: Update ebuild and manifest
         run: |
           cd arrans_overlay
-          # Extract version from tag
-          VERSION="${{ needs.bump-version.outputs.new_tag }}"
+          VERSION="${{ needs.prepare-release-tag.outputs.release_tag }}"
           if [ -z "$VERSION" ]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
             VERSION="${VERSION#v}"
           fi
 
-          # Find the latest ebuild
           EBUILD_DIR="dev-vcs/kgithub-notify"
           LATEST_EBUILD=$(ls -1 $EBUILD_DIR/*.ebuild | sort -V | tail -n 1)
           NEW_EBUILD="$EBUILD_DIR/kgithub-notify-${VERSION}.ebuild"
@@ -375,10 +475,7 @@ jobs:
           if [ -f "$NEW_EBUILD" ]; then
             echo "Ebuild for version ${VERSION} already exists. Skipping."
           else
-            # Copy to new version
             cp "$LATEST_EBUILD" "$NEW_EBUILD"
-
-            # Generate Manifest
             g2 manifest upsert-from-url "https://github.com/arran4/kgithub-notify/archive/refs/tags/v${VERSION}.tar.gz" "kgithub-notify-${VERSION}.tar.gz" "$EBUILD_DIR/Manifest"
           fi
 
@@ -387,7 +484,7 @@ jobs:
           GH_TOKEN: ${{ secrets.OVERLAY_GITHB_TOKEN }}
         run: |
           cd arrans_overlay
-          VERSION="${{ needs.bump-version.outputs.new_tag }}"
+          VERSION="${{ needs.prepare-release-tag.outputs.release_tag }}"
           if [ -z "$VERSION" ]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
@@ -409,4 +506,3 @@ jobs:
               --body "Automated update of kgithub-notify ebuild for version ${VERSION}." \
               --base main \
               --head $BRANCH_NAME
-          fi

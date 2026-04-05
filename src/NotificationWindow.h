@@ -14,11 +14,11 @@
 class NotificationWindow : public KXmlGuiWindow {
     Q_OBJECT
    public:
-    explicit NotificationWindow(const Notification &notification, GitHubClient *client, QWidget *parent = nullptr);
+    explicit NotificationWindow(const Notification& notification, GitHubClient* client, QWidget* parent = nullptr);
 
    signals:
-    void actionRequested(const QString &actionName, const QString &id, const QString &url);
-    void debugApiRequested(const QString &apiUrl);
+    void actionRequested(const QString& actionName, const QString& id, const QString& url);
+    void debugApiRequested(const QString& apiUrl);
 
    private slots:
     void onOpenUrl();
@@ -32,7 +32,7 @@ class NotificationWindow : public KXmlGuiWindow {
 
    private:
     Notification m_notification;
-    GitHubClient *m_client;
+    GitHubClient* m_client;
 };
 
 #endif  // NOTIFICATIONWINDOW_H

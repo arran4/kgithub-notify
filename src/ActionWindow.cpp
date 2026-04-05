@@ -6,7 +6,7 @@
 #include <QJsonObject>
 #include <QMessageBox>
 
-ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget *parent)
+ActionWindow::ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
       m_notification(n),
       m_client(client),
@@ -20,18 +20,19 @@ ActionWindow::ActionWindow(const Notification &n, GitHubClient *client, QWidget 
 }
 
 void ActionWindow::setupUi() {
-    QWidget *centralWidget = new QWidget(this);
+    QWidget* centralWidget = new QWidget(this);
     setObjectName("ActionWindow");
     setCentralWidget(centralWidget);
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
-    QVBoxLayout *layout = new QVBoxLayout(centralWidget);
+    QVBoxLayout* layout = new QVBoxLayout(centralWidget);
 
     m_statusLabel = new QLabel(tr("<b>Status:</b> Loading..."));
     m_statusLabel->setWordWrap(true);
     layout->addWidget(m_statusLabel);
 
     m_jobsTable = new QTableWidget();
+    m_jobsTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_jobsTable->setColumnCount(4);
     m_jobsTable->setHorizontalHeaderLabels({tr("Job Name"), tr("Status"), tr("Conclusion"), tr("Started At")});
     m_jobsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -44,11 +45,11 @@ void ActionWindow::setupUi() {
 void ActionWindow::fetchRunDetails() {
     QUrl url(m_notification.url);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onRunDetailsReply(reply); });
 }
 
-void ActionWindow::onRunDetailsReply(QNetworkReply *reply) {
+void ActionWindow::onRunDetailsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -75,11 +76,11 @@ void ActionWindow::fetchJobs() {
 
     QUrl url(m_jobsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply *reply = m_manager->get(request);
+    QNetworkReply* reply = m_manager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onJobsReply(reply); });
 }
 
-void ActionWindow::onJobsReply(QNetworkReply *reply) {
+void ActionWindow::onJobsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);

@@ -23,11 +23,11 @@ class TestGitHubClient : public QObject {
             "[{\"id\":\"1\", \"subject\":{\"title\":\"Test\", \"url\":\"http://api.github.com/repos/foo/bar\", "
             "\"type\":\"Issue\"}, \"repository\":{\"full_name\":\"foo/bar\"}, \"updated_at\":\"2023-01-01T00:00:00Z\", "
             "\"unread\":true}]";
-        MockNetworkReply *reply = new MockNetworkReply(json, &client);
+        MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -48,14 +48,14 @@ class TestGitHubClient : public QObject {
         QByteArray json =
             "[{\"id\":\"2\", \"subject\":{\"title\":\"Test2\", \"url\":\"url\", \"type\":\"Issue\"}, "
             "\"repository\":{\"full_name\":\"repo\"}, \"updated_at\":\"date\", \"unread\":true}]";
-        MockNetworkReply *reply = new MockNetworkReply(json, &client);
+        MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
         reply->setRawHeader("Link",
                             "<https://api.github.com/notifications?page=2>; rel=\"next\", "
                             "<https://api.github.com/notifications?page=5>; rel=\"last\"");
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -74,12 +74,12 @@ class TestGitHubClient : public QObject {
 
         QByteArray json =
             "{\"html_url\":\"http://github.com/foo/bar\", \"user\":{\"login\":\"user\", \"avatar_url\":\"url\"}}";
-        MockNetworkReply *reply = new MockNetworkReply(json, &client);
+        MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "details");
         reply->setProperty("notificationId", "123");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -91,13 +91,13 @@ class TestGitHubClient : public QObject {
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::detailsError);
 
-        MockNetworkReply *reply = new MockNetworkReply("", &client);
+        MockNetworkReply* reply = new MockNetworkReply("", &client);
         reply->setProperty("type", "details");
         reply->setProperty("notificationId", "123");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 404);
         reply->setError(QNetworkReply::ContentNotFoundError, "Not Found");
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -110,11 +110,11 @@ class TestGitHubClient : public QObject {
         QSignalSpy spy(&client, &GitHubClient::tokenVerified);
 
         QByteArray json = "{\"login\":\"user\"}";
-        MockNetworkReply *reply = new MockNetworkReply(json, &client);
+        MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "verification");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
@@ -158,11 +158,11 @@ class TestGitHubClient : public QObject {
         array.append(n3);
         QJsonDocument doc(array);
 
-        MockNetworkReply *reply = new MockNetworkReply(doc.toJson(), &client);
+        MockNetworkReply* reply = new MockNetworkReply(doc.toJson(), &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();
@@ -253,11 +253,11 @@ class TestGitHubClient : public QObject {
         array.append(n4);
         QJsonDocument doc(array);
 
-        MockNetworkReply *reply = new MockNetworkReply(doc.toJson(), &client);
+        MockNetworkReply* reply = new MockNetworkReply(doc.toJson(), &client);
         reply->setProperty("type", "notifications");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply *, reply));
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
 
         QCOMPARE(spy.count(), 1);
         QList<Notification> notifications = spy.takeFirst().at(0).value<QList<Notification>>();

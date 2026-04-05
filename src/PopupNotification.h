@@ -11,8 +11,8 @@ class PopupNotification : public QWidget {
     Q_OBJECT
 
    public:
-    explicit PopupNotification(QWidget *parent = nullptr);
-    void setMessage(const QString &message);
+    explicit PopupNotification(QWidget* parent = nullptr);
+    void setMessage(const QString& message);
     void setSettingsVisible(bool visible);
 
    signals:
@@ -24,9 +24,9 @@ class PopupNotification : public QWidget {
     void onDismissClicked();
 
    private:
-    QLabel *messageLabel;
-    QPushButton *settingsButton;
-    QPushButton *dismissButton;
+    QLabel* messageLabel;
+    QPushButton* settingsButton;
+    QPushButton* dismissButton;
 };
 
 #endif  // POPUPNOTIFICATION_H

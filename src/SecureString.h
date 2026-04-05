@@ -18,20 +18,20 @@ class SecureString {
    public:
     SecureString() = default;
 
-    explicit SecureString(const QString &str) { set(str); }
+    explicit SecureString(const QString& str) { set(str); }
 
     ~SecureString() { clear(); }
 
     // Disable copy
-    SecureString(const SecureString &) = delete;
-    SecureString &operator=(const SecureString &) = delete;
+    SecureString(const SecureString&) = delete;
+    SecureString& operator=(const SecureString&) = delete;
 
     // Enable move
-    SecureString(SecureString &&other) noexcept : m_data(std::move(other.m_data)) {
+    SecureString(SecureString&& other) noexcept : m_data(std::move(other.m_data)) {
         // Since m_data was moved, other.m_data is now empty.
     }
 
-    SecureString &operator=(SecureString &&other) noexcept {
+    SecureString& operator=(SecureString&& other) noexcept {
         if (this != &other) {
             clear();
             m_data = std::move(other.m_data);
@@ -39,7 +39,7 @@ class SecureString {
         return *this;
     }
 
-    void set(const QString &str) {
+    void set(const QString& str) {
         clear();
         QByteArray bytes = str.toUtf8();
         if (bytes.isEmpty()) return;
@@ -54,7 +54,7 @@ class SecureString {
         std::memcpy(m_data.data(), bytes.constData(), bytes.size());
 
         // Attempt to clear temporary QByteArray buffer
-        volatile char *p = bytes.data();
+        volatile char* p = bytes.data();
         size_t s = bytes.size();
         while (s--) *p++ = 0;
     }
@@ -80,7 +80,7 @@ class SecureString {
             munlock(m_data.data(), m_data.size());
 #endif
 
-            volatile char *p = m_data.data();
+            volatile char* p = m_data.data();
             size_t s = m_data.size();
             while (s--) *p++ = 0;
             m_data.clear();

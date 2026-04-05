@@ -27,7 +27,7 @@
 #include "RulesDialog.h"
 #include "SettingsDialog.h"
 
-NotificationListWidget::NotificationListWidget(QWidget *parent)
+NotificationListWidget::NotificationListWidget(QWidget* parent)
     : QWidget(parent),
       loadMoreItem(nullptr),
       m_filterMode(0),
@@ -38,10 +38,11 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
       m_client(nullptr) {
     loadKnownNotifications();
 
-    QVBoxLayout *layout = new QVBoxLayout(this);
+    QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
     listWidget = new QListWidget(this);
+    listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     listWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
     listWidget->setAlternatingRowColors(true);
 
@@ -74,10 +75,10 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     markAsReadAction = new QAction(tr("Mark as Read"), this);
     connect(markAsReadAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = listWidget->currentItem();
+        QListWidgetItem* item = listWidget->currentItem();
         if (!item) return;
 
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+        NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
         if (widget && widget->isLoading()) return;
         if (widget) widget->setLoading(true);
 
@@ -113,7 +114,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
 
     viewRawAction = new QAction(tr("View Raw JSON"), this);
     connect(viewRawAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = listWidget->currentItem();
+        QListWidgetItem* item = listWidget->currentItem();
         if (!item) return;
 
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
@@ -126,12 +127,12 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
         QJsonDocument doc(combined);
         QString rawJson = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
 
-        QDialog *dialog = new QDialog(this);
+        QDialog* dialog = new QDialog(this);
         dialog->setWindowTitle(tr("Raw JSON"));
         dialog->resize(600, 400);
 
-        QVBoxLayout *layout = new QVBoxLayout(dialog);
-        QTextEdit *textEdit = new QTextEdit(dialog);
+        QVBoxLayout* layout = new QVBoxLayout(dialog);
+        QTextEdit* textEdit = new QTextEdit(dialog);
         textEdit->setReadOnly(true);
         textEdit->setPlainText(rawJson);
         layout->addWidget(textEdit);
@@ -142,16 +143,16 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     contextMenu->addAction(viewRawAction);
     contextMenu->addSeparator();
 
-    QAction *muteRepoAction = new QAction(tr("Mute Repository"), this);
+    QAction* muteRepoAction = new QAction(tr("Mute Repository"), this);
     connect(muteRepoAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = listWidget->currentItem();
+        QListWidgetItem* item = listWidget->currentItem();
         if (!item) return;
         QString currentId = item->data(Qt::UserRole + 1).toString();
         if (currentId.isEmpty()) return;
 
         Notification n;
         bool found = false;
-        for (const Notification &notif : m_allNotifications) {
+        for (const Notification& notif : m_allNotifications) {
             if (notif.id == currentId) {
                 n = notif;
                 found = true;
@@ -168,16 +169,16 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
                                  tr("Muted notifications for repository:\n%1").arg(n.repository));
     });
 
-    QAction *openRulesAction = new QAction(tr("Manage Notification Rules..."), this);
+    QAction* openRulesAction = new QAction(tr("Manage Notification Rules..."), this);
     connect(openRulesAction, &QAction::triggered, this, [this]() {
-        QListWidgetItem *item = listWidget->currentItem();
+        QListWidgetItem* item = listWidget->currentItem();
         if (!item) return;
         QString currentId = item->data(Qt::UserRole + 1).toString();
         if (currentId.isEmpty()) return;
 
         Notification n;
         bool found = false;
-        for (const Notification &notif : m_allNotifications) {
+        for (const Notification& notif : m_allNotifications) {
             if (notif.id == currentId) {
                 n = notif;
                 found = true;
@@ -194,7 +195,7 @@ NotificationListWidget::NotificationListWidget(QWidget *parent)
     contextMenu->addAction(openRulesAction);
 }
 
-void NotificationListWidget::setNotifications(const QList<Notification> &notifications, bool append, bool hasMore) {
+void NotificationListWidget::setNotifications(const QList<Notification>& notifications, bool append, bool hasMore) {
     if (!append) {
         m_allNotifications = notifications;
         m_pendingNewNotifications = 0;
@@ -204,7 +205,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     }
     m_hasMore = hasMore;
 
-    for (const Notification &n : notifications) {
+    for (const Notification& n : notifications) {
         if (!knownNotificationIds.contains(n.id)) {
             m_pendingNewNotifications++;
             knownNotificationIds.insert(n.id);
@@ -217,7 +218,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
 
     // Emit progressively without triggering popups (newCount=0, empty list)
     int totalUnread = 0;
-    for (const auto &n : m_allNotifications) {
+    for (const auto& n : m_allNotifications) {
         if (n.unread) totalUnread++;
     }
     emit countsChanged(m_allNotifications.count(), totalUnread, 0, QList<Notification>());
@@ -225,7 +226,7 @@ void NotificationListWidget::setNotifications(const QList<Notification> &notific
     updateList();
 }
 
-void NotificationListWidget::resizeEvent(QResizeEvent *event) {
+void NotificationListWidget::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
     handleLoadMoreStrategy();
 }
@@ -243,13 +244,13 @@ void NotificationListWidget::setSortMode(int mode) {
     updateList();
 }
 
-void NotificationListWidget::setRepoFilter(const QString &repo) {
+void NotificationListWidget::setRepoFilter(const QString& repo) {
     if (m_repoFilter == repo) return;
     m_repoFilter = repo;
     applyClientFilters();
 }
 
-void NotificationListWidget::setSearchFilter(const QString &text) {
+void NotificationListWidget::setSearchFilter(const QString& text) {
     if (m_searchFilter == text) return;
     m_searchFilter = text;
     applyClientFilters();
@@ -265,15 +266,15 @@ void NotificationListWidget::selectTop(int n) {
     int limit = qMin(n, count);
 
     for (int i = 0; i < limit; ++i) {
-        QListWidgetItem *item = listWidget->item(i);
+        QListWidgetItem* item = listWidget->item(i);
         if (item) item->setSelected(true);
     }
 }
 
 void NotificationListWidget::dismissSelected() {
-    QList<QListWidgetItem *> items = listWidget->selectedItems();
+    QList<QListWidgetItem*> items = listWidget->selectedItems();
     for (auto item : items) {
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+        NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
         if (widget && !widget->isLoading()) {
             widget->setLoading(true);
 
@@ -297,7 +298,7 @@ void NotificationListWidget::dismissSelected() {
 }
 
 void NotificationListWidget::openSelected() {
-    QList<QListWidgetItem *> items = listWidget->selectedItems();
+    QList<QListWidgetItem*> items = listWidget->selectedItems();
     for (auto item : items) {
         openUrlForItem(item);
     }
@@ -306,7 +307,7 @@ void NotificationListWidget::openSelected() {
 bool NotificationListWidget::willLoadMore() const {
     if (!loadMoreItem) return false;
 
-    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    QPushButton* btn = qobject_cast<QPushButton*>(listWidget->itemWidget(loadMoreItem));
     if (!btn || !btn->isEnabled()) return false;
 
     SettingsDialog::GetDataOption option = SettingsDialog::getGetDataOption();
@@ -340,7 +341,7 @@ bool NotificationListWidget::willLoadMore() const {
 void NotificationListWidget::handleLoadMoreStrategy() {
     bool currentlyLoading = false;
     if (loadMoreItem) {
-        QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+        QPushButton* btn = qobject_cast<QPushButton*>(listWidget->itemWidget(loadMoreItem));
         if (btn && !btn->isEnabled()) {
             currentlyLoading = true;
         }
@@ -350,7 +351,7 @@ void NotificationListWidget::handleLoadMoreStrategy() {
         triggerLoadMore();
     } else if (!currentlyLoading && m_countsDirty) {
         int totalUnread = 0;
-        for (const auto &n : m_allNotifications) {
+        for (const auto& n : m_allNotifications) {
             if (n.unread) totalUnread++;
         }
         emit countsChanged(m_allNotifications.count(), totalUnread, m_pendingNewNotifications,
@@ -361,9 +362,9 @@ void NotificationListWidget::handleLoadMoreStrategy() {
     }
 }
 
-void NotificationListWidget::focusNotification(const QString &id) {
+void NotificationListWidget::focusNotification(const QString& id) {
     for (int i = 0; i < listWidget->count(); ++i) {
-        QListWidgetItem *item = listWidget->item(i);
+        QListWidgetItem* item = listWidget->item(i);
         if (item->data(Qt::UserRole + 1).toString() == id) {
             listWidget->scrollToItem(item);
             listWidget->setCurrentItem(item);
@@ -378,7 +379,7 @@ QStringList NotificationListWidget::getAvailableRepos() const {
     // Iterate over visible items or all items?
     // Usually repo filter is based on currently loaded items
     for (int i = 0; i < listWidget->count(); ++i) {
-        QListWidgetItem *item = listWidget->item(i);
+        QListWidgetItem* item = listWidget->item(i);
         if (item == loadMoreItem) continue;
         QString repo = item->data(Qt::UserRole + 3).toString();
         if (!repo.isEmpty()) {
@@ -392,15 +393,15 @@ QStringList NotificationListWidget::getAvailableRepos() const {
 
 int NotificationListWidget::count() const { return listWidget->count(); }
 
-void NotificationListWidget::updateDetails(const QString &id, const QString &author, const QString &avatarUrl,
-                                           const QString &htmlUrl) {
-    NotificationDetails &details = detailsCache[id];
+void NotificationListWidget::updateDetails(const QString& id, const QString& author, const QString& avatarUrl,
+                                           const QString& htmlUrl) {
+    NotificationDetails& details = detailsCache[id];
     details.author = author;
     details.avatarUrl = avatarUrl;
     details.htmlUrl = htmlUrl;
     details.hasDetails = true;
 
-    NotificationItemWidget *widget = findNotificationWidget(id);
+    NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setAuthor(author, details.avatar);
         widget->setHtmlUrl(htmlUrl);
@@ -411,28 +412,28 @@ void NotificationListWidget::updateDetails(const QString &id, const QString &aut
     }
 }
 
-void NotificationListWidget::updateImage(const QString &id, const QPixmap &pixmap) {
-    NotificationDetails &details = detailsCache[id];
+void NotificationListWidget::updateImage(const QString& id, const QPixmap& pixmap) {
+    NotificationDetails& details = detailsCache[id];
     details.avatar = pixmap;
     details.hasImage = true;
 
-    NotificationItemWidget *widget = findNotificationWidget(id);
+    NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setAuthor(details.author, pixmap);
     }
 }
 
-void NotificationListWidget::updateError(const QString &id, const QString &error) {
-    NotificationItemWidget *widget = findNotificationWidget(id);
+void NotificationListWidget::updateError(const QString& id, const QString& error) {
+    NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setError(error);
     }
 }
 
-void NotificationListWidget::onListContextMenu(const QPoint &pos) {
-    QListWidgetItem *item = listWidget->itemAt(pos);
+void NotificationListWidget::onListContextMenu(const QPoint& pos) {
+    QListWidgetItem* item = listWidget->itemAt(pos);
     if (item) {
-        NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+        NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
         if (widget && widget->isLoading()) return;
 
         listWidget->setCurrentItem(item);
@@ -446,12 +447,12 @@ void NotificationListWidget::onListContextMenu(const QPoint &pos) {
     }
 }
 
-void NotificationListWidget::onItemActivated(QListWidgetItem *item) { openWindowForItem(item); }
+void NotificationListWidget::onItemActivated(QListWidgetItem* item) { openWindowForItem(item); }
 
 void NotificationListWidget::triggerLoadMore() {
     if (!loadMoreItem) return;
 
-    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    QPushButton* btn = qobject_cast<QPushButton*>(listWidget->itemWidget(loadMoreItem));
     if (btn && btn->isEnabled()) {
         btn->setEnabled(false);
         btn->setText(tr("Loading..."));
@@ -461,12 +462,12 @@ void NotificationListWidget::triggerLoadMore() {
 
 void NotificationListWidget::onLoadMoreClicked() { triggerLoadMore(); }
 
-void NotificationListWidget::insertNotificationItem(int row, const Notification &n) {
-    QListWidgetItem *item = new QListWidgetItem();
-    NotificationItemWidget *widget = new NotificationItemWidget(n);
+void NotificationListWidget::insertNotificationItem(int row, const Notification& n) {
+    QListWidgetItem* item = new QListWidgetItem();
+    NotificationItemWidget* widget = new NotificationItemWidget(n);
 
     if (detailsCache.contains(n.id)) {
-        const NotificationDetails &details = detailsCache[n.id];
+        const NotificationDetails& details = detailsCache[n.id];
         if (details.hasDetails) {
             widget->setAuthor(details.author, details.avatar);
             widget->setHtmlUrl(details.htmlUrl);
@@ -488,7 +489,64 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification 
     widget->setRead(!n.unread);
 
     QPointer<NotificationItemWidget> safeWidget(widget);
+
+    connect(widget, &NotificationItemWidget::heightChanged, this, [item, safeWidget]() {
+        if (safeWidget) {
+            QSize hint = safeWidget->sizeHint();
+            if (hint.height() < 60) hint.setHeight(60);
+            item->setSizeHint(hint);
+        }
+    });
+
     connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() { openUrlForItem(item); });
+
+    connect(widget, &NotificationItemWidget::childOpenClicked, this,
+            [this](const QString& url) { QDesktopServices::openUrl(QUrl(url)); });
+
+    connect(widget, &NotificationItemWidget::childCopyClicked, this,
+            [this](const QString& url) { QApplication::clipboard()->setText(url); });
+
+    connect(widget, &NotificationItemWidget::childMarkAsReadClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsRead(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications[i].unread = false;
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
+
+    connect(widget, &NotificationItemWidget::childMarkAsDoneClicked, this, [this, item](const QString& id) {
+        if (m_client) m_client->markAsDone(id);
+
+        QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+        Notification n = Notification::fromJson(json);
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == id) {
+                n.groupedNotifications.removeAt(i);
+                break;
+            }
+        }
+        item->setData(Qt::UserRole + 4, n.toJson());
+
+        for (int i = 0; i < m_allNotifications.size(); ++i) {
+            if (m_allNotifications[i].id == n.id) {
+                m_allNotifications[i] = n;
+                break;
+            }
+        }
+    });
 
     connect(
         widget, &NotificationItemWidget::doneClicked, this,
@@ -509,7 +567,7 @@ void NotificationListWidget::updateList() {
 
     // Prepare Target List
     QList<Notification> targetNotifications;
-    for (const Notification &n : m_allNotifications) {
+    for (const Notification& n : m_allNotifications) {
         bool show = false;
 
         QDateTime updated = QDateTime::fromString(n.updatedAt, Qt::ISODate);
@@ -552,7 +610,7 @@ void NotificationListWidget::updateList() {
     // Sort the list
     if (m_sortMode != SortDefault) {
         std::sort(targetNotifications.begin(), targetNotifications.end(),
-                  [this](const Notification &a, const Notification &b) {
+                  [this](const Notification& a, const Notification& b) {
                       switch (m_sortMode) {
                           case SortUpdatedDesc:
                               return a.updatedAt > b.updatedAt;
@@ -607,8 +665,8 @@ void NotificationListWidget::updateList() {
     // Sync Loop
     int i = 0;
     while (i < targetNotifications.size()) {
-        const Notification &n = targetNotifications[i];
-        QListWidgetItem *currentItem = listWidget->item(i);
+        const Notification& n = targetNotifications[i];
+        QListWidgetItem* currentItem = listWidget->item(i);
 
         // Check if current item matches target
         QString currentId = currentItem ? currentItem->data(Qt::UserRole + 1).toString() : QString();
@@ -622,8 +680,7 @@ void NotificationListWidget::updateList() {
 
         if (currentItem && currentId == n.id) {
             // Match: Update existing
-            NotificationItemWidget *widget =
-                qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(currentItem));
+            NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(currentItem));
             if (widget) {
                 widget->updateNotification(n);
             }
@@ -636,7 +693,7 @@ void NotificationListWidget::updateList() {
             // Check if n.id exists later in the list
             int foundIndex = -1;
             for (int k = i + 1; k < listWidget->count(); ++k) {
-                QListWidgetItem *searchItem = listWidget->item(k);
+                QListWidgetItem* searchItem = listWidget->item(k);
                 if (searchItem == loadMoreItem) continue;
                 if (searchItem->data(Qt::UserRole + 1).toString() == n.id) {
                     foundIndex = k;
@@ -647,11 +704,11 @@ void NotificationListWidget::updateList() {
             if (foundIndex != -1) {
                 // Found later: Move it to current position 'i'
                 // Safely remove old item and widget
-                QWidget *widget = listWidget->itemWidget(listWidget->item(foundIndex));
+                QWidget* widget = listWidget->itemWidget(listWidget->item(foundIndex));
                 if (widget) {
                     widget->deleteLater();
                 }
-                QListWidgetItem *movedItem = listWidget->takeItem(foundIndex);
+                QListWidgetItem* movedItem = listWidget->takeItem(foundIndex);
                 delete movedItem;
 
                 insertNotificationItem(i, n);
@@ -666,12 +723,12 @@ void NotificationListWidget::updateList() {
     // Cleanup: Remove remaining items starting from i (excluding loadMoreItem if we want to keep it logic clean)
     // We iterate backwards to avoid index shifting issues
     for (int k = listWidget->count() - 1; k >= i; --k) {
-        QListWidgetItem *item = listWidget->item(k);
+        QListWidgetItem* item = listWidget->item(k);
         if (item == loadMoreItem) {
             // Handle loadMoreItem logic below, don't delete here unless we reset it
             continue;
         }
-        QWidget *w = listWidget->itemWidget(item);
+        QWidget* w = listWidget->itemWidget(item);
         if (w) w->deleteLater();
         delete listWidget->takeItem(k);
     }
@@ -681,7 +738,7 @@ void NotificationListWidget::updateList() {
     if (m_hasMore) {
         if (!loadMoreItem) {
             loadMoreItem = new QListWidgetItem();
-            QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+            QPushButton* loadMoreBtn = new QPushButton(tr("Load More"));
             connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
 
             loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
@@ -693,13 +750,13 @@ void NotificationListWidget::updateList() {
             // Ensure it is at the very end
             int r = listWidget->row(loadMoreItem);
             if (r != listWidget->count() - 1) {
-                QWidget *w = listWidget->itemWidget(loadMoreItem);
+                QWidget* w = listWidget->itemWidget(loadMoreItem);
                 if (w) w->deleteLater();
                 listWidget->takeItem(r);
                 delete loadMoreItem;  // Delete old pointer
 
                 loadMoreItem = new QListWidgetItem();
-                QPushButton *loadMoreBtn = new QPushButton(tr("Load More"));
+                QPushButton* loadMoreBtn = new QPushButton(tr("Load More"));
                 connect(loadMoreBtn, &QPushButton::clicked, this, &NotificationListWidget::onLoadMoreClicked);
 
                 loadMoreItem->setSizeHint(loadMoreBtn->sizeHint());
@@ -708,7 +765,7 @@ void NotificationListWidget::updateList() {
                 listWidget->addItem(loadMoreItem);
                 listWidget->setItemWidget(loadMoreItem, loadMoreBtn);
             } else {
-                QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+                QPushButton* btn = qobject_cast<QPushButton*>(listWidget->itemWidget(loadMoreItem));
                 if (btn) {
                     btn->setEnabled(true);
                     btn->setText(tr("Load More"));
@@ -719,7 +776,7 @@ void NotificationListWidget::updateList() {
         if (loadMoreItem) {
             int r = listWidget->row(loadMoreItem);
             if (r >= 0) {
-                QWidget *w = listWidget->itemWidget(loadMoreItem);
+                QWidget* w = listWidget->itemWidget(loadMoreItem);
                 if (w) w->deleteLater();
                 delete listWidget->takeItem(r);
             }
@@ -742,7 +799,7 @@ void NotificationListWidget::applyClientFilters() {
     int visibleCount = 0;
 
     for (int i = 0; i < listWidget->count(); ++i) {
-        QListWidgetItem *item = listWidget->item(i);
+        QListWidgetItem* item = listWidget->item(i);
         if (item == loadMoreItem) continue;
 
         bool matchRepo = true;
@@ -769,21 +826,21 @@ void NotificationListWidget::applyClientFilters() {
     emit statusMessage(tr("Items: %1").arg(visibleCount));
 }
 
-NotificationItemWidget *NotificationListWidget::findNotificationWidget(const QString &id) {
+NotificationItemWidget* NotificationListWidget::findNotificationWidget(const QString& id) {
     for (int i = 0; i < listWidget->count(); ++i) {
-        QListWidgetItem *item = listWidget->item(i);
+        QListWidgetItem* item = listWidget->item(i);
         if (item->data(Qt::UserRole + 1).toString() == id) {
-            return qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+            return qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
         }
     }
     return nullptr;
 }
 
 void NotificationListWidget::dismissCurrentItem() {
-    QListWidgetItem *item = listWidget->currentItem();
+    QListWidgetItem* item = listWidget->currentItem();
     if (!item) return;
 
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
     if (widget && widget->isLoading()) return;
     if (widget) widget->setLoading(true);
 
@@ -798,6 +855,9 @@ void NotificationListWidget::dismissCurrentItem() {
     item->setFont(font);
 
     emit markAsDone(id);
+    for (const auto& child : n.groupedNotifications) {
+        emit markAsDone(child.id);
+    }
     knownNotificationIds.remove(id);
     removeKnownNotification(id);
 
@@ -805,31 +865,35 @@ void NotificationListWidget::dismissCurrentItem() {
 }
 
 void NotificationListWidget::openUrlCurrentItem() {
-    QListWidgetItem *item = listWidget->currentItem();
+    QListWidgetItem* item = listWidget->currentItem();
     if (item) {
         openUrlForItem(item);
     }
 }
 
 void NotificationListWidget::openWindowCurrentItem() {
-    QListWidgetItem *item = listWidget->currentItem();
+    QListWidgetItem* item = listWidget->currentItem();
     if (item) {
         openWindowForItem(item);
     }
 }
 
-void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
+void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem* item) {
     QString id = item->data(Qt::UserRole + 1).toString();
 
     emit markAsRead(id);
 
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    for (const auto& child : n.groupedNotifications) {
+        emit markAsRead(child.id);
+    }
+
+    NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
     if (widget) {
         widget->setRead(true);
     }
-
-    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-    Notification n = Notification::fromJson(json);
     n.unread = false;
     item->setData(Qt::UserRole + 4, n.toJson());
 
@@ -843,10 +907,10 @@ void NotificationListWidget::markAsReadAndRemoveItem(QListWidgetItem *item) {
     }
 }
 
-void NotificationListWidget::openUrlForItem(QListWidgetItem *item) {
+void NotificationListWidget::openUrlForItem(QListWidgetItem* item) {
     if (!item) return;
 
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
     if (widget && widget->isLoading()) return;
 
     QString apiUrl = item->data(Qt::UserRole).toString();
@@ -859,26 +923,26 @@ void NotificationListWidget::openUrlForItem(QListWidgetItem *item) {
     markAsReadAndRemoveItem(item);
 }
 
-void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
+void NotificationListWidget::openWindowForItem(QListWidgetItem* item) {
     if (!item) return;
 
-    NotificationItemWidget *widget = qobject_cast<NotificationItemWidget *>(listWidget->itemWidget(item));
+    NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(item));
     if (widget && widget->isLoading()) return;
 
     QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
     Notification n = Notification::fromJson(json);
 
-    NotificationWindow *win = new NotificationWindow(n, m_client, this);
+    NotificationWindow* win = new NotificationWindow(n, m_client, this);
     win->setAttribute(Qt::WA_DeleteOnClose);
     connect(win, &NotificationWindow::debugApiRequested, this,
-            [this](const QString &url) { emit requestDebugApi(url); });
+            [this](const QString& url) { emit requestDebugApi(url); });
 
     connect(win, &NotificationWindow::actionRequested, this,
-            [this](const QString &actionName, const QString &id, const QString &url) {
+            [this](const QString& actionName, const QString& id, const QString& url) {
                 // Find item by ID
-                QListWidgetItem *targetItem = nullptr;
+                QListWidgetItem* targetItem = nullptr;
                 for (int i = 0; i < listWidget->count(); ++i) {
-                    QListWidgetItem *it = listWidget->item(i);
+                    QListWidgetItem* it = listWidget->item(i);
                     if (it->data(Qt::UserRole + 1).toString() == id) {
                         targetItem = it;
                         break;
@@ -908,7 +972,7 @@ void NotificationListWidget::openWindowForItem(QListWidgetItem *item) {
 }
 
 void NotificationListWidget::copyLinkCurrentItem() {
-    QListWidgetItem *item = listWidget->currentItem();
+    QListWidgetItem* item = listWidget->currentItem();
     if (item) {
         QString apiUrl = item->data(Qt::UserRole).toString();
         QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl);
@@ -918,7 +982,7 @@ void NotificationListWidget::copyLinkCurrentItem() {
 
 QList<Notification> NotificationListWidget::getUnreadNotifications(int limit) const {
     QList<Notification> unread;
-    for (const auto &n : m_allNotifications) {
+    for (const auto& n : m_allNotifications) {
         if (n.unread) {
             unread.append(n);
             if (unread.count() >= limit) break;
@@ -930,7 +994,7 @@ QList<Notification> NotificationListWidget::getUnreadNotifications(int limit) co
 void NotificationListWidget::resetLoadMoreState() {
     if (!loadMoreItem) return;
 
-    QPushButton *btn = qobject_cast<QPushButton *>(listWidget->itemWidget(loadMoreItem));
+    QPushButton* btn = qobject_cast<QPushButton*>(listWidget->itemWidget(loadMoreItem));
     if (btn) {
         btn->setEnabled(true);
         btn->setText(tr("Retry Load More"));
@@ -944,7 +1008,7 @@ void NotificationListWidget::loadKnownNotifications() {
 
         if (dir.exists()) {
             QStringList files = dir.entryList(QDir::Files);
-            for (const QString &file : files) {
+            for (const QString& file : files) {
                 knownNotificationIds.insert(file);
             }
         }
@@ -953,7 +1017,7 @@ void NotificationListWidget::loadKnownNotifications() {
     }
 }
 
-void NotificationListWidget::addKnownNotification(const QString &id) {
+void NotificationListWidget::addKnownNotification(const QString& id) {
     if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
         QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
         QDir dir(path);
@@ -971,7 +1035,7 @@ void NotificationListWidget::addKnownNotification(const QString &id) {
     }
 }
 
-void NotificationListWidget::removeKnownNotification(const QString &id) {
+void NotificationListWidget::removeKnownNotification(const QString& id) {
     if (SettingsDialog::getNotifyOnce() && !id.isEmpty()) {
         QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/known_notifications";
         QFile file(path + "/" + id);

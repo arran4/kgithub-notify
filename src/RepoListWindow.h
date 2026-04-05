@@ -16,28 +16,28 @@ class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
 
    public:
-    explicit RepoListWindow(GitHubClient *client, QWidget *parent = nullptr);
+    explicit RepoListWindow(GitHubClient* client, QWidget* parent = nullptr);
 
    private slots:
     void onRefreshClicked();
     void onExportClicked();
-    void onReposReceived(const QJsonArray &repos, const QString &nextPageUrl);
+    void onReposReceived(const QJsonArray& repos, const QString& nextPageUrl);
     void updateTimerLabel();
-    void onCustomContextMenuRequested(const QPoint &pos);
-    void onError(const QString &error);
+    void onCustomContextMenuRequested(const QPoint& pos);
+    void onError(const QString& error);
 
    private:
     void setupUI();
     void loadCache();
     void saveCache();
-    void addReposToTable(const QJsonArray &repos);
+    void addReposToTable(const QJsonArray& repos);
 
-    GitHubClient *m_client;
-    QTableWidget *m_table;
-    QToolBar *m_toolbar;
-    QStatusBar *m_statusBar;
-    QLabel *m_timerLabel;
-    QTimer *m_updateTimer;
+    GitHubClient* m_client;
+    QTableWidget* m_table;
+    QToolBar* m_toolbar;
+    QStatusBar* m_statusBar;
+    QLabel* m_timerLabel;
+    QTimer* m_updateTimer;
     QDateTime m_lastRefresh;
     QJsonArray m_allRepos;
 };

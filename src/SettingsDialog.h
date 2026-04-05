@@ -14,7 +14,7 @@ class QCheckBox;
 class SettingsDialog : public QDialog {
     Q_OBJECT
    public:
-    explicit SettingsDialog(QWidget *parent = nullptr);
+    explicit SettingsDialog(QWidget* parent = nullptr);
     enum GetDataOption { Manual, FillScreen, GetAll, Infinite };
     Q_ENUM(GetDataOption)
 
@@ -33,26 +33,26 @@ class SettingsDialog : public QDialog {
    private slots:
     void saveSettings();
     void onTestClicked();
-    void onVerificationResult(bool valid, const QString &message);
+    void onVerificationResult(bool valid, const QString& message);
     void installNotifyRc();
 
    private:
     void updateAutostartEntry();
     bool isAutostartEnabled();
 
-    QLineEdit *tokenEdit;
-    QComboBox *intervalCombo;
-    QComboBox *dataOptionCombo;
-    QComboBox *summaryThresholdCombo;
-    QComboBox *notificationDelayCombo;
-    QComboBox *trayUnreadLimitCombo;
-    QCheckBox *autostartCheckBox;
-    QCheckBox *startMinimizedCheckBox;
-    QCheckBox *notifyOnceCheckBox;
-    QCheckBox *notifyReadCheckBox;
-    QPushButton *testButton;
-    QLabel *statusLabel;
-    GitHubClient *testClient;
+    QLineEdit* tokenEdit;
+    QComboBox* intervalCombo;
+    QComboBox* dataOptionCombo;
+    QComboBox* summaryThresholdCombo;
+    QComboBox* notificationDelayCombo;
+    QComboBox* trayUnreadLimitCombo;
+    QCheckBox* autostartCheckBox;
+    QCheckBox* startMinimizedCheckBox;
+    QCheckBox* notifyOnceCheckBox;
+    QCheckBox* notifyReadCheckBox;
+    QPushButton* testButton;
+    QLabel* statusLabel;
+    GitHubClient* testClient;
 };
 
 #endif  // SETTINGSDIALOG_H
