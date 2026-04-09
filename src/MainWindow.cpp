@@ -248,7 +248,6 @@ void MainWindow::onAuthError(const QString& message) {
         notificationListWidget->resetLoadMoreState();
     }
 
-    static bool authNotificationSent = false;
     if (!authNotificationSent) {
         KNotification* notification = new KNotification("AuthError");
         notification->setComponentName(QStringLiteral("kgithub-notify"));
@@ -335,6 +334,8 @@ void MainWindow::dismissAllNotifications() {
 
 void MainWindow::onTokenLoaded() {
     m_loadedToken = tokenWatcher->result();
+
+    authNotificationSent = false;
 
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);

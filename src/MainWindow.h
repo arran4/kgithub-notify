@@ -114,6 +114,7 @@ class MainWindow : public KXmlGuiWindow {
     GitHubClient* client;
 
     bool pendingAuthError;
+    bool authNotificationSent = false;
     QString lastError;
 
     // Toolbar
