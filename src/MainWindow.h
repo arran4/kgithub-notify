@@ -22,7 +22,6 @@
 #include "GitHubClient.h"
 #include "Notification.h"
 #include "NotificationListWidget.h"
-#include "PopupNotification.h"
 
 class NotificationItemWidget;
 class QSpinBox;
@@ -85,7 +84,6 @@ class MainWindow : public KXmlGuiWindow {
     void createTrayIcon();
     void updateTrayMenu();
     void updateTrayToolTip();
-    void positionPopup(QWidget* popup);
     void createErrorPage();
     void createLoginPage();
     void createEmptyStatePage();
@@ -116,6 +114,7 @@ class MainWindow : public KXmlGuiWindow {
     GitHubClient* client;
 
     bool pendingAuthError;
+    bool authNotificationSent = false;
     QString lastError;
 
     // Toolbar
@@ -142,8 +141,6 @@ class MainWindow : public KXmlGuiWindow {
     QLabel* emptyStateLabel;
     QWidget* loadingPage;
     QLabel* loadingLabel;
-
-    PopupNotification* authNotification;
 
     // Status Bar
     QStatusBar* statusBar;
