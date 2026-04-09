@@ -67,7 +67,6 @@ MainWindow::MainWindow(QWidget* parent)
       notificationListWidget(nullptr),
       client(nullptr),
       pendingAuthError(false),
-      authNotification(nullptr),
       m_lastUnreadCount(0) {
     setupWindow();
     setupCentralWidget();
@@ -156,10 +155,6 @@ void MainWindow::updateNotifications(const QList<Notification>& notifications, b
     m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
-
-    if (authNotification && authNotification->isVisible()) {
-        authNotification->close();
-    }
 
     notificationListWidget->setNotifications(notifications, append, hasMore);
 
@@ -253,15 +248,20 @@ void MainWindow::onAuthError(const QString& message) {
         notificationListWidget->resetLoadMoreState();
     }
 
-    if (!authNotification) {
-        authNotification = new PopupNotification(this);
-        connect(authNotification, &PopupNotification::settingsClicked, this,
-                &MainWindow::onAuthNotificationSettingsClicked);
-    }
+    static bool authNotificationSent = false;
+    if (!authNotificationSent) {
+        KNotification* notification = new KNotification("AuthError");
+        notification->setComponentName(QStringLiteral("kgithub-notify"));
+        notification->setTitle(tr("GitHub Authentication Error"));
+        notification->setText(message);
 
-    authNotification->setMessage(message);
-    positionPopup(authNotification);
-    authNotification->show();
+        auto settingsAction = notification->addAction(tr("Settings"));
+        connect(settingsAction, &KNotificationAction::activated, this, &MainWindow::onAuthNotificationSettingsClicked);
+        connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
+
+        notification->sendEvent();
+        authNotificationSent = true;
+    }
 
     if (!trayIcon || !trayIcon->isVisible()) {
         if (isVisible()) {
@@ -326,12 +326,7 @@ void MainWindow::onLoadingStarted() {
     updateTrayToolTip();
 }
 
-void MainWindow::onAuthNotificationSettingsClicked() {
-    if (authNotification) {
-        authNotification->close();
-    }
-    showSettings();
-}
+void MainWindow::onAuthNotificationSettingsClicked() { showSettings(); }
 
 void MainWindow::dismissAllNotifications() {
     notificationListWidget->selectAll();
@@ -646,32 +641,6 @@ void MainWindow::updateTrayToolTip() {
     }
 
     trayIcon->setToolTip(parts.join(QStringLiteral("\n")));
-}
-
-void MainWindow::positionPopup(QWidget* popup) {
-    if (!popup) return;
-
-    QRect screenGeom = QGuiApplication::primaryScreen()->availableGeometry();
-
-    if (!trayIcon || !trayIcon->isVisible() || trayIcon->geometry().isEmpty()) {
-        popup->move(screenGeom.bottomRight() - QPoint(popup->width() + 10, popup->height() + 10));
-        return;
-    }
-
-    QRect trayGeom = trayIcon->geometry();
-    int x = trayGeom.center().x() - popup->width() / 2;
-    int y;
-
-    if (trayGeom.center().y() < screenGeom.height() / 2) {
-        y = trayGeom.bottom() + 10;
-    } else {
-        y = trayGeom.top() - popup->height() - 10;
-    }
-
-    if (x < screenGeom.left()) x = screenGeom.left() + 10;
-    if (x + popup->width() > screenGeom.right()) x = screenGeom.right() - popup->width() - 10;
-
-    popup->move(x, y);
 }
 
 void MainWindow::createErrorPage() {

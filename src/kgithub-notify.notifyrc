@@ -8,3 +8,9 @@ Name=New Notification
 Comment=You have new GitHub notifications
 Action=Popup
 Urgency=Normal
+
+[Event/AuthError]
+Name=Authentication Error
+Comment=GitHub authentication failed
+Action=Popup
+Urgency=Critical
