@@ -38,6 +38,8 @@ Kgithub-notify acts as a mini-client for managing your daily GitHub workflows di
 * **C++ Compiler**: Must support C++17 (e.g., GCC 7+, Clang 5+, MSVC 2017+).
 * **CMake**: Version 3.10 or higher.
 * **Qt6 & KDE Frameworks 6**:
+  * **Qt6**: Widgets, Network, Svg, DBus, Test
+  * **KF6**: Wallet, Notifications, CoreAddons, XmlGui, ConfigWidgets, I18n
 
 ### Installing Dependencies (Debian / Ubuntu 24.10+)
 
