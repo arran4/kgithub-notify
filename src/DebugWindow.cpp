@@ -29,11 +29,8 @@ DebugWindow::DebugWindow(GitHubClient* client, QWidget* parent) : QDialog(parent
     for (const auto& preset : m_presets) {
         m_apiSelector->addItem(preset.name);
     }
-    // Use the Qt connect syntax for overloaded signals if needed, or function pointer
-    // connect(m_apiSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &DebugWindow::onApiSelected);
-    // But basic SIGNAL/SLOT is safer if not sure about overload support in this env.
-    // QComboBox::currentIndexChanged(int)
-    connect(m_apiSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(onApiSelected(int)));
+    // Use the modern Qt function pointer connect syntax
+    connect(m_apiSelector, &QComboBox::currentIndexChanged, this, &DebugWindow::onApiSelected);
     topLayout->addWidget(m_apiSelector);
 
     topLayout->addWidget(new QLabel(tr("Method:")));
