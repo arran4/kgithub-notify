@@ -414,6 +414,7 @@ jobs:
       - name: Install xvfb and flatpak-builder
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb flatpak-builder flatpak
+          sudo mkdir -p /etc/polkit-1/rules.d && echo 'polkit.addRule(function(action, subject) { if (action.id.indexOf("org.freedesktop.Flatpak.") === 0 && subject.isInGroup("sudo")) { return polkit.Result.YES; } });' | sudo tee /etc/polkit-1/rules.d/99-flatpak.rules
           sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
