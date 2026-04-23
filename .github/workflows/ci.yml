@@ -393,7 +393,7 @@ jobs:
       - name: Install xvfb and flatpak-builder
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb flatpak-builder flatpak
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -428,7 +428,7 @@ jobs:
   publish-release:
     name: Publish Release
     needs: [route, cpp-qt-build-test, prepare-release-tag, flatpak-build]
-    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (needs.flatpak-build.result == 'success' || needs.flatpak-build.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
