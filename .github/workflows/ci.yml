@@ -381,6 +381,27 @@ jobs:
             --head "$BRANCH" \
             --label "ci-autofix"
 
+  flatpak-build:
+    name: Flatpak Build
+    needs: [route, discover, prepare-release-tag]
+    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: kgithub-notify.flatpak
+          manifest-path: com.arran4.kgithub_notify.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-bundle
+          path: kgithub-notify.flatpak
+
   cleanup-autofix-prs:
     name: Cleanup autofix PRs on parent close
     needs: [route]
@@ -402,7 +423,7 @@ jobs:
 
   publish-release:
     name: Publish Release
-    needs: [route, cpp-qt-build-test, prepare-release-tag]
+    needs: [route, cpp-qt-build-test, prepare-release-tag, flatpak-build]
     if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
@@ -419,14 +440,24 @@ jobs:
           name: build-artifacts-ubuntu-latest
           path: build
 
+      - name: Download Flatpak Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak-bundle
+          path: .
+
+      - name: Rename executable
+        run: mv build/kgithub-notify build/kgithub-notify-linux-amd64
+
       - name: Publish draft GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
           name: Release ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
-          files: build/kgithub-notify
+          files: |
+            build/kgithub-notify-linux-amd64
+            kgithub-notify.flatpak
           generate_release_notes: true
-          discussion_category_name: Announcements
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
