@@ -384,7 +384,7 @@ jobs:
   flatpak-build:
     name: Flatpak Build
     needs: [route, discover, prepare-release-tag]
-    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
