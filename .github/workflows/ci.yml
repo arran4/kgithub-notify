@@ -173,6 +173,7 @@ jobs:
         env:
           OVERRIDE_INPUT: ${{ inputs.release_version_override }}
           MODE_INPUT: ${{ inputs.mode }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git config --global user.name "github-actions[bot]"
@@ -249,9 +250,8 @@ jobs:
             CMAKE_NEXT_VERSION="${CLEAN_NEXT%%-*}"
             sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
             git add CMakeLists.txt
-            git commit -m "chore: bump version to $CMAKE_NEXT_VERSION"
+            git commit -m "chore: release version $CMAKE_NEXT_VERSION"
             git tag "$next_tag"
-            git push origin HEAD:${{ github.ref_name }}
             git push origin "$next_tag"
           else
             git tag "$next_tag"
@@ -261,7 +261,28 @@ jobs:
           echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
           clean_tag="${next_tag#v}"; clean_tag="${clean_tag%%-*}"
           IFS='.' read -r maj min pat <<< "$clean_tag"
-          echo "next_version=${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))-SNAPSHOT" >> "$GITHUB_OUTPUT"
+          NEXT_VER="${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))"
+          echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
+
+          # Create a PR for the next SNAPSHOT version
+          BRANCH="ci/bump-version-${NEXT_VER}"
+          git checkout -b "$BRANCH"
+          sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION ${NEXT_VER})/" CMakeLists.txt
+          git add CMakeLists.txt
+          git commit -m "chore: bump version to ${NEXT_VER} for next development cycle"
+          git push origin "$BRANCH"
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+
+          gh pr create \
+            --title "chore: bump version to ${NEXT_VER}" \
+            --body "Automated version bump to ${NEXT_VER} after release of ${next_tag}." \
+            --base "${{ github.ref_name }}" \
+            --head "$BRANCH"
 
   gitleaks:
     name: Secret scan
