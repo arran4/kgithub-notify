@@ -565,3 +565,4 @@ jobs:
               --body "Automated update of kgithub-notify ebuild for version ${VERSION}." \
               --base main \
               --head $BRANCH_NAME
+          fi
