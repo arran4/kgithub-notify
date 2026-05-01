@@ -283,7 +283,8 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QLabel* label = new QLabel(tr("**%1** on %2\n\n%3\n\n---").arg(author, formattedDate, body));
+    QLabel* label = new QLabel(tr("**%1** on %2").arg(author, formattedDate) + QStringLiteral("\n\n") + body +
+                               QStringLiteral("\n\n---"));
     label->setTextFormat(Qt::MarkdownText);
     label->setWordWrap(true);
     label->setTextInteractionFlags(Qt::TextBrowserInteraction);
