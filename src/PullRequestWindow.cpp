@@ -8,6 +8,76 @@
 #include <QJsonObject>
 #include <QMessageBox>
 
+PullRequestWindow::CommentWidget::CommentWidget(const QString& author, const QString& body,
+                                                const QString& formattedDate, QWidget* parent)
+    : QWidget(parent) {
+    QVBoxLayout* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    // Header
+    QWidget* headerWidget = new QWidget(this);
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    QPushButton* toggleBtn = new QPushButton(QStringLiteral("-"), headerWidget);
+    toggleBtn->setFixedSize(20, 20);
+
+    QLabel* headerLabel = new QLabel(tr("**%1** on %2").arg(author, formattedDate), headerWidget);
+    headerLabel->setTextFormat(Qt::MarkdownText);
+
+    QPushButton* detachBtn = new QPushButton(tr("Detach"), headerWidget);
+
+    headerLayout->addWidget(toggleBtn);
+    headerLayout->addWidget(headerLabel);
+    headerLayout->addStretch();
+    headerLayout->addWidget(detachBtn);
+
+    layout->addWidget(headerWidget);
+
+    // Body
+    QLabel* bodyLabel = new QLabel(body, this);
+    bodyLabel->setTextFormat(Qt::MarkdownText);
+    bodyLabel->setWordWrap(true);
+    bodyLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    bodyLabel->setOpenExternalLinks(true);
+
+    layout->addWidget(bodyLabel);
+
+    // Divider
+    QFrame* divider = new QFrame(this);
+    divider->setFrameShape(QFrame::HLine);
+    divider->setFrameShadow(QFrame::Sunken);
+    layout->addWidget(divider);
+
+    // Connections
+    connect(toggleBtn, &QPushButton::clicked, this, [toggleBtn, bodyLabel]() {
+        bool visible = !bodyLabel->isVisible();
+        bodyLabel->setVisible(visible);
+        toggleBtn->setText(visible ? QStringLiteral("-") : QStringLiteral("+"));
+    });
+
+    connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
+        KXmlGuiWindow* detachedWindow = new KXmlGuiWindow(this, Qt::Window);
+        detachedWindow->setAttribute(Qt::WA_DeleteOnClose);
+        detachedWindow->setObjectName(QStringLiteral("DetachedCommentWindow"));
+
+        QLabel* label = new QLabel(body, detachedWindow);
+        label->setTextFormat(Qt::MarkdownText);
+        label->setWordWrap(true);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        label->setOpenExternalLinks(true);
+
+        QScrollArea* scrollArea = new QScrollArea(detachedWindow);
+        scrollArea->setWidgetResizable(true);
+        scrollArea->setWidget(label);
+
+        detachedWindow->setCentralWidget(scrollArea);
+        detachedWindow->setWindowTitle(tr("Comment by %1").arg(author));
+        detachedWindow->resize(600, 400);
+        detachedWindow->show();
+    });
+}
+
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
       m_notification(n),
@@ -284,79 +354,8 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QWidget* container = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(container);
-    layout->setContentsMargins(0, 0, 0, 0);
-
-    // Header
-    QWidget* headerWidget = new QWidget();
-    QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
-    headerLayout->setContentsMargins(0, 0, 0, 0);
-
-    QPushButton* toggleBtn = new QPushButton("-");
-    toggleBtn->setFixedSize(20, 20);
-
-    QLabel* headerLabel = new QLabel(tr("**%1** on %2").arg(author, formattedDate));
-    headerLabel->setTextFormat(Qt::MarkdownText);
-
-    QPushButton* detachBtn = new QPushButton(tr("Detach"));
-
-    headerLayout->addWidget(toggleBtn);
-    headerLayout->addWidget(headerLabel);
-    headerLayout->addStretch();
-    headerLayout->addWidget(detachBtn);
-
-    layout->addWidget(headerWidget);
-
-    // Body
-    QLabel* bodyLabel = new QLabel(body);
-    bodyLabel->setTextFormat(Qt::MarkdownText);
-    bodyLabel->setWordWrap(true);
-    bodyLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    bodyLabel->setOpenExternalLinks(true);
-
-    layout->addWidget(bodyLabel);
-
-    // Divider
-    QFrame* divider = new QFrame();
-    divider->setFrameShape(QFrame::HLine);
-    divider->setFrameShadow(QFrame::Sunken);
-    layout->addWidget(divider);
-
-    m_commentsContainerLayout->addWidget(container);
-
-    // Connections
-    connect(toggleBtn, &QPushButton::clicked, this, [toggleBtn, bodyLabel]() {
-        if (bodyLabel->isVisible()) {
-            bodyLabel->setVisible(false);
-            toggleBtn->setText("+");
-        } else {
-            bodyLabel->setVisible(true);
-            toggleBtn->setText("-");
-        }
-    });
-
-    connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
-        KXmlGuiWindow* detachedWindow = new KXmlGuiWindow(this, Qt::Window);
-        detachedWindow->setAttribute(Qt::WA_DeleteOnClose);
-        detachedWindow->setObjectName(
-            QStringLiteral("DetachedCommentWindow_%1").arg(QDateTime::currentMSecsSinceEpoch()));
-
-        QLabel* label = new QLabel(body);
-        label->setTextFormat(Qt::MarkdownText);
-        label->setWordWrap(true);
-        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-        label->setOpenExternalLinks(true);
-
-        QScrollArea* scrollArea = new QScrollArea();
-        scrollArea->setWidgetResizable(true);
-        scrollArea->setWidget(label);
-
-        detachedWindow->setCentralWidget(scrollArea);
-        detachedWindow->setWindowTitle(tr("Comment by %1").arg(author));
-        detachedWindow->resize(600, 400);
-        detachedWindow->show();
-    });
+    CommentWidget* widget = new CommentWidget(author, body, formattedDate);
+    m_commentsContainerLayout->addWidget(widget);
 }
 
 void PullRequestWindow::onCommentButtonClicked() {

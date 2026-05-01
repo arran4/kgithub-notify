@@ -21,6 +21,13 @@
 class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
 
+   private:
+    class CommentWidget : public QWidget {
+       public:
+        explicit CommentWidget(const QString& author, const QString& body, const QString& formattedDate,
+                               QWidget* parent = nullptr);
+    };
+
    public:
     explicit PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr);
 
