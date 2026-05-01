@@ -4,6 +4,7 @@
 #include <KStandardAction>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QFontDatabase>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -113,6 +114,9 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         m_rawJsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+        if (QAction* action = actionCollection()->action(QStringLiteral("view_raw_json"))) {
+            action->setEnabled(true);
+        }
         QJsonObject obj = doc.object();
 
         m_commentsUrl = obj["comments_url"].toString();
@@ -319,13 +323,14 @@ void PullRequestWindow::onCommentButtonClicked() {
 void PullRequestWindow::setupMenus() {
     KStandardAction::close(this, &PullRequestWindow::close, actionCollection());
     QAction* viewRawJsonAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
+    viewRawJsonAction->setEnabled(false);
     connect(viewRawJsonAction, &QAction::triggered, this, &PullRequestWindow::onViewRawJson);
     actionCollection()->addAction(QStringLiteral("view_raw_json"), viewRawJsonAction);
 
     // Open in browser mapping for the tools menu since it shares rc file
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
     connect(openUrlAction, &QAction::triggered, this,
-            [this]() { QDesktopServices::openUrl(QUrl(m_notification.url)); });
+            [this]() { QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id))); });
     actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
 }
 
@@ -336,6 +341,7 @@ void PullRequestWindow::onViewRawJson() {
 
     QVBoxLayout* layout = new QVBoxLayout(dialog);
     QTextEdit* textEdit = new QTextEdit(dialog);
+    textEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     textEdit->setReadOnly(true);
     textEdit->setPlainText(m_rawJsonStr);
     layout->addWidget(textEdit);
