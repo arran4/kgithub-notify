@@ -201,8 +201,7 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
             QString path = obj["path"].toString();
             QString diffHunk = obj["diff_hunk"].toString();
 
-            QString fullBody =
-                tr("<b>Review comment on %1:</b><br><pre>%2</pre><br>%3").arg(path, diffHunk.toHtmlEscaped(), body);
+            QString fullBody = tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(path, diffHunk, body);
             addCommentToUI(author, fullBody, createdAt);
         }
     }
@@ -284,7 +283,9 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QLabel* label = new QLabel(tr("<b>%1</b> on %2<br>%3<hr>").arg(author, formattedDate, body));
+    QLabel* label = new QLabel(tr("**%1** on %2").arg(author, formattedDate) + QStringLiteral("\n\n") + body +
+                               QStringLiteral("\n\n---"));
+    label->setTextFormat(Qt::MarkdownText);
     label->setWordWrap(true);
     label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     label->setOpenExternalLinks(true);
