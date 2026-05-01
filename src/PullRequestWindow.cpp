@@ -1,15 +1,15 @@
 #include "PullRequestWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <KStandardAction>
-#include <KActionCollection>
 #include <QTextEdit>
-#include <QDesktopServices>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -324,7 +324,8 @@ void PullRequestWindow::setupMenus() {
 
     // Open in browser mapping for the tools menu since it shares rc file
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
-    connect(openUrlAction, &QAction::triggered, this, [this]() { QDesktopServices::openUrl(QUrl(m_notification.url)); });
+    connect(openUrlAction, &QAction::triggered, this,
+            [this]() { QDesktopServices::openUrl(QUrl(m_notification.url)); });
     actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
 }
 
