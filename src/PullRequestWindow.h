@@ -28,8 +28,8 @@ class PullRequestWindow : public KXmlGuiWindow {
     void fetchPrDetails();
     void onPrDetailsReply(QNetworkReply* reply);
 
-    void fetchComments();
-    void onCommentsReply(QNetworkReply* reply);
+    void fetchTimeline();
+    void onTimelineReply(QNetworkReply* reply);
 
     void fetchReviewComments();
     void onReviewCommentsReply(QNetworkReply* reply);
@@ -80,6 +80,7 @@ class PullRequestWindow : public KXmlGuiWindow {
     QString m_reviewCommentsUrl;
     QString m_commitsUrl;
     QString m_issueCommentsUrl;
+    QString m_timelineUrl;
 
     void setupUi();
     void addCommentToUI(const QString& author, const QString& body, const QString& createdAt);
