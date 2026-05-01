@@ -1,9 +1,9 @@
 #include "PullRequestWindow.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QHeaderView>
 #include <QJsonArray>
-#include <QDesktopServices>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
