@@ -294,7 +294,9 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
     if (!blobUrl.isEmpty()) {
         QUrl url(blobUrl);
         if (url.scheme() == "http" || url.scheme() == "https") {
-            QDesktopServices::openUrl(url);
+            if (!QDesktopServices::openUrl(url)) {
+                QMessageBox::warning(this, tr("Error"), tr("Failed to open the URL in your web browser."));
+            }
         } else {
             QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe URL scheme."));
         }
