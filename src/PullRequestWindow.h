@@ -40,6 +40,8 @@ class PullRequestWindow : public KXmlGuiWindow {
     void fetchFiles();
     void onFilesReply(QNetworkReply* reply);
 
+    void onFileDoubleClicked(int row, int column);
+
     void onCommentButtonClicked();
     void onPostCommentReply(QNetworkReply* reply);
 
