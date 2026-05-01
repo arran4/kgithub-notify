@@ -355,7 +355,6 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
         detachedWindow->setCentralWidget(scrollArea);
         detachedWindow->setWindowTitle(tr("Comment by %1").arg(author));
         detachedWindow->resize(600, 400);
-        detachedWindow->setupGUI(Default, ":/kgithub-notifyui.rc");
         detachedWindow->show();
     });
 }
