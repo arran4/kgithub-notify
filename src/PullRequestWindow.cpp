@@ -248,6 +248,11 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 }
 
                 if (!text.isEmpty()) {
+                    if (!createdAt.isEmpty()) {
+                        QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
+                        QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
+                        text += tr(" on %1").arg(formattedDate);
+                    }
                     QLabel* label = new QLabel(text);
                     label->setTextFormat(Qt::RichText);
                     label->setWordWrap(true);
@@ -256,6 +261,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 }
             }
         }
+    } else {
+        qWarning() << "Failed to fetch timeline:" << reply->errorString();
     }
     reply->deleteLater();
 }
