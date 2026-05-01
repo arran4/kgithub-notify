@@ -42,6 +42,7 @@ class PullRequestWindow : public KXmlGuiWindow {
 
     void onCommentButtonClicked();
     void onPostCommentReply(QNetworkReply* reply);
+    void onViewRawJson();
 
    private:
     Notification m_notification;
@@ -84,6 +85,8 @@ class PullRequestWindow : public KXmlGuiWindow {
 
     void setupUi();
     void addCommentToUI(const QString& author, const QString& body, const QString& createdAt);
+    void setupMenus();
+    QString m_rawJsonStr;
 };
 
 #endif  // PULLREQUESTWINDOW_H

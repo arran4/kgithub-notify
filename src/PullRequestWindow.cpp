@@ -1,11 +1,16 @@
 #include "PullRequestWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QFontDatabase>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QTextEdit>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -24,6 +29,7 @@ void PullRequestWindow::setupUi() {
     m_tabWidget = new QTabWidget(this);
     setObjectName("PullRequestWindow");
     setCentralWidget(m_tabWidget);
+    setupMenus();
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // 1. Conversation Tab
@@ -107,6 +113,10 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
+        m_rawJsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+        if (QAction* action = actionCollection()->action(QStringLiteral("view_raw_json"))) {
+            action->setEnabled(true);
+        }
         QJsonObject obj = doc.object();
 
         m_commentsUrl = obj["comments_url"].toString();
@@ -397,6 +407,36 @@ void PullRequestWindow::onCommentButtonClicked() {
 
     QNetworkReply* reply = m_manager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPostCommentReply(reply); });
+}
+
+void PullRequestWindow::setupMenus() {
+    KStandardAction::close(this, &PullRequestWindow::close, actionCollection());
+    QAction* viewRawJsonAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
+    viewRawJsonAction->setEnabled(false);
+    connect(viewRawJsonAction, &QAction::triggered, this, &PullRequestWindow::onViewRawJson);
+    actionCollection()->addAction(QStringLiteral("view_raw_json"), viewRawJsonAction);
+
+    // Open in browser mapping for the tools menu since it shares rc file
+    QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
+    connect(openUrlAction, &QAction::triggered, this,
+            [this]() { QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id))); });
+    actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
+}
+
+void PullRequestWindow::onViewRawJson() {
+    QDialog* dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("Raw JSON"));
+    dialog->resize(600, 400);
+
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    QTextEdit* textEdit = new QTextEdit(dialog);
+    textEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    textEdit->setReadOnly(true);
+    textEdit->setPlainText(m_rawJsonStr);
+    layout->addWidget(textEdit);
+
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void PullRequestWindow::onPostCommentReply(QNetworkReply* reply) {
