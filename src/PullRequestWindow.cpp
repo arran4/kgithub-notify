@@ -339,7 +339,8 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
         KXmlGuiWindow* detachedWindow = new KXmlGuiWindow(this, Qt::Window);
         detachedWindow->setAttribute(Qt::WA_DeleteOnClose);
-        detachedWindow->setObjectName(QStringLiteral("DetachedCommentWindow_%1").arg(QDateTime::currentMSecsSinceEpoch()));
+        detachedWindow->setObjectName(
+            QStringLiteral("DetachedCommentWindow_%1").arg(QDateTime::currentMSecsSinceEpoch()));
 
         QLabel* label = new QLabel(body);
         label->setTextFormat(Qt::MarkdownText);
