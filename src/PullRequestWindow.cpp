@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QFrame>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -283,13 +284,78 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QLabel* label = new QLabel(tr("**%1** on %2").arg(author, formattedDate) + QStringLiteral("\n\n") + body +
-                               QStringLiteral("\n\n---"));
-    label->setTextFormat(Qt::MarkdownText);
-    label->setWordWrap(true);
-    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    label->setOpenExternalLinks(true);
-    m_commentsContainerLayout->addWidget(label);
+    QWidget* container = new QWidget();
+    QVBoxLayout* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    // Header
+    QWidget* headerWidget = new QWidget();
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    QPushButton* toggleBtn = new QPushButton("-");
+    toggleBtn->setFixedSize(20, 20);
+
+    QLabel* headerLabel = new QLabel(tr("**%1** on %2").arg(author, formattedDate));
+    headerLabel->setTextFormat(Qt::MarkdownText);
+
+    QPushButton* detachBtn = new QPushButton(tr("Detach"));
+
+    headerLayout->addWidget(toggleBtn);
+    headerLayout->addWidget(headerLabel);
+    headerLayout->addStretch();
+    headerLayout->addWidget(detachBtn);
+
+    layout->addWidget(headerWidget);
+
+    // Body
+    QLabel* bodyLabel = new QLabel(body);
+    bodyLabel->setTextFormat(Qt::MarkdownText);
+    bodyLabel->setWordWrap(true);
+    bodyLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    bodyLabel->setOpenExternalLinks(true);
+
+    layout->addWidget(bodyLabel);
+
+    // Divider
+    QFrame* divider = new QFrame();
+    divider->setFrameShape(QFrame::HLine);
+    divider->setFrameShadow(QFrame::Sunken);
+    layout->addWidget(divider);
+
+    m_commentsContainerLayout->addWidget(container);
+
+    // Connections
+    connect(toggleBtn, &QPushButton::clicked, this, [toggleBtn, bodyLabel]() {
+        if (bodyLabel->isVisible()) {
+            bodyLabel->setVisible(false);
+            toggleBtn->setText("+");
+        } else {
+            bodyLabel->setVisible(true);
+            toggleBtn->setText("-");
+        }
+    });
+
+    connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
+        KXmlGuiWindow* detachedWindow = new KXmlGuiWindow(this, Qt::Window);
+        detachedWindow->setObjectName("DetachedCommentWindow");
+
+        QLabel* label = new QLabel(body);
+        label->setTextFormat(Qt::MarkdownText);
+        label->setWordWrap(true);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        label->setOpenExternalLinks(true);
+
+        QScrollArea* scrollArea = new QScrollArea();
+        scrollArea->setWidgetResizable(true);
+        scrollArea->setWidget(label);
+
+        detachedWindow->setCentralWidget(scrollArea);
+        detachedWindow->setWindowTitle(tr("Comment by %1").arg(author));
+        detachedWindow->resize(600, 400);
+        detachedWindow->setupGUI(Default, ":/kgithub-notifyui.rc");
+        detachedWindow->show();
+    });
 }
 
 void PullRequestWindow::onCommentButtonClicked() {
