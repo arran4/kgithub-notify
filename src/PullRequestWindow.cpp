@@ -1,12 +1,12 @@
 #include "PullRequestWindow.h"
 
 #include <QDateTime>
+#include <QFrame>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <QFrame>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -338,7 +338,8 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
 
     connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
         KXmlGuiWindow* detachedWindow = new KXmlGuiWindow(this, Qt::Window);
-        detachedWindow->setObjectName("DetachedCommentWindow");
+        detachedWindow->setAttribute(Qt::WA_DeleteOnClose);
+        detachedWindow->setObjectName(QStringLiteral("DetachedCommentWindow_%1").arg(QDateTime::currentMSecsSinceEpoch()));
 
         QLabel* label = new QLabel(body);
         label->setTextFormat(Qt::MarkdownText);
