@@ -201,8 +201,7 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
             QString path = obj["path"].toString();
             QString diffHunk = obj["diff_hunk"].toString();
 
-            QString fullBody =
-                tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(path, diffHunk, body);
+            QString fullBody = tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(path, diffHunk, body);
             addCommentToUI(author, fullBody, createdAt);
         }
     }
