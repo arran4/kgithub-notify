@@ -218,14 +218,14 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
                     if (requested.isEmpty()) {
-                         requested = obj["requested_team"].toObject()["name"].toString();
+                        requested = obj["requested_team"].toObject()["name"].toString();
                     }
                     text = tr("<i>%1 requested a review from %2</i>").arg(actor, requested);
                 } else if (event == "review_request_removed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
                     if (requested.isEmpty()) {
-                         requested = obj["requested_team"].toObject()["name"].toString();
+                        requested = obj["requested_team"].toObject()["name"].toString();
                     }
                     text = tr("<i>%1 removed the request for review from %2</i>").arg(actor, requested);
                 } else if (event == "reviewed") {
