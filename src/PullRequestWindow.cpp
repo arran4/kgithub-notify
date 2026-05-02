@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QUrl>
 #include <QTextEdit>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
@@ -81,6 +82,7 @@ void PullRequestWindow::setupUi() {
     m_filesTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_filesTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_filesLayout->addWidget(m_filesTable);
+    connect(m_filesTable, &QTableWidget::cellDoubleClicked, this, &PullRequestWindow::onFileDoubleClicked);
     m_tabWidget->addTab(m_filesTab, tr("Changed Files"));
 
     // 4. Metadata Tab
@@ -359,9 +361,12 @@ void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
             int additions = obj["additions"].toInt();
             int deletions = obj["deletions"].toInt();
             int changes = obj["changes"].toInt();
+            QString blobUrl = obj["blob_url"].toString();
 
             m_filesTable->insertRow(i);
-            m_filesTable->setItem(i, 0, new QTableWidgetItem(filename));
+            QTableWidgetItem* fileItem = new QTableWidgetItem(filename);
+            fileItem->setData(Qt::UserRole, blobUrl);
+            m_filesTable->setItem(i, 0, fileItem);
 
             QTableWidgetItem* addItem = new QTableWidgetItem(QString::number(additions));
             addItem->setForeground(QBrush(Qt::darkGreen));
@@ -375,6 +380,24 @@ void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
         }
     }
     reply->deleteLater();
+}
+
+void PullRequestWindow::onFileDoubleClicked(int row, int column) {
+    Q_UNUSED(column);
+    QTableWidgetItem* item = m_filesTable->item(row, 0);
+    if (!item) return;
+
+    QString blobUrl = item->data(Qt::UserRole).toString();
+    if (!blobUrl.isEmpty()) {
+        QUrl url(blobUrl);
+        if (url.isValid() && (url.scheme() == "http" || url.scheme() == "https")) {
+            if (!QDesktopServices::openUrl(url)) {
+                QMessageBox::warning(this, tr("Error"), tr("Failed to open the URL in your web browser."));
+            }
+        } else {
+            QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe or invalid URL."));
+        }
+    }
 }
 
 void PullRequestWindow::addCommentToUI(const QString& author, const QString& body, const QString& createdAt) {
