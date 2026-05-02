@@ -293,12 +293,12 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
     QString blobUrl = item->data(Qt::UserRole).toString();
     if (!blobUrl.isEmpty()) {
         QUrl url(blobUrl);
-        if (url.scheme() == "http" || url.scheme() == "https") {
+        if (url.isValid() && (url.scheme() == "http" || url.scheme() == "https")) {
             if (!QDesktopServices::openUrl(url)) {
                 QMessageBox::warning(this, tr("Error"), tr("Failed to open the URL in your web browser."));
             }
         } else {
-            QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe URL scheme."));
+            QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe or invalid URL."));
         }
     }
 }
