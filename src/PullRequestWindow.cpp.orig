@@ -8,14 +8,8 @@
 #include <QJsonObject>
 #include <QMessageBox>
 
-class CommentWidget : public QWidget {
-    Q_OBJECT
-   public:
-    explicit CommentWidget(const QString& author, const QString& body, const QString& formattedDate,
-                           QWidget* parent = nullptr);
-};
-
-CommentWidget::CommentWidget(const QString& author, const QString& body, const QString& formattedDate, QWidget* parent)
+PullRequestWindow::CommentWidget::CommentWidget(const QString& author, const QString& body,
+                                                const QString& formattedDate, QWidget* parent)
     : QWidget(parent) {
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -85,8 +79,6 @@ CommentWidget::CommentWidget(const QString& author, const QString& body, const Q
         detachedWindow->show();
     });
 }
-
-#include "PullRequestWindow.moc"
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
