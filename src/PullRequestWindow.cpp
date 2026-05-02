@@ -1,13 +1,17 @@
 #include "PullRequestWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QFontDatabase>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QUrl>
+#include <QTextEdit>
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -26,6 +30,7 @@ void PullRequestWindow::setupUi() {
     m_tabWidget = new QTabWidget(this);
     setObjectName("PullRequestWindow");
     setCentralWidget(m_tabWidget);
+    setupMenus();
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // 1. Conversation Tab
@@ -110,6 +115,10 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
+        m_rawJsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+        if (QAction* action = actionCollection()->action(QStringLiteral("view_raw_json"))) {
+            action->setEnabled(true);
+        }
         QJsonObject obj = doc.object();
 
         m_commentsUrl = obj["comments_url"].toString();
@@ -117,7 +126,9 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_commitsUrl = obj["commits_url"].toString();
 
         // Convert issues url to get issue comments url for PR
-        m_issueCommentsUrl = obj["issue_url"].toString() + "/comments";
+        QString issueUrl = obj["issue_url"].toString();
+        m_issueCommentsUrl = issueUrl + "/comments";
+        m_timelineUrl = issueUrl + "/timeline";
 
         // Add the PR body as the first comment
         QString author = obj["user"].toObject()["login"].toString();
@@ -147,7 +158,7 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
             m_milestoneLabel->setText(tr("<b>Milestone:</b> None"));
         }
 
-        fetchComments();
+        fetchTimeline();
         fetchReviewComments();
         fetchCommits();
         fetchFiles();
@@ -157,15 +168,15 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchComments() {
-    if (m_issueCommentsUrl.isEmpty()) return;
-    QUrl url(m_issueCommentsUrl);
+void PullRequestWindow::fetchTimeline() {
+    if (m_timelineUrl.isEmpty()) return;
+    QUrl url(m_timelineUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() { onCommentsReply(reply); });
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() { onTimelineReply(reply); });
 }
 
-void PullRequestWindow::onCommentsReply(QNetworkReply* reply) {
+void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -173,11 +184,97 @@ void PullRequestWindow::onCommentsReply(QNetworkReply* reply) {
 
         for (const QJsonValue& val : array) {
             QJsonObject obj = val.toObject();
-            QString author = obj["user"].toObject()["login"].toString();
-            QString body = obj["body"].toString();
-            QString createdAt = obj["created_at"].toString();
-            addCommentToUI(author, body, createdAt);
+            QString event = obj["event"].toString();
+
+            if (event == "commented") {
+                QString author = obj["user"].toObject()["login"].toString();
+                QString body = obj["body"].toString();
+                QString createdAt = obj["created_at"].toString();
+                addCommentToUI(author, body, createdAt);
+            } else {
+                QString createdAt = obj["created_at"].toString();
+                QString text;
+
+                if (event == "committed") {
+                    QString sha = obj["sha"].toString().left(7);
+                    QString message = obj["message"].toString().section('\n', 0, 0);
+                    QString author = obj["author"].toObject()["name"].toString();
+                    text = tr("<i>%1 committed %2: %3</i>").arg(author, sha, message);
+                } else if (event == "assigned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString assignee = obj["assignee"].toObject()["login"].toString();
+                    text = tr("<i>%1 assigned %2</i>").arg(actor, assignee);
+                } else if (event == "unassigned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString assignee = obj["assignee"].toObject()["login"].toString();
+                    text = tr("<i>%1 unassigned %2</i>").arg(actor, assignee);
+                } else if (event == "labeled") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString label = obj["label"].toObject()["name"].toString();
+                    text = tr("<i>%1 added the %2 label</i>").arg(actor, label);
+                } else if (event == "unlabeled") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString label = obj["label"].toObject()["name"].toString();
+                    text = tr("<i>%1 removed the %2 label</i>").arg(actor, label);
+                } else if (event == "closed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<i>%1 closed this</i>").arg(actor);
+                } else if (event == "reopened") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<i>%1 reopened this</i>").arg(actor);
+                } else if (event == "merged") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString commitId = obj["commit_id"].toString().left(7);
+                    text = tr("<i>%1 merged commit %2</i>").arg(actor, commitId);
+                } else if (event == "review_requested") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString requested = obj["requested_reviewer"].toObject()["login"].toString();
+                    if (requested.isEmpty()) {
+                        requested = obj["requested_team"].toObject()["name"].toString();
+                    }
+                    text = tr("<i>%1 requested a review from %2</i>").arg(actor, requested);
+                } else if (event == "review_request_removed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString requested = obj["requested_reviewer"].toObject()["login"].toString();
+                    if (requested.isEmpty()) {
+                        requested = obj["requested_team"].toObject()["name"].toString();
+                    }
+                    text = tr("<i>%1 removed the request for review from %2</i>").arg(actor, requested);
+                } else if (event == "reviewed") {
+                    QString actor = obj["user"].toObject()["login"].toString();
+                    QString state = obj["state"].toString();
+                    text = tr("<i>%1 reviewed this (%2)</i>").arg(actor, state);
+                } else if (event == "head_ref_force_pushed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<i>%1 force-pushed the branch</i>").arg(actor);
+                } else {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    if (actor.isEmpty()) {
+                        actor = obj["user"].toObject()["login"].toString();
+                    }
+                    if (actor.isEmpty()) {
+                        text = tr("<i>Event: %1</i>").arg(event);
+                    } else {
+                        text = tr("<i>%1: %2</i>").arg(actor, event);
+                    }
+                }
+
+                if (!text.isEmpty()) {
+                    if (!createdAt.isEmpty()) {
+                        QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
+                        QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
+                        text += tr(" on %1").arg(formattedDate);
+                    }
+                    QLabel* label = new QLabel(text);
+                    label->setTextFormat(Qt::RichText);
+                    label->setWordWrap(true);
+                    label->setStyleSheet("color: gray;");
+                    m_commentsContainerLayout->addWidget(label);
+                }
+            }
         }
+    } else {
+        qWarning() << "Failed to fetch timeline:" << reply->errorString();
     }
     reply->deleteLater();
 }
@@ -333,6 +430,36 @@ void PullRequestWindow::onCommentButtonClicked() {
 
     QNetworkReply* reply = m_manager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPostCommentReply(reply); });
+}
+
+void PullRequestWindow::setupMenus() {
+    KStandardAction::close(this, &PullRequestWindow::close, actionCollection());
+    QAction* viewRawJsonAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
+    viewRawJsonAction->setEnabled(false);
+    connect(viewRawJsonAction, &QAction::triggered, this, &PullRequestWindow::onViewRawJson);
+    actionCollection()->addAction(QStringLiteral("view_raw_json"), viewRawJsonAction);
+
+    // Open in browser mapping for the tools menu since it shares rc file
+    QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
+    connect(openUrlAction, &QAction::triggered, this,
+            [this]() { QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id))); });
+    actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
+}
+
+void PullRequestWindow::onViewRawJson() {
+    QDialog* dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("Raw JSON"));
+    dialog->resize(600, 400);
+
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    QTextEdit* textEdit = new QTextEdit(dialog);
+    textEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    textEdit->setReadOnly(true);
+    textEdit->setPlainText(m_rawJsonStr);
+    layout->addWidget(textEdit);
+
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void PullRequestWindow::onPostCommentReply(QNetworkReply* reply) {
