@@ -18,6 +18,7 @@
         </Menu>
         <Menu name="view">
             <text>&amp;View</text>
+            <Action name="view_raw_json"/>
             <Action name="view_redisplay"/>
         </Menu>
         <Menu name="settings">
@@ -30,6 +31,7 @@
             <Action name="debug"/>
             <Action name="new_issue"/>
             <Action name="repo_list"/>
+            <Action name="open_browser"/>
             <Separator/>
             <Action name="issues_menu"/>
             <Action name="prs_menu"/>
