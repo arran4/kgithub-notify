@@ -3,6 +3,7 @@
 #include <KActionCollection>
 #include <KStandardAction>
 #include <QDateTime>
+#include <QFrame>
 #include <QDesktopServices>
 #include <QFontDatabase>
 #include <QHeaderView>
@@ -12,6 +13,86 @@
 #include <QMessageBox>
 #include <QUrl>
 #include <QTextEdit>
+
+class CommentWidget : public QWidget {
+    Q_OBJECT
+   public:
+    explicit CommentWidget(const QString& author, const QString& body, const QString& formattedDate,
+                           QWidget* parent = nullptr);
+};
+
+CommentWidget::CommentWidget(const QString& author, const QString& body, const QString& formattedDate, QWidget* parent)
+    : QWidget(parent) {
+    QVBoxLayout* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    // Header
+    QWidget* headerWidget = new QWidget(this);
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    QPushButton* toggleBtn = new QPushButton(QStringLiteral("-"), headerWidget);
+    toggleBtn->setFixedSize(20, 20);
+
+    QLabel* headerLabel = new QLabel(tr("**%1** on %2").arg(author, formattedDate), headerWidget);
+    headerLabel->setTextFormat(Qt::MarkdownText);
+
+    QPushButton* detachBtn = new QPushButton(tr("Detach"), headerWidget);
+
+    headerLayout->addWidget(toggleBtn);
+    headerLayout->addWidget(headerLabel);
+    headerLayout->addStretch();
+    headerLayout->addWidget(detachBtn);
+
+    layout->addWidget(headerWidget);
+
+    // Body
+    QLabel* bodyLabel = new QLabel(body, this);
+    bodyLabel->setTextFormat(Qt::MarkdownText);
+    bodyLabel->setWordWrap(true);
+    bodyLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    bodyLabel->setOpenExternalLinks(true);
+
+    layout->addWidget(bodyLabel);
+
+    // Divider
+    QFrame* divider = new QFrame(this);
+    divider->setFrameShape(QFrame::HLine);
+    divider->setFrameShadow(QFrame::Sunken);
+    layout->addWidget(divider);
+
+    // Connections
+    connect(toggleBtn, &QPushButton::clicked, this, [toggleBtn, bodyLabel]() {
+        bool visible = !bodyLabel->isVisible();
+        bodyLabel->setVisible(visible);
+        toggleBtn->setText(visible ? QStringLiteral("-") : QStringLiteral("+"));
+    });
+
+    connect(detachBtn, &QPushButton::clicked, this, [author, body, this]() {
+        QWidget* detachedWindow = new QWidget(this, Qt::Window);
+        detachedWindow->setAttribute(Qt::WA_DeleteOnClose);
+        detachedWindow->setObjectName(QStringLiteral("DetachedCommentWindow"));
+
+        QLabel* label = new QLabel(body, detachedWindow);
+        label->setTextFormat(Qt::MarkdownText);
+        label->setWordWrap(true);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        label->setOpenExternalLinks(true);
+
+        QScrollArea* scrollArea = new QScrollArea(detachedWindow);
+        scrollArea->setWidgetResizable(true);
+        scrollArea->setWidget(label);
+
+        QVBoxLayout* winLayout = new QVBoxLayout(detachedWindow);
+        winLayout->setContentsMargins(0, 0, 0, 0);
+        winLayout->addWidget(scrollArea);
+        detachedWindow->setWindowTitle(tr("Comment by %1").arg(author));
+        detachedWindow->resize(600, 400);
+        detachedWindow->show();
+    });
+}
+
+#include "PullRequestWindow.moc"
 
 PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window),
@@ -404,13 +485,8 @@ void PullRequestWindow::addCommentToUI(const QString& author, const QString& bod
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
     QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
 
-    QLabel* label = new QLabel(tr("**%1** on %2").arg(author, formattedDate) + QStringLiteral("\n\n") + body +
-                               QStringLiteral("\n\n---"));
-    label->setTextFormat(Qt::MarkdownText);
-    label->setWordWrap(true);
-    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    label->setOpenExternalLinks(true);
-    m_commentsContainerLayout->addWidget(label);
+    CommentWidget* widget = new CommentWidget(author, body, formattedDate);
+    m_commentsContainerLayout->addWidget(widget);
 }
 
 void PullRequestWindow::onCommentButtonClicked() {

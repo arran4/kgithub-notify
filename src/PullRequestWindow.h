@@ -20,7 +20,6 @@
 
 class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
-
    public:
     explicit PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr);
 
