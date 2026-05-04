@@ -3,16 +3,16 @@
 #include <KActionCollection>
 #include <KStandardAction>
 #include <QDateTime>
-#include <QFrame>
 #include <QDesktopServices>
 #include <QFontDatabase>
+#include <QFrame>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <QUrl>
 #include <QTextEdit>
+#include <QUrl>
 
 class CommentWidget : public QWidget {
     Q_OBJECT
@@ -116,7 +116,12 @@ void PullRequestWindow::setupUi() {
 
     // 1. Conversation Tab
     m_conversationTab = new QWidget();
-    m_conversationLayout = new QVBoxLayout(m_conversationTab);
+    m_conversationLayout = new QHBoxLayout(m_conversationTab);
+
+    // LHS - Comments
+    QWidget* leftConvWidget = new QWidget();
+    QVBoxLayout* leftConvLayout = new QVBoxLayout(leftConvWidget);
+    leftConvLayout->setContentsMargins(0, 0, 0, 0);
 
     m_commentsScrollArea = new QScrollArea();
     m_commentsScrollArea->setWidgetResizable(true);
@@ -126,16 +131,53 @@ void PullRequestWindow::setupUi() {
     m_commentsContainer->setLayout(m_commentsContainerLayout);
     m_commentsScrollArea->setWidget(m_commentsContainer);
 
-    m_conversationLayout->addWidget(m_commentsScrollArea);
+    leftConvLayout->addWidget(m_commentsScrollArea);
 
     m_replyEdit = new QTextEdit();
     m_replyEdit->setPlaceholderText(tr("Leave a comment..."));
     m_replyEdit->setMaximumHeight(100);
-    m_conversationLayout->addWidget(m_replyEdit);
+    leftConvLayout->addWidget(m_replyEdit);
 
     m_commentButton = new QPushButton(tr("Comment"));
     connect(m_commentButton, &QPushButton::clicked, this, &PullRequestWindow::onCommentButtonClicked);
-    m_conversationLayout->addWidget(m_commentButton, 0, Qt::AlignRight);
+    leftConvLayout->addWidget(m_commentButton, 0, Qt::AlignRight);
+
+    m_conversationLayout->addWidget(leftConvWidget, 1);
+
+    // RHS - Metadata/Tool Window
+    QWidget* rightConvWidget = new QWidget();
+    rightConvWidget->setMaximumWidth(250);
+    QVBoxLayout* rhsLayout = new QVBoxLayout(rightConvWidget);
+    rhsLayout->setContentsMargins(0, 0, 0, 0);
+
+    m_openedByLabel = new QLabel(tr("<b>Opened by:</b> Loading..."));
+    m_openedByLabel->setWordWrap(true);
+    m_createdAtLabel = new QLabel(tr("<b>Created:</b> Loading..."));
+    m_createdAtLabel->setWordWrap(true);
+    m_updatedAtLabel = new QLabel(tr("<b>Updated:</b> Loading..."));
+    m_updatedAtLabel->setWordWrap(true);
+    m_convAssigneesLabel = new QLabel(tr("<b>Assignees:</b> Loading..."));
+    m_convAssigneesLabel->setWordWrap(true);
+    m_convLabelsLabel = new QLabel(tr("<b>Labels:</b> Loading..."));
+    m_convLabelsLabel->setWordWrap(true);
+    m_convMilestoneLabel = new QLabel(tr("<b>Milestone:</b> Loading..."));
+    m_convMilestoneLabel->setWordWrap(true);
+
+    rhsLayout->addWidget(m_openedByLabel);
+    rhsLayout->addWidget(m_createdAtLabel);
+    rhsLayout->addWidget(m_updatedAtLabel);
+
+    QFrame* divider1 = new QFrame();
+    divider1->setFrameShape(QFrame::HLine);
+    divider1->setFrameShadow(QFrame::Sunken);
+    rhsLayout->addWidget(divider1);
+
+    rhsLayout->addWidget(m_convAssigneesLabel);
+    rhsLayout->addWidget(m_convLabelsLabel);
+    rhsLayout->addWidget(m_convMilestoneLabel);
+    rhsLayout->addStretch();
+
+    m_conversationLayout->addWidget(rightConvWidget);
 
     m_tabWidget->addTab(m_conversationTab, tr("Conversation"));
 
@@ -217,27 +259,47 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         QString createdAt = obj["created_at"].toString();
         addCommentToUI(author, body, createdAt);
 
+        // Update RHS conversation metadata
+        m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
+
+        QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
+        m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(QLocale().toString(createdDt, QLocale::ShortFormat)));
+
+        QString updatedAt = obj["updated_at"].toString();
+        if (!updatedAt.isEmpty()) {
+            QDateTime updatedDt = QDateTime::fromString(updatedAt, Qt::ISODate);
+            m_updatedAtLabel->setText(
+                tr("<b>Updated:</b> %1").arg(QLocale().toString(updatedDt, QLocale::ShortFormat)));
+        } else {
+            m_updatedAtLabel->setText(tr("<b>Updated:</b> N/A"));
+        }
+
         // Update Metadata
         QStringList labels;
         QJsonArray labelsArray = obj["labels"].toArray();
         for (const QJsonValue& val : labelsArray) {
             labels << val.toObject()["name"].toString();
         }
-        m_labelsLabel->setText(tr("<b>Labels:</b> %1").arg(labels.isEmpty() ? "None" : labels.join(", ")));
+        QString labelsText = labels.isEmpty() ? "None" : labels.join(", ");
+        m_labelsLabel->setText(tr("<b>Labels:</b> %1").arg(labelsText));
+        m_convLabelsLabel->setText(tr("<b>Labels:</b> %1").arg(labelsText));
 
         QStringList assignees;
         QJsonArray assigneesArray = obj["assignees"].toArray();
         for (const QJsonValue& val : assigneesArray) {
             assignees << val.toObject()["login"].toString();
         }
-        m_assigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assignees.isEmpty() ? "None" : assignees.join(", ")));
+        QString assigneesText = assignees.isEmpty() ? "None" : assignees.join(", ");
+        m_assigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assigneesText));
+        m_convAssigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assigneesText));
 
         QJsonObject milestoneObj = obj["milestone"].toObject();
+        QString milestoneText = "None";
         if (!milestoneObj.isEmpty()) {
-            m_milestoneLabel->setText(tr("<b>Milestone:</b> %1").arg(milestoneObj["title"].toString()));
-        } else {
-            m_milestoneLabel->setText(tr("<b>Milestone:</b> None"));
+            milestoneText = milestoneObj["title"].toString();
         }
+        m_milestoneLabel->setText(tr("<b>Milestone:</b> %1").arg(milestoneText));
+        m_convMilestoneLabel->setText(tr("<b>Milestone:</b> %1").arg(milestoneText));
 
         fetchTimeline();
         fetchReviewComments();
@@ -517,8 +579,9 @@ void PullRequestWindow::setupMenus() {
 
     // Open in browser mapping for the tools menu since it shares rc file
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
-    connect(openUrlAction, &QAction::triggered, this,
-            [this]() { QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id))); });
+    connect(openUrlAction, &QAction::triggered, this, [this]() {
+        QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id)));
+    });
     actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
 }
 
