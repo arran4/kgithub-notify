@@ -279,64 +279,68 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (event == "committed") {
                     QString sha = obj["sha"].toString().left(7);
                     QString message = obj["message"].toString().section('\n', 0, 0);
-                    QString author = obj["author"].toObject()["name"].toString();
-                    text = tr("<i>%1 committed %2: %3</i>").arg(author, sha, message);
+                    QJsonObject authorObj = obj["author"].toObject();
+                    QString author = authorObj["name"].toString();
+                    if (createdAt.isEmpty()) {
+                        createdAt = authorObj["date"].toString();
+                    }
+                    text = tr("<i>%1 committed %2: %3</i>").arg(author.toHtmlEscaped(), sha, message.toHtmlEscaped());
                 } else if (event == "assigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<i>%1 assigned %2</i>").arg(actor, assignee);
+                    text = tr("<i>%1 assigned %2</i>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
                 } else if (event == "unassigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<i>%1 unassigned %2</i>").arg(actor, assignee);
+                    text = tr("<i>%1 unassigned %2</i>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
                 } else if (event == "labeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString label = obj["label"].toObject()["name"].toString();
-                    text = tr("<i>%1 added the %2 label</i>").arg(actor, label);
+                    text = tr("<i>%1 added the %2 label</i>").arg(actor.toHtmlEscaped(), label.toHtmlEscaped());
                 } else if (event == "unlabeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString label = obj["label"].toObject()["name"].toString();
-                    text = tr("<i>%1 removed the %2 label</i>").arg(actor, label);
+                    text = tr("<i>%1 removed the %2 label</i>").arg(actor.toHtmlEscaped(), label.toHtmlEscaped());
                 } else if (event == "closed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 closed this</i>").arg(actor);
+                    text = tr("<i>%1 closed this</i>").arg(actor.toHtmlEscaped());
                 } else if (event == "reopened") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 reopened this</i>").arg(actor);
+                    text = tr("<i>%1 reopened this</i>").arg(actor.toHtmlEscaped());
                 } else if (event == "merged") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString commitId = obj["commit_id"].toString().left(7);
-                    text = tr("<i>%1 merged commit %2</i>").arg(actor, commitId);
+                    text = tr("<i>%1 merged commit %2</i>").arg(actor.toHtmlEscaped(), commitId);
                 } else if (event == "review_requested") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
                     if (requested.isEmpty()) {
                         requested = obj["requested_team"].toObject()["name"].toString();
                     }
-                    text = tr("<i>%1 requested a review from %2</i>").arg(actor, requested);
+                    text = tr("<i>%1 requested a review from %2</i>").arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
                 } else if (event == "review_request_removed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
                     if (requested.isEmpty()) {
                         requested = obj["requested_team"].toObject()["name"].toString();
                     }
-                    text = tr("<i>%1 removed the request for review from %2</i>").arg(actor, requested);
+                    text = tr("<i>%1 removed the request for review from %2</i>").arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
                 } else if (event == "reviewed") {
                     QString actor = obj["user"].toObject()["login"].toString();
                     QString state = obj["state"].toString();
-                    text = tr("<i>%1 reviewed this (%2)</i>").arg(actor, state);
+                    text = tr("<i>%1 reviewed this (%2)</i>").arg(actor.toHtmlEscaped(), state.toHtmlEscaped());
                 } else if (event == "head_ref_force_pushed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 force-pushed the branch</i>").arg(actor);
+                    text = tr("<i>%1 force-pushed the branch</i>").arg(actor.toHtmlEscaped());
                 } else {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     if (actor.isEmpty()) {
                         actor = obj["user"].toObject()["login"].toString();
                     }
                     if (actor.isEmpty()) {
-                        text = tr("<i>Event: %1</i>").arg(event);
+                        text = tr("<i>Event: %1</i>").arg(event.toHtmlEscaped());
                     } else {
-                        text = tr("<i>%1: %2</i>").arg(actor, event);
+                        text = tr("<i>%1: %2</i>").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
                     }
                 }
 
