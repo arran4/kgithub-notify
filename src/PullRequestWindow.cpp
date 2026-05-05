@@ -3,16 +3,16 @@
 #include <KActionCollection>
 #include <KStandardAction>
 #include <QDateTime>
-#include <QFrame>
 #include <QDesktopServices>
 #include <QFontDatabase>
+#include <QFrame>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <QUrl>
 #include <QTextEdit>
+#include <QUrl>
 
 class CommentWidget : public QWidget {
     Q_OBJECT
@@ -317,14 +317,16 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     if (requested.isEmpty()) {
                         requested = obj["requested_team"].toObject()["name"].toString();
                     }
-                    text = tr("<i>%1 requested a review from %2</i>").arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
+                    text = tr("<i>%1 requested a review from %2</i>")
+                               .arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
                 } else if (event == "review_request_removed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
                     if (requested.isEmpty()) {
                         requested = obj["requested_team"].toObject()["name"].toString();
                     }
-                    text = tr("<i>%1 removed the request for review from %2</i>").arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
+                    text = tr("<i>%1 removed the request for review from %2</i>")
+                               .arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
                 } else if (event == "reviewed") {
                     QString actor = obj["user"].toObject()["login"].toString();
                     QString state = obj["state"].toString();
@@ -521,8 +523,9 @@ void PullRequestWindow::setupMenus() {
 
     // Open in browser mapping for the tools menu since it shares rc file
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
-    connect(openUrlAction, &QAction::triggered, this,
-            [this]() { QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id))); });
+    connect(openUrlAction, &QAction::triggered, this, [this]() {
+        QDesktopServices::openUrl(QUrl(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id)));
+    });
     actionCollection()->addAction(QStringLiteral("open_browser"), openUrlAction);
 }
 
