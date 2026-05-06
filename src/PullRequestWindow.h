@@ -54,7 +54,7 @@ class PullRequestWindow : public KXmlGuiWindow {
 
     // Conversation Tab
     QWidget* m_conversationTab;
-    QVBoxLayout* m_conversationLayout;
+    QHBoxLayout* m_conversationLayout;
     QScrollArea* m_commentsScrollArea;
     QWidget* m_commentsContainer;
     QVBoxLayout* m_commentsContainerLayout;
@@ -70,6 +70,14 @@ class PullRequestWindow : public KXmlGuiWindow {
     QWidget* m_filesTab;
     QVBoxLayout* m_filesLayout;
     QTableWidget* m_filesTable;
+
+    // Conversation Tab RHS (Tool Window)
+    QLabel* m_openedByLabel;
+    QLabel* m_createdAtLabel;
+    QLabel* m_updatedAtLabel;
+    QLabel* m_convAssigneesLabel;
+    QLabel* m_convLabelsLabel;
+    QLabel* m_convMilestoneLabel;
 
     // Metadata Tab
     QWidget* m_metadataTab;
