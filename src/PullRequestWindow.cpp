@@ -284,7 +284,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     if (createdAt.isEmpty()) {
                         createdAt = authorObj["date"].toString();
                     }
-                    text = tr("<i>%1 committed %2: %3</i>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped(), message.toHtmlEscaped());
+                    text = tr("<i>%1 committed %2: %3</i>")
+                               .arg(author.toHtmlEscaped(), sha.toHtmlEscaped(), message.toHtmlEscaped());
                 } else if (event == "assigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
