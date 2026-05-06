@@ -284,7 +284,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     if (createdAt.isEmpty()) {
                         createdAt = authorObj["date"].toString();
                     }
-                    text = tr("<i>%1 committed %2: %3</i>").arg(author.toHtmlEscaped(), sha, message.toHtmlEscaped());
+                    text = tr("<i>%1 committed %2: %3</i>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped(), message.toHtmlEscaped());
                 } else if (event == "assigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
@@ -310,7 +310,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 } else if (event == "merged") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString commitId = obj["commit_id"].toString().left(7);
-                    text = tr("<i>%1 merged commit %2</i>").arg(actor.toHtmlEscaped(), commitId);
+                    text = tr("<i>%1 merged commit %2</i>").arg(actor.toHtmlEscaped(), commitId.toHtmlEscaped());
                 } else if (event == "review_requested") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString requested = obj["requested_reviewer"].toObject()["login"].toString();
