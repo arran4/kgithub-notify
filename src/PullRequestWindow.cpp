@@ -146,7 +146,7 @@ void PullRequestWindow::setupUi() {
 
     // RHS - Metadata/Tool Window
     QWidget* rightConvWidget = new QWidget();
-    rightConvWidget->setMaximumWidth(250);
+    rightConvWidget->setFixedWidth(250);
     QVBoxLayout* rhsLayout = new QVBoxLayout(rightConvWidget);
     rhsLayout->setContentsMargins(0, 0, 0, 0);
 
@@ -263,16 +263,13 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
 
         QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
-        m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(QLocale().toString(createdDt, QLocale::ShortFormat)));
+        QString createdStr = createdDt.isValid() ? QLocale().toString(createdDt, QLocale::ShortFormat) : tr("N/A");
+        m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(createdStr));
 
         QString updatedAt = obj["updated_at"].toString();
-        if (!updatedAt.isEmpty()) {
-            QDateTime updatedDt = QDateTime::fromString(updatedAt, Qt::ISODate);
-            m_updatedAtLabel->setText(
-                tr("<b>Updated:</b> %1").arg(QLocale().toString(updatedDt, QLocale::ShortFormat)));
-        } else {
-            m_updatedAtLabel->setText(tr("<b>Updated:</b> N/A"));
-        }
+        QDateTime updatedDt = QDateTime::fromString(updatedAt, Qt::ISODate);
+        QString updatedStr = updatedDt.isValid() ? QLocale().toString(updatedDt, QLocale::ShortFormat) : tr("N/A");
+        m_updatedAtLabel->setText(tr("<b>Updated:</b> %1").arg(updatedStr));
 
         // Update Metadata
         QStringList labels;
@@ -280,7 +277,7 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         for (const QJsonValue& val : labelsArray) {
             labels << val.toObject()["name"].toString();
         }
-        QString labelsText = labels.isEmpty() ? "None" : labels.join(", ");
+        QString labelsText = labels.isEmpty() ? tr("None") : labels.join(QStringLiteral(", "));
         m_labelsLabel->setText(tr("<b>Labels:</b> %1").arg(labelsText));
         m_convLabelsLabel->setText(tr("<b>Labels:</b> %1").arg(labelsText));
 
@@ -289,12 +286,12 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         for (const QJsonValue& val : assigneesArray) {
             assignees << val.toObject()["login"].toString();
         }
-        QString assigneesText = assignees.isEmpty() ? "None" : assignees.join(", ");
+        QString assigneesText = assignees.isEmpty() ? tr("None") : assignees.join(QStringLiteral(", "));
         m_assigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assigneesText));
         m_convAssigneesLabel->setText(tr("<b>Assignees:</b> %1").arg(assigneesText));
 
         QJsonObject milestoneObj = obj["milestone"].toObject();
-        QString milestoneText = "None";
+        QString milestoneText = tr("None");
         if (!milestoneObj.isEmpty()) {
             milestoneText = milestoneObj["title"].toString();
         }
