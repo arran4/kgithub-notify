@@ -83,6 +83,7 @@ void WorkItemWindow::setupUi() {
     KStandardAction::close(this, &WorkItemWindow::close, actionCollection());
 
     m_copyAction = KStandardAction::copy(this, &WorkItemWindow::copyLink, actionCollection());
+    m_copyAction->setText(tr("Copy Link"));
 
     setupGUI(Default, ":/kgithub-notifyui.rc");
 

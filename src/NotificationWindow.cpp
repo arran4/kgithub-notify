@@ -30,6 +30,7 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
     KStandardAction::close(this, &NotificationWindow::close, actionCollection());
 
     QAction* copyLinkAction = KStandardAction::copy(this, &NotificationWindow::onCopyLink, actionCollection());
+    copyLinkAction->setText(tr("Copy Link"));
 
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
     connect(openUrlAction, &QAction::triggered, this, &NotificationWindow::onOpenUrl);
