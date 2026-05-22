@@ -12,8 +12,9 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QMenu>
-#include <QMenuBar>
 #include <QSettings>
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QStyle>
 #include <QTableWidget>
 #include <QTextEdit>
@@ -31,7 +32,6 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     setObjectName("TrendingWindow");
     setCentralWidget(centralWidget);
-    setupGUI(Default, ":/kgithub-notifyui.rc");
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
 
     QHBoxLayout* topLayout = new QHBoxLayout();
@@ -89,17 +89,9 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(tableWidget);
 
-    QMenuBar* menuBarWidget = menuBar();
-    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
-    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
-    closeAction->setShortcut(QKeySequence::Close);
-    connect(closeAction, &QAction::triggered, this, &TrendingWindow::close);
-    fileMenu->addAction(closeAction);
+    KStandardAction::close(this, &TrendingWindow::close, actionCollection());
 
-    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
-    QAction* copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
-    copyAction->setShortcut(QKeySequence::Copy);
-    connect(copyAction, &QAction::triggered, this, [this]() {
+    KStandardAction::copy(this, [this]() {
         QList<QTableWidgetItem*> items = tableWidget->selectedItems();
         if (!items.isEmpty()) {
             QTableWidgetItem* item = items.first();
@@ -110,14 +102,11 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
                 }
             }
         }
-    });
-    editMenu->addAction(copyAction);
+    }, actionCollection());
 
-    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
-    QAction* refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
-    refreshAction->setShortcut(QKeySequence::Refresh);
-    connect(refreshAction, &QAction::triggered, this, &TrendingWindow::onRefreshClicked);
-    viewMenu->addAction(refreshAction);
+    KStandardAction::redisplay(this, &TrendingWindow::onRefreshClicked, actionCollection());
+
+    setupGUI(Default, ":/kgithub-notifyui.rc");
 
     m_netManager = new QNetworkAccessManager(this);
     connect(m_netManager, &QNetworkAccessManager::finished, this, &TrendingWindow::onRepoStarredCheckFinished);

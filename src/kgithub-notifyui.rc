@@ -7,6 +7,8 @@
 
     <MenuBar>
         <Menu name="file">
+            <Action name="export_csv"/>
+            <Action name="export_json"/>
             <Separator/>
             <Action name="file_close"/>
             <Action name="file_quit"/>
@@ -15,11 +17,24 @@
             <text>&amp;Edit</text>
             <Action name="edit_select_all"/>
             <Action name="edit_deselect"/>
+            <Action name="edit_copy"/>
         </Menu>
         <Menu name="view">
             <text>&amp;View</text>
             <Action name="view_raw_json"/>
             <Action name="view_redisplay"/>
+        </Menu>
+        <Menu name="actions">
+            <text>&amp;Actions</text>
+            <Action name="open_url"/>
+            <Action name="mark_as_read"/>
+            <Action name="mark_as_done"/>
+            <Separator/>
+            <Action name="mute_repo"/>
+            <Action name="open_rules"/>
+            <Separator/>
+            <Action name="view_pull_request"/>
+            <Action name="view_action_job"/>
         </Menu>
         <Menu name="settings">
             <Action name="notification_rules"/>

@@ -8,6 +8,8 @@
 #include <QJsonDocument>
 #include <QLabel>
 #include <QMessageBox>
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -24,34 +26,23 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
     setWindowTitle(tr("Notification Details - %1").arg(n.repository));
     resize(500, 400);
 
-    // Menu Bar
-    QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
-    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
-    closeAction->setShortcut(QKeySequence::Close);
-    connect(closeAction, &QAction::triggered, this, &NotificationWindow::close);
-    fileMenu->addAction(closeAction);
+    // Actions & Menus
+    KStandardAction::close(this, &NotificationWindow::close, actionCollection());
 
-    QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
-
-    QAction* copyLinkAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
-    copyLinkAction->setShortcut(QKeySequence::Copy);
-    connect(copyLinkAction, &QAction::triggered, this, &NotificationWindow::onCopyLink);
-    editMenu->addAction(copyLinkAction);
-
-    QMenu* actionsMenu = menuBar()->addMenu(tr("&Actions"));
+    QAction* copyLinkAction = KStandardAction::copy(this, &NotificationWindow::onCopyLink, actionCollection());
 
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open URL"), this);
     connect(openUrlAction, &QAction::triggered, this, &NotificationWindow::onOpenUrl);
-    actionsMenu->addAction(openUrlAction);
+    actionCollection()->addAction(QStringLiteral("open_url"), openUrlAction);
 
     QAction* markAsReadAction = new QAction(QIcon::fromTheme("mail-mark-read"), tr("Mark as Read"), this);
     connect(markAsReadAction, &QAction::triggered, this, &NotificationWindow::onMarkAsRead);
-    actionsMenu->addAction(markAsReadAction);
+    actionCollection()->addAction(QStringLiteral("mark_as_read"), markAsReadAction);
 
     QAction* markAsDoneAction = new QAction(QIcon::fromTheme("task-complete"), tr("Mark as Done"), this);
     connect(markAsDoneAction, &QAction::triggered, this, &NotificationWindow::onMarkAsDone);
-    actionsMenu->addAction(markAsDoneAction);
-    actionsMenu->addSeparator();
+    actionCollection()->addAction(QStringLiteral("mark_as_done"), markAsDoneAction);
+
     QAction* muteRepoAction = new QAction(QIcon::fromTheme("notifications-disabled"), tr("Mute Repository"), this);
     connect(muteRepoAction, &QAction::triggered, this, [this]() {
         NotificationRule rule;
@@ -61,7 +52,7 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
         QMessageBox::information(this, tr("Rule Added"),
                                  tr("Muted notifications for repository:\n%1").arg(m_notification.repository));
     });
-    actionsMenu->addAction(muteRepoAction);
+    actionCollection()->addAction(QStringLiteral("mute_repo"), muteRepoAction);
 
     QAction* openRulesAction =
         new QAction(QIcon::fromTheme("view-list-details"), tr("Manage Notification Rules..."), this);
@@ -69,13 +60,11 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
         RulesDialog dialog(this, m_notification.repository, m_notification.repository);
         dialog.exec();
     });
-    actionsMenu->addAction(openRulesAction);
-
-    actionsMenu->addSeparator();
+    actionCollection()->addAction(QStringLiteral("open_rules"), openRulesAction);
 
     QAction* viewRawAction = new QAction(QIcon::fromTheme("text-x-generic"), tr("View Raw JSON"), this);
     connect(viewRawAction, &QAction::triggered, this, &NotificationWindow::onViewRawJson);
-    actionsMenu->addAction(viewRawAction);
+    actionCollection()->addAction(QStringLiteral("view_raw_json"), viewRawAction);
 
     QAction* viewPullRequestAction = nullptr;
     QAction* viewActionJobAction = nullptr;
@@ -83,11 +72,11 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
     if (m_notification.type == "PullRequest") {
         viewPullRequestAction = new QAction(QIcon::fromTheme("vcs-merge-request"), tr("View Pull Request"), this);
         connect(viewPullRequestAction, &QAction::triggered, this, &NotificationWindow::onViewPullRequest);
-        actionsMenu->addAction(viewPullRequestAction);
+        actionCollection()->addAction(QStringLiteral("view_pull_request"), viewPullRequestAction);
     } else if (m_notification.type == "CheckSuite" || m_notification.type == "WorkflowRun") {
         viewActionJobAction = new QAction(QIcon::fromTheme("system-run"), tr("View Action Job"), this);
         connect(viewActionJobAction, &QAction::triggered, this, &NotificationWindow::onViewActionJob);
-        actionsMenu->addAction(viewActionJobAction);
+        actionCollection()->addAction(QStringLiteral("view_action_job"), viewActionJobAction);
     }
 
     // Tool Bar
