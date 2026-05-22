@@ -1,5 +1,7 @@
 #include "RepoListWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -13,7 +15,6 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QMenu>
-#include <QMenuBar>
 #include <QMessageBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -69,6 +70,30 @@ void RepoListWindow::setupUI() {
 
     setObjectName("RepoListWindow");
     setCentralWidget(m_table);
+
+    // Actions
+    QAction* refreshAction = KStandardAction::redisplay(this, &RepoListWindow::onRefreshClicked, actionCollection());
+
+    QAction* exportAction = new QAction(QIcon::fromTheme("document-export"), tr("Export to CSV"), this);
+    connect(exportAction, &QAction::triggered, this, &RepoListWindow::onExportClicked);
+    actionCollection()->addAction(QStringLiteral("export_csv"), exportAction);
+
+    KStandardAction::close(this, &RepoListWindow::close, actionCollection());
+
+    KStandardAction::copy(
+        this,
+        [this]() {
+            QList<QTableWidgetItem*> items = m_table->selectedItems();
+            if (!items.isEmpty()) {
+                int row = items.first()->row();
+                QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
+                if (urlItem) {
+                    QApplication::clipboard()->setText(urlItem->text());
+                }
+            }
+        },
+        actionCollection());
+
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Toolbar
@@ -76,42 +101,8 @@ void RepoListWindow::setupUI() {
     m_toolbar->setObjectName("RepoListMainToolBar");
     m_toolbar->setMovable(false);
 
-    QAction* refreshAction = new QAction(QIcon::fromTheme("view-refresh"), tr("Refresh"), this);
-    connect(refreshAction, &QAction::triggered, this, &RepoListWindow::onRefreshClicked);
     m_toolbar->addAction(refreshAction);
-
-    QAction* exportAction = new QAction(QIcon::fromTheme("document-export"), tr("Export to CSV"), this);
-    connect(exportAction, &QAction::triggered, this, &RepoListWindow::onExportClicked);
     m_toolbar->addAction(exportAction);
-
-    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
-    closeAction->setShortcut(QKeySequence::Close);
-    connect(closeAction, &QAction::triggered, this, &RepoListWindow::close);
-
-    QMenuBar* menuBarWidget = menuBar();
-    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
-    fileMenu->addAction(exportAction);
-    fileMenu->addSeparator();
-    fileMenu->addAction(closeAction);
-
-    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
-    QAction* copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy URL"), this);
-    copyAction->setShortcut(QKeySequence::Copy);
-    connect(copyAction, &QAction::triggered, this, [this]() {
-        QList<QTableWidgetItem*> items = m_table->selectedItems();
-        if (!items.isEmpty()) {
-            int row = items.first()->row();
-            QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
-            if (urlItem) {
-                QApplication::clipboard()->setText(urlItem->text());
-            }
-        }
-    });
-    editMenu->addAction(copyAction);
-
-    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
-    refreshAction->setShortcut(QKeySequence::Refresh);
-    viewMenu->addAction(refreshAction);
 
     // Status bar
     m_statusBar = statusBar();

@@ -1,5 +1,7 @@
 #include "WorkItemWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -11,7 +13,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMenu>
-#include <QMenuBar>
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QStandardPaths>
@@ -61,39 +62,30 @@ void WorkItemWindow::setupUi() {
 
     setObjectName("WorkItemWindow");
     setCentralWidget(m_table);
-    setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Actions
     QAction* exportCsvAction = new QAction(tr("Export to CSV"), this);
     connect(exportCsvAction, &QAction::triggered, this, &WorkItemWindow::exportToCsv);
+    actionCollection()->addAction(QStringLiteral("export_csv"), exportCsvAction);
+
     QAction* exportJsonAction = new QAction(tr("Export to JSON"), this);
     connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
-    QAction* refreshAction = new QAction(tr("Refresh"), this);
-    connect(refreshAction, &QAction::triggered, this, [this]() {
-        m_table->setRowCount(0);  // Give immediate visual feedback of refresh
-        loadData(1);
-    });
-    QAction* closeAction = new QAction(QIcon::fromTheme("window-close"), tr("Close"), this);
-    closeAction->setShortcut(QKeySequence::Close);
-    connect(closeAction, &QAction::triggered, this, &WorkItemWindow::close);
+    actionCollection()->addAction(QStringLiteral("export_json"), exportJsonAction);
 
-    // Menu Bar
-    QMenuBar* menuBarWidget = menuBar();
-    QMenu* fileMenu = menuBarWidget->addMenu(tr("&File"));
-    fileMenu->addAction(exportCsvAction);
-    fileMenu->addAction(exportJsonAction);
-    fileMenu->addSeparator();
-    fileMenu->addAction(closeAction);
+    QAction* refreshAction = KStandardAction::redisplay(
+        this,
+        [this]() {
+            m_table->setRowCount(0);  // Give immediate visual feedback of refresh
+            loadData(1);
+        },
+        actionCollection());
 
-    QMenu* editMenu = menuBarWidget->addMenu(tr("&Edit"));
-    m_copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy Link"), this);
-    m_copyAction->setShortcut(QKeySequence::Copy);
-    connect(m_copyAction, &QAction::triggered, this, &WorkItemWindow::copyLink);
-    editMenu->addAction(m_copyAction);
+    KStandardAction::close(this, &WorkItemWindow::close, actionCollection());
 
-    QMenu* viewMenu = menuBarWidget->addMenu(tr("&View"));
-    refreshAction->setShortcut(QKeySequence::Refresh);
-    viewMenu->addAction(refreshAction);
+    m_copyAction = KStandardAction::copy(this, &WorkItemWindow::copyLink, actionCollection());
+    m_copyAction->setText(tr("Copy Link"));
+
+    setupGUI(Default, ":/kgithub-notifyui.rc");
 
     // Tool Bar
     QToolBar* toolBar = addToolBar(tr("Main Toolbar"));
