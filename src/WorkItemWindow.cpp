@@ -1,5 +1,7 @@
 #include "WorkItemWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -12,8 +14,6 @@
 #include <QJsonObject>
 #include <QMenu>
 #include <QMessageBox>
-#include <KActionCollection>
-#include <KStandardAction>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -72,10 +72,13 @@ void WorkItemWindow::setupUi() {
     connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
     actionCollection()->addAction(QStringLiteral("export_json"), exportJsonAction);
 
-    QAction* refreshAction = KStandardAction::redisplay(this, [this]() {
-        m_table->setRowCount(0);  // Give immediate visual feedback of refresh
-        loadData(1);
-    }, actionCollection());
+    QAction* refreshAction = KStandardAction::redisplay(
+        this,
+        [this]() {
+            m_table->setRowCount(0);  // Give immediate visual feedback of refresh
+            loadData(1);
+        },
+        actionCollection());
 
     KStandardAction::close(this, &WorkItemWindow::close, actionCollection());
 

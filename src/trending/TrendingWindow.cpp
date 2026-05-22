@@ -1,5 +1,7 @@
 #include "TrendingWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -13,8 +15,6 @@
 #include <QLabel>
 #include <QMenu>
 #include <QSettings>
-#include <KActionCollection>
-#include <KStandardAction>
 #include <QStyle>
 #include <QTableWidget>
 #include <QTextEdit>
@@ -91,18 +91,21 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
 
     KStandardAction::close(this, &TrendingWindow::close, actionCollection());
 
-    KStandardAction::copy(this, [this]() {
-        QList<QTableWidgetItem*> items = tableWidget->selectedItems();
-        if (!items.isEmpty()) {
-            QTableWidgetItem* item = items.first();
-            if (item) {
-                QString url = item->data(Qt::UserRole).toString();
-                if (!url.isEmpty()) {
-                    QApplication::clipboard()->setText(url);
+    KStandardAction::copy(
+        this,
+        [this]() {
+            QList<QTableWidgetItem*> items = tableWidget->selectedItems();
+            if (!items.isEmpty()) {
+                QTableWidgetItem* item = items.first();
+                if (item) {
+                    QString url = item->data(Qt::UserRole).toString();
+                    if (!url.isEmpty()) {
+                        QApplication::clipboard()->setText(url);
+                    }
                 }
             }
-        }
-    }, actionCollection());
+        },
+        actionCollection());
 
     KStandardAction::redisplay(this, &TrendingWindow::onRefreshClicked, actionCollection());
 

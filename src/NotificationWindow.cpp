@@ -1,5 +1,7 @@
 #include "NotificationWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -8,8 +10,6 @@
 #include <QJsonDocument>
 #include <QLabel>
 #include <QMessageBox>
-#include <KActionCollection>
-#include <KStandardAction>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QVBoxLayout>

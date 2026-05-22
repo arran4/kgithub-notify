@@ -1,5 +1,7 @@
 #include "RepoListWindow.h"
 
+#include <KActionCollection>
+#include <KStandardAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
@@ -14,8 +16,6 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
-#include <KActionCollection>
-#include <KStandardAction>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTableWidget>
@@ -80,16 +80,19 @@ void RepoListWindow::setupUI() {
 
     KStandardAction::close(this, &RepoListWindow::close, actionCollection());
 
-    KStandardAction::copy(this, [this]() {
-        QList<QTableWidgetItem*> items = m_table->selectedItems();
-        if (!items.isEmpty()) {
-            int row = items.first()->row();
-            QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
-            if (urlItem) {
-                QApplication::clipboard()->setText(urlItem->text());
+    KStandardAction::copy(
+        this,
+        [this]() {
+            QList<QTableWidgetItem*> items = m_table->selectedItems();
+            if (!items.isEmpty()) {
+                int row = items.first()->row();
+                QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
+                if (urlItem) {
+                    QApplication::clipboard()->setText(urlItem->text());
+                }
             }
-        }
-    }, actionCollection());
+        },
+        actionCollection());
 
     setupGUI(Default, ":/kgithub-notifyui.rc");
 
