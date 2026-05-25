@@ -4,6 +4,7 @@
 #include <QRegularExpressionMatch>
 #include <QRegularExpressionMatchIterator>
 #include <QStringList>
+#include <QtGlobal>
 
 struct Token {
     enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD };
