@@ -47,6 +47,8 @@ add_executable(kgithub-notify
     src/SettingsDialog.h
     src/NotificationRuleEngine.cpp
     src/NotificationRuleEngine.h
+    src/utils/FilterParser.cpp
+    src/utils/FilterParser.h
     src/RulesDialog.cpp
     src/RulesDialog.h
     src/DebugWindow.cpp
