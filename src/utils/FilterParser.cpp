@@ -170,7 +170,7 @@ bool OrNode::evaluate(const FilterDataAccessor& accessor) const {
     for (const auto& child : m_children) {
         if (child->evaluate(accessor)) return true;
     }
-    return m_children.isEmpty();
+    return false;
 }
 QString OrNode::toString() const {
     QStringList parts;
@@ -214,14 +214,13 @@ bool KeyValueNode::evaluate(const FilterDataAccessor& accessor) const {
     }
     QString val = accessor.getValue(m_key);
     if (lowerKey == QStringLiteral("repo") || lowerKey == QStringLiteral("owner")) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
         QRegularExpression re = QRegularExpression::fromWildcard(m_value, Qt::CaseInsensitive);
         return re.match(val).hasMatch();
 #else
-        QRegExp rx(m_value);
-        rx.setPatternSyntax(QRegExp::Wildcard);
-        rx.setCaseSensitivity(Qt::CaseInsensitive);
-        return rx.exactMatch(val);
+        QRegularExpression re(QRegularExpression::wildcardToRegularExpression(m_value),
+                              QRegularExpression::CaseInsensitiveOption);
+        return re.match(val).hasMatch();
 #endif
     }
     return val.contains(m_value, Qt::CaseInsensitive);
