@@ -2,9 +2,9 @@
 #define REPOLISTWINDOW_H
 
 #include <KXmlGuiWindow>
+#include <QComboBox>
 #include <QDateTime>
 #include <QJsonArray>
-#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QStatusBar>

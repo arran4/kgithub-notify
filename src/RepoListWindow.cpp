@@ -30,7 +30,7 @@
 #include "utils/FilterParser.h"
 
 class RepoAccessor : public FilterDataAccessor {
-public:
+   public:
     RepoAccessor(const QJsonObject& repo) : m_repo(repo) {}
 
     QString getValue(const QString& key) const override {
@@ -46,18 +46,16 @@ public:
     }
 
     QList<QString> getAllValues() const override {
-        return {
-            m_repo["fork"].toBool() ? "true" : "false",
-            m_repo["archived"].toBool() ? "true" : "false",
-            m_repo["name"].toString(),
-            m_repo["owner"].toObject()["login"].toString(),
-            m_repo["visibility"].toString(),
-            m_repo["created_at"].toString(),
-            m_repo["updated_at"].toString()
-        };
+        return {m_repo["fork"].toBool() ? "true" : "false",
+                m_repo["archived"].toBool() ? "true" : "false",
+                m_repo["name"].toString(),
+                m_repo["owner"].toObject()["login"].toString(),
+                m_repo["visibility"].toString(),
+                m_repo["created_at"].toString(),
+                m_repo["updated_at"].toString()};
     }
 
-private:
+   private:
     QJsonObject m_repo;
 };
 
@@ -91,7 +89,8 @@ void RepoListWindow::setupUI() {
     m_table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_table->setColumnCount(11);
     m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"),
-                                        tr("Open Issues"), tr("Created"), tr("Updated"), tr("Archived"), tr("Fork"), tr("URL")});
+                                        tr("Open Issues"), tr("Created"), tr("Updated"), tr("Archived"), tr("Fork"),
+                                        tr("URL")});
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->verticalHeader()->setVisible(false);
@@ -171,9 +170,7 @@ void RepoListWindow::onRefreshClicked() {
     if (m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
 }
 
-void RepoListWindow::onFilterChanged() {
-    addReposToTable(m_allRepos);
-}
+void RepoListWindow::onFilterChanged() { addReposToTable(m_allRepos); }
 
 void RepoListWindow::onExportClicked() {
     QString fileName = QFileDialog::getSaveFileName(this, tr("Export Repositories"),
@@ -229,7 +226,7 @@ void RepoListWindow::onReposReceived(const QJsonArray& repos, const QString& nex
 
 void RepoListWindow::addReposToTable(const QJsonArray& repos) {
     m_table->setSortingEnabled(false);
-    m_table->setRowCount(0); // clear rows
+    m_table->setRowCount(0);  // clear rows
 
     QString filterQuery = m_filterEdit ? m_filterEdit->text().trimmed() : "";
     QSharedPointer<ASTNode> ast;
@@ -284,8 +281,10 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
             QDateTime m_date;
         };
 
-        QTableWidgetItem* createdItem = new DateTableItem(QLocale::system().toString(createdDt, QLocale::ShortFormat), createdDt);
-        QTableWidgetItem* updatedItem = new DateTableItem(QLocale::system().toString(updatedDt, QLocale::ShortFormat), updatedDt);
+        QTableWidgetItem* createdItem =
+            new DateTableItem(QLocale::system().toString(createdDt, QLocale::ShortFormat), createdDt);
+        QTableWidgetItem* updatedItem =
+            new DateTableItem(QLocale::system().toString(updatedDt, QLocale::ShortFormat), updatedDt);
 
         QTableWidgetItem* archivedItem = new QTableWidgetItem(repo["archived"].toBool() ? tr("Yes") : tr("No"));
         QTableWidgetItem* isForkItem = new QTableWidgetItem(repo["fork"].toBool() ? tr("Yes") : tr("No"));
@@ -307,7 +306,7 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
         row++;
     }
     m_table->setSortingEnabled(true);
-    m_table->sortItems(7, Qt::DescendingOrder); // Sort by Updated
+    m_table->sortItems(7, Qt::DescendingOrder);  // Sort by Updated
 }
 
 void RepoListWindow::updateTimerLabel() {
