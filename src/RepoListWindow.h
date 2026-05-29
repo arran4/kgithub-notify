@@ -4,7 +4,9 @@
 #include <KXmlGuiWindow>
 #include <QDateTime>
 #include <QJsonArray>
+#include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTimer>
@@ -25,6 +27,7 @@ class RepoListWindow : public KXmlGuiWindow {
     void updateTimerLabel();
     void onCustomContextMenuRequested(const QPoint& pos);
     void onError(const QString& error);
+    void onFilterChanged();
 
    private:
     void setupUI();
@@ -35,6 +38,8 @@ class RepoListWindow : public KXmlGuiWindow {
     GitHubClient* m_client;
     QTableWidget* m_table;
     QToolBar* m_toolbar;
+    QComboBox* m_filterCombo;
+    QLineEdit* m_filterEdit;
     QStatusBar* m_statusBar;
     QLabel* m_timerLabel;
     QTimer* m_updateTimer;
