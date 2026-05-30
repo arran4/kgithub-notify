@@ -71,7 +71,7 @@ class Parser {
 
     QSharedPointer<ASTNode> parse() {
         if (m_tokens.isEmpty()) return QSharedPointer<ASTNode>();
-        return parseAnd();
+        return parseOr();
     }
 
    private:
