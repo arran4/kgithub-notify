@@ -4,6 +4,7 @@
 #include <QRegularExpressionMatch>
 #include <QRegularExpressionMatchIterator>
 #include <QStringList>
+#include <QtGlobal>
 
 struct Token {
     enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD };
@@ -66,7 +67,7 @@ class Parser {
     int m_pos;
 
    public:
-    Parser(const QList<Token>& tokens) : m_tokens(tokens), m_pos(0) {}
+    explicit Parser(const QList<Token>& tokens) : m_tokens(tokens), m_pos(0) {}
 
     QSharedPointer<ASTNode> parse() {
         if (m_tokens.isEmpty()) return QSharedPointer<ASTNode>();
@@ -155,10 +156,8 @@ QSharedPointer<ASTNode> FilterParser::parse(const QString& query) {
 }
 
 bool AndNode::evaluate(const FilterDataAccessor& accessor) const {
-    for (const auto& child : m_children) {
-        if (!child->evaluate(accessor)) return false;
-    }
-    return true;
+    return std::all_of(m_children.begin(), m_children.end(),
+                       [&accessor](const auto& child) { return child->evaluate(accessor); });
 }
 QString AndNode::toString() const {
     QStringList parts;
@@ -167,10 +166,8 @@ QString AndNode::toString() const {
 }
 
 bool OrNode::evaluate(const FilterDataAccessor& accessor) const {
-    for (const auto& child : m_children) {
-        if (child->evaluate(accessor)) return true;
-    }
-    return false;
+    return std::any_of(m_children.begin(), m_children.end(),
+                       [&accessor](const auto& child) { return child->evaluate(accessor); });
 }
 QString OrNode::toString() const {
     QStringList parts;
@@ -185,10 +182,8 @@ bool InNode::evaluate(const FilterDataAccessor& accessor) const {
     if (m_values.isEmpty()) return false;
     QString val = accessor.getValue(m_key);
     if (val.isEmpty()) return false;
-    for (const QString& v : m_values) {
-        if (val.compare(v, Qt::CaseInsensitive) == 0) return true;
-    }
-    return false;
+    return std::any_of(m_values.begin(), m_values.end(),
+                       [&val](const QString& v) { return val.compare(v, Qt::CaseInsensitive) == 0; });
 }
 QString InNode::toString() const { return m_key + QStringLiteral(" IN \"") + m_valuesStr + QStringLiteral("\""); }
 
@@ -214,14 +209,9 @@ bool KeyValueNode::evaluate(const FilterDataAccessor& accessor) const {
     }
     QString val = accessor.getValue(m_key);
     if (lowerKey == QStringLiteral("repo") || lowerKey == QStringLiteral("owner")) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
-        QRegularExpression re = QRegularExpression::fromWildcard(m_value, Qt::CaseInsensitive);
-        return re.match(val).hasMatch();
-#else
         QRegularExpression re(QRegularExpression::wildcardToRegularExpression(m_value),
                               QRegularExpression::CaseInsensitiveOption);
         return re.match(val).hasMatch();
-#endif
     }
     return val.contains(m_value, Qt::CaseInsensitive);
 }
@@ -233,10 +223,8 @@ QString KeyValueNode::toString() const {
 
 bool KeywordNode::evaluate(const FilterDataAccessor& accessor) const {
     QList<QString> allVals = accessor.getAllValues();
-    for (const QString& v : allVals) {
-        if (v.contains(m_keyword, Qt::CaseInsensitive)) return true;
-    }
-    return false;
+    return std::any_of(allVals.begin(), allVals.end(),
+                       [this](const QString& v) { return v.contains(m_keyword, Qt::CaseInsensitive); });
 }
 QString KeywordNode::toString() const {
     if (m_keyword.contains(QLatin1Char(' '))) return QStringLiteral("\"") + m_keyword + QStringLiteral("\"");

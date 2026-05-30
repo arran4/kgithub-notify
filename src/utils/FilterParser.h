@@ -23,7 +23,7 @@ class ASTNode {
 
 class AndNode : public ASTNode {
    public:
-    AndNode(QList<QSharedPointer<ASTNode>> children) : m_children(children) {}
+    explicit AndNode(QList<QSharedPointer<ASTNode>> children) : m_children(children) {}
     bool evaluate(const FilterDataAccessor& accessor) const override;
     QString toString() const override;
     QList<QSharedPointer<ASTNode>> children() const { return m_children; }
@@ -34,7 +34,7 @@ class AndNode : public ASTNode {
 
 class OrNode : public ASTNode {
    public:
-    OrNode(QList<QSharedPointer<ASTNode>> children) : m_children(children) {}
+    explicit OrNode(QList<QSharedPointer<ASTNode>> children) : m_children(children) {}
     bool evaluate(const FilterDataAccessor& accessor) const override;
     QString toString() const override;
     QList<QSharedPointer<ASTNode>> children() const { return m_children; }
@@ -45,7 +45,7 @@ class OrNode : public ASTNode {
 
 class NotNode : public ASTNode {
    public:
-    NotNode(QSharedPointer<ASTNode> child) : m_child(child) {}
+    explicit NotNode(QSharedPointer<ASTNode> child) : m_child(child) {}
     bool evaluate(const FilterDataAccessor& accessor) const override;
     QString toString() const override;
     QSharedPointer<ASTNode> child() const { return m_child; }
@@ -91,7 +91,7 @@ class KeyValueNode : public ASTNode {
 
 class KeywordNode : public ASTNode {
    public:
-    KeywordNode(const QString& keyword) : m_keyword(keyword) {}
+    explicit KeywordNode(const QString& keyword) : m_keyword(keyword) {}
     bool evaluate(const FilterDataAccessor& accessor) const override;
     QString toString() const override;
     QString keyword() const { return m_keyword; }
