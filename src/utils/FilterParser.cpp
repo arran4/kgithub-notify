@@ -85,29 +85,60 @@ class Parser {
     }
     bool atEnd() const { return m_pos >= m_tokens.size(); }
 
-    QSharedPointer<ASTNode> parseAnd() {
-        QList<QSharedPointer<ASTNode>> nodes;
-        nodes.append(parseOr());
-        while (!atEnd() && current().type != Token::RPAREN) {
-            if (current().type == Token::OR) break;
-            if (current().type == Token::AND) {
-                next();
-            }
-            nodes.append(parseOr());
-        }
-        if (nodes.size() == 1) return nodes.first();
-        return QSharedPointer<ASTNode>(new AndNode(nodes));
-    }
-
     QSharedPointer<ASTNode> parseOr() {
         QList<QSharedPointer<ASTNode>> nodes;
-        nodes.append(parseUnary());
+        QSharedPointer<ASTNode> firstChild = parseAnd();
+        if (firstChild) {
+            if (auto* childOr = dynamic_cast<OrNode*>(firstChild.data())) {
+                nodes.append(childOr->children());
+            } else {
+                nodes.append(firstChild);
+            }
+        }
+
         while (!atEnd() && current().type == Token::OR) {
             next();
-            nodes.append(parseUnary());
+            QSharedPointer<ASTNode> child = parseAnd();
+            if (child) {
+                if (auto* childOr = dynamic_cast<OrNode*>(child.data())) {
+                    nodes.append(childOr->children());
+                } else {
+                    nodes.append(child);
+                }
+            }
         }
         if (nodes.size() == 1) return nodes.first();
         return QSharedPointer<ASTNode>(new OrNode(nodes));
+    }
+
+    QSharedPointer<ASTNode> parseAnd() {
+        QList<QSharedPointer<ASTNode>> nodes;
+        QSharedPointer<ASTNode> firstChild = parseUnary();
+        if (firstChild) {
+            if (auto* childAnd = dynamic_cast<AndNode*>(firstChild.data())) {
+                nodes.append(childAnd->children());
+            } else {
+                nodes.append(firstChild);
+            }
+        }
+
+        while (!atEnd() && current().type != Token::RPAREN && current().type != Token::OR) {
+            if (current().type == Token::AND) {
+                next();
+            } else {
+                // implicit AND: do not consume token
+            }
+            QSharedPointer<ASTNode> child = parseUnary();
+            if (child) {
+                if (auto* childAnd = dynamic_cast<AndNode*>(child.data())) {
+                    nodes.append(childAnd->children());
+                } else {
+                    nodes.append(child);
+                }
+            }
+        }
+        if (nodes.size() == 1) return nodes.first();
+        return QSharedPointer<ASTNode>(new AndNode(nodes));
     }
 
     QSharedPointer<ASTNode> parseUnary() {
