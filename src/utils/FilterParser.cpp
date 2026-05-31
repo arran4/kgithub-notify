@@ -154,7 +154,7 @@ class Parser {
 
         Token tok = next();
         if (tok.type == Token::LPAREN) {
-            QSharedPointer<ASTNode> node = parseAnd();
+            QSharedPointer<ASTNode> node = parseOr();
             if (!atEnd() && current().type == Token::RPAREN) {
                 next();
             }
@@ -243,6 +243,9 @@ bool KeyValueNode::evaluate(const FilterDataAccessor& accessor) const {
         QRegularExpression re(QRegularExpression::wildcardToRegularExpression(m_value),
                               QRegularExpression::CaseInsensitiveOption);
         return re.match(val).hasMatch();
+    }
+    if (lowerKey == QStringLiteral("repo") || lowerKey == QStringLiteral("owner")) {
+        return val.compare(m_value, Qt::CaseInsensitive) == 0;
     }
     return val.contains(m_value, Qt::CaseInsensitive);
 }
