@@ -134,7 +134,8 @@ class TestFilterParser : public QObject {
         QVERIFY(FilterParser::parse("fork:false OR archived:false AND name:foo")->evaluate(accessor) == true);
 
         // Precedence: false AND false OR true -> (false AND false) OR true -> true
-        QVERIFY(FilterParser::parse("fork:true AND archived:false OR name:my-awesome-repo")->evaluate(accessor) == true);
+        QVERIFY(FilterParser::parse("fork:true AND archived:false OR name:my-awesome-repo")->evaluate(accessor) ==
+                true);
 
         // Implicit AND
         QVERIFY(FilterParser::parse("fork:false archived:true")->evaluate(accessor) == true);
@@ -142,7 +143,7 @@ class TestFilterParser : public QObject {
 
         // Keyword text search
         QVERIFY(FilterParser::parse("awesome")->evaluate(accessor) == true);
-        QVERIFY(FilterParser::parse("john")->evaluate(accessor) == true); // matches owner substring in getAllValues
+        QVERIFY(FilterParser::parse("john")->evaluate(accessor) == true);  // matches owner substring in getAllValues
         QVERIFY(FilterParser::parse("terrible")->evaluate(accessor) == false);
 
         // NOT
