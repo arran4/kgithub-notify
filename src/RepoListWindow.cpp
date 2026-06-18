@@ -87,7 +87,7 @@ void RepoListWindow::setupUI() {
     // Table
     m_table = new QTableWidget(this);
     m_table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    m_table->setColumnCount(11);
+    m_table->setColumnCount(ColumnCount);
     m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"),
                                         tr("Open Issues"), tr("Created"), tr("Updated"), tr("Archived"), tr("Fork"),
                                         tr("URL")});
@@ -120,7 +120,7 @@ void RepoListWindow::setupUI() {
             QList<QTableWidgetItem*> items = m_table->selectedItems();
             if (!items.isEmpty()) {
                 int row = items.first()->row();
-                QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
+                QTableWidgetItem* urlItem = m_table->item(row, ColUrl);
                 if (urlItem) {
                     QApplication::clipboard()->setText(urlItem->text());
                 }
@@ -291,22 +291,22 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
 
         QTableWidgetItem* urlItem = new QTableWidgetItem(repo["html_url"].toString());
 
-        m_table->setItem(row, 0, nameItem);
-        m_table->setItem(row, 1, ownerItem);
-        m_table->setItem(row, 2, visItem);
-        m_table->setItem(row, 3, starsItem);
-        m_table->setItem(row, 4, forksItem);
-        m_table->setItem(row, 5, issuesItem);
-        m_table->setItem(row, 6, createdItem);
-        m_table->setItem(row, 7, updatedItem);
-        m_table->setItem(row, 8, archivedItem);
-        m_table->setItem(row, 9, isForkItem);
-        m_table->setItem(row, 10, urlItem);
+        m_table->setItem(row, ColName, nameItem);
+        m_table->setItem(row, ColOwner, ownerItem);
+        m_table->setItem(row, ColVisibility, visItem);
+        m_table->setItem(row, ColStars, starsItem);
+        m_table->setItem(row, ColForks, forksItem);
+        m_table->setItem(row, ColOpenIssues, issuesItem);
+        m_table->setItem(row, ColCreated, createdItem);
+        m_table->setItem(row, ColUpdated, updatedItem);
+        m_table->setItem(row, ColArchived, archivedItem);
+        m_table->setItem(row, ColIsFork, isForkItem);
+        m_table->setItem(row, ColUrl, urlItem);
 
         row++;
     }
     m_table->setSortingEnabled(true);
-    m_table->sortItems(7, Qt::DescendingOrder);  // Sort by Updated
+    m_table->sortItems(ColUpdated, Qt::DescendingOrder);
 }
 
 void RepoListWindow::updateTimerLabel() {
@@ -329,7 +329,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
     if (!item) return;
 
     int row = item->row();
-    QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is col 7
+    QTableWidgetItem* urlItem = m_table->item(row, ColUrl);
     if (!urlItem) return;
 
     QString url = urlItem->text();

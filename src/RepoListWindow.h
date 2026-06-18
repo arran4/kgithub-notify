@@ -18,6 +18,21 @@ class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
 
    public:
+    enum Column {
+        ColName = 0,
+        ColOwner,
+        ColVisibility,
+        ColStars,
+        ColForks,
+        ColOpenIssues,
+        ColCreated,
+        ColUpdated,
+        ColArchived,
+        ColIsFork,
+        ColUrl,
+        ColumnCount
+    };
+
     explicit RepoListWindow(GitHubClient* client, QWidget* parent = nullptr);
 
    private slots:
