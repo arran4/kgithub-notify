@@ -27,12 +27,45 @@
 #include <QtGui/QAction>
 
 #include "NewIssueDialog.h"
+#include "utils/FilterParser.h"
+
+class RepoAccessor : public FilterDataAccessor {
+   public:
+    RepoAccessor(const QJsonObject& repo) : m_repo(repo) {}
+
+    QString getValue(const QString& key) const override {
+        QString lowerKey = key.toLower();
+        if (lowerKey == "fork") return m_repo["fork"].toBool() ? "true" : "false";
+        if (lowerKey == "archived") return m_repo["archived"].toBool() ? "true" : "false";
+        if (lowerKey == "name") return m_repo["name"].toString();
+        if (lowerKey == "owner") return m_repo["owner"].toObject()["login"].toString();
+        if (lowerKey == "visibility") return m_repo["visibility"].toString();
+        if (lowerKey == "createdat") return m_repo["created_at"].toString();
+        if (lowerKey == "updatedat") return m_repo["updated_at"].toString();
+        return "";
+    }
+
+    QList<QString> getAllValues() const override {
+        return {m_repo["fork"].toBool() ? "true" : "false",
+                m_repo["archived"].toBool() ? "true" : "false",
+                m_repo["name"].toString(),
+                m_repo["owner"].toObject()["login"].toString(),
+                m_repo["visibility"].toString(),
+                m_repo["created_at"].toString(),
+                m_repo["updated_at"].toString()};
+    }
+
+   private:
+    QJsonObject m_repo;
+};
 
 RepoListWindow::RepoListWindow(GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent),
       m_client(client),
       m_table(nullptr),
       m_toolbar(nullptr),
+      m_filterCombo(nullptr),
+      m_filterEdit(nullptr),
       m_statusBar(nullptr),
       m_timerLabel(nullptr),
       m_updateTimer(nullptr) {
@@ -54,9 +87,10 @@ void RepoListWindow::setupUI() {
     // Table
     m_table = new QTableWidget(this);
     m_table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    m_table->setColumnCount(8);
+    m_table->setColumnCount(ColumnCount);
     m_table->setHorizontalHeaderLabels({tr("Name"), tr("Owner"), tr("Visibility"), tr("Stars"), tr("Forks"),
-                                        tr("Open Issues"), tr("Updated"), tr("URL")});
+                                        tr("Open Issues"), tr("Created"), tr("Updated"), tr("Archived"), tr("Fork"),
+                                        tr("URL")});
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->verticalHeader()->setVisible(false);
@@ -86,7 +120,7 @@ void RepoListWindow::setupUI() {
             QList<QTableWidgetItem*> items = m_table->selectedItems();
             if (!items.isEmpty()) {
                 int row = items.first()->row();
-                QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is column 7
+                QTableWidgetItem* urlItem = m_table->item(row, ColUrl);
                 if (urlItem) {
                     QApplication::clipboard()->setText(urlItem->text());
                 }
@@ -101,8 +135,28 @@ void RepoListWindow::setupUI() {
     m_toolbar->setObjectName("RepoListMainToolBar");
     m_toolbar->setMovable(false);
 
+    m_filterCombo = new QComboBox(this);
+    m_filterCombo->addItem(tr("Custom"), "fork:false AND archived:false");
+    m_filterCombo->addItem(tr("All"), "");
+    m_filterCombo->addItem(tr("Not Forks"), "fork:false");
+    m_filterCombo->addItem(tr("Not Archived"), "archived:false");
+
+    m_filterEdit = new QLineEdit(this);
+    m_filterEdit->setPlaceholderText(tr("Filter repositories... e.g. fork:false AND archived:false"));
+    m_filterEdit->setText("fork:false AND archived:false");
+
+    connect(m_filterCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        QString preset = m_filterCombo->itemData(index).toString();
+        m_filterEdit->setText(preset);
+    });
+    connect(m_filterEdit, &QLineEdit::textChanged, this, &RepoListWindow::onFilterChanged);
+
     m_toolbar->addAction(refreshAction);
     m_toolbar->addAction(exportAction);
+    m_toolbar->addSeparator();
+    m_toolbar->addWidget(new QLabel(tr("Filter: "), this));
+    m_toolbar->addWidget(m_filterCombo);
+    m_toolbar->addWidget(m_filterEdit);
 
     // Status bar
     m_statusBar = statusBar();
@@ -115,6 +169,8 @@ void RepoListWindow::onRefreshClicked() {
     m_client->fetchUserRepos();
     if (m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
 }
+
+void RepoListWindow::onFilterChanged() { addReposToTable(m_allRepos); }
 
 void RepoListWindow::onExportClicked() {
     QString fileName = QFileDialog::getSaveFileName(this, tr("Export Repositories"),
@@ -170,10 +226,26 @@ void RepoListWindow::onReposReceived(const QJsonArray& repos, const QString& nex
 
 void RepoListWindow::addReposToTable(const QJsonArray& repos) {
     m_table->setSortingEnabled(false);
-    m_table->setRowCount(repos.size());
+    m_table->setRowCount(0);  // clear rows
 
+    QString filterQuery = m_filterEdit ? m_filterEdit->text().trimmed() : "";
+    QSharedPointer<ASTNode> ast;
+    if (!filterQuery.isEmpty()) {
+        ast = FilterParser::parse(filterQuery);
+    }
+
+    int row = 0;
     for (int i = 0; i < repos.size(); ++i) {
         QJsonObject repo = repos[i].toObject();
+
+        if (ast) {
+            RepoAccessor accessor(repo);
+            if (!ast->evaluate(accessor)) {
+                continue;
+            }
+        }
+
+        m_table->insertRow(row);
 
         QTableWidgetItem* nameItem = new QTableWidgetItem(repo["name"].toString());
         QTableWidgetItem* ownerItem = new QTableWidgetItem(repo["owner"].toObject()["login"].toString());
@@ -188,8 +260,11 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
         QTableWidgetItem* issuesItem = new QTableWidgetItem();
         issuesItem->setData(Qt::DisplayRole, repo["open_issues_count"].toInt());
 
+        QString createdStr = repo["created_at"].toString();
+        QDateTime createdDt = QDateTime::fromString(createdStr, Qt::ISODate);
+
         QString updatedStr = repo["updated_at"].toString();
-        QDateTime dt = QDateTime::fromString(updatedStr, Qt::ISODate);
+        QDateTime updatedDt = QDateTime::fromString(updatedStr, Qt::ISODate);
 
         class DateTableItem : public QTableWidgetItem {
            public:
@@ -206,20 +281,32 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
             QDateTime m_date;
         };
 
-        QTableWidgetItem* updatedItem = new DateTableItem(QLocale::system().toString(dt, QLocale::ShortFormat), dt);
+        QTableWidgetItem* createdItem =
+            new DateTableItem(QLocale::system().toString(createdDt, QLocale::ShortFormat), createdDt);
+        QTableWidgetItem* updatedItem =
+            new DateTableItem(QLocale::system().toString(updatedDt, QLocale::ShortFormat), updatedDt);
+
+        QTableWidgetItem* archivedItem = new QTableWidgetItem(repo["archived"].toBool() ? tr("Yes") : tr("No"));
+        QTableWidgetItem* isForkItem = new QTableWidgetItem(repo["fork"].toBool() ? tr("Yes") : tr("No"));
 
         QTableWidgetItem* urlItem = new QTableWidgetItem(repo["html_url"].toString());
 
-        m_table->setItem(i, 0, nameItem);
-        m_table->setItem(i, 1, ownerItem);
-        m_table->setItem(i, 2, visItem);
-        m_table->setItem(i, 3, starsItem);
-        m_table->setItem(i, 4, forksItem);
-        m_table->setItem(i, 5, issuesItem);
-        m_table->setItem(i, 6, updatedItem);
-        m_table->setItem(i, 7, urlItem);
+        m_table->setItem(row, ColName, nameItem);
+        m_table->setItem(row, ColOwner, ownerItem);
+        m_table->setItem(row, ColVisibility, visItem);
+        m_table->setItem(row, ColStars, starsItem);
+        m_table->setItem(row, ColForks, forksItem);
+        m_table->setItem(row, ColOpenIssues, issuesItem);
+        m_table->setItem(row, ColCreated, createdItem);
+        m_table->setItem(row, ColUpdated, updatedItem);
+        m_table->setItem(row, ColArchived, archivedItem);
+        m_table->setItem(row, ColIsFork, isForkItem);
+        m_table->setItem(row, ColUrl, urlItem);
+
+        row++;
     }
     m_table->setSortingEnabled(true);
+    m_table->sortItems(ColUpdated, Qt::DescendingOrder);
 }
 
 void RepoListWindow::updateTimerLabel() {
@@ -242,7 +329,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
     if (!item) return;
 
     int row = item->row();
-    QTableWidgetItem* urlItem = m_table->item(row, 7);  // URL is col 7
+    QTableWidgetItem* urlItem = m_table->item(row, ColUrl);
     if (!urlItem) return;
 
     QString url = urlItem->text();

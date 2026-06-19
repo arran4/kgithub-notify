@@ -975,6 +975,12 @@ void MainWindow::setupMenus() {
     createSubMenu(prsMenu, tr("Merged"), "prs_merged", "is:merged", "is:pr", 1);
     createSubMenu(prsMenu, tr("All Statuses"), "prs_all", "", "is:pr", 1);
 
+    QAction* openRepoListAction = new QAction(tr("Open Repository List"), this);
+    connect(openRepoListAction, &QAction::triggered, this, &MainWindow::showRepoListWindow);
+    actionCollection()->addAction(QStringLiteral("action_repos_open_list"), openRepoListAction);
+    reposMenu->addAction(openRepoListAction);
+    reposMenu->addSeparator();
+
     createSubMenu(reposMenu, "", "repos", "", "", 2);
 
     QAction* aboutQtAction = new QAction(tr("About &Qt"), this);
