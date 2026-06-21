@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
+#include <QLocale>
 #include <QDesktopServices>
 #include <QFile>
 #include <QFileDialog>
@@ -212,7 +213,10 @@ void WorkItemWindow::appendRow(const QJsonObject& item) {
         QTableWidgetItem* titleItem = new QTableWidgetItem(title);
         QTableWidgetItem* stateItem = new QTableWidgetItem(state);
         QTableWidgetItem* authorItem = new QTableWidgetItem(author);
-        QTableWidgetItem* createdItem = new QTableWidgetItem(createdAt);
+
+        QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
+        QString displayDate = dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
+        QTableWidgetItem* createdItem = new QTableWidgetItem(displayDate);
 
         // Store the URL in the title item for easy access later
         titleItem->setData(Qt::UserRole, htmlUrl);
@@ -234,7 +238,10 @@ void WorkItemWindow::appendRow(const QJsonObject& item) {
         QTableWidgetItem* descItem = new QTableWidgetItem(description);
         QTableWidgetItem* langItem = new QTableWidgetItem(language);
         QTableWidgetItem* ownerItem = new QTableWidgetItem(owner);
-        QTableWidgetItem* createdItem = new QTableWidgetItem(createdAt);
+
+        QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
+        QString displayDate = dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
+        QTableWidgetItem* createdItem = new QTableWidgetItem(displayDate);
 
         // Store the URL in the repo item
         repoItem->setData(Qt::UserRole, htmlUrl);
