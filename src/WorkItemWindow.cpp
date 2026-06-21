@@ -5,7 +5,6 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
-#include <QLocale>
 #include <QDesktopServices>
 #include <QFile>
 #include <QFileDialog>
@@ -13,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QRegularExpression>
@@ -215,7 +215,8 @@ void WorkItemWindow::appendRow(const QJsonObject& item) {
         QTableWidgetItem* authorItem = new QTableWidgetItem(author);
 
         QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
-        QString displayDate = dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
+        QString displayDate =
+            dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
         QTableWidgetItem* createdItem = new QTableWidgetItem(displayDate);
 
         // Store the URL in the title item for easy access later
@@ -240,7 +241,8 @@ void WorkItemWindow::appendRow(const QJsonObject& item) {
         QTableWidgetItem* ownerItem = new QTableWidgetItem(owner);
 
         QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
-        QString displayDate = dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
+        QString displayDate =
+            dt.isValid() ? QLocale::system().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
         QTableWidgetItem* createdItem = new QTableWidgetItem(displayDate);
 
         // Store the URL in the repo item

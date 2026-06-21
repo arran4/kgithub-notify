@@ -263,12 +263,14 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
 
         QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
-        QString createdStr = createdDt.isValid() ? QLocale::system().toString(createdDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
+        QString createdStr =
+            createdDt.isValid() ? QLocale::system().toString(createdDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
         m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(createdStr));
 
         QString updatedAt = obj["updated_at"].toString();
         QDateTime updatedDt = QDateTime::fromString(updatedAt, Qt::ISODate);
-        QString updatedStr = updatedDt.isValid() ? QLocale::system().toString(updatedDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
+        QString updatedStr =
+            updatedDt.isValid() ? QLocale::system().toString(updatedDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
         m_updatedAtLabel->setText(tr("<b>Updated:</b> %1").arg(updatedStr));
 
         // Update Metadata
