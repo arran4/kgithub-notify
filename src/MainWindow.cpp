@@ -447,7 +447,8 @@ void MainWindow::showAboutDialog() {
 
 void MainWindow::showDebugWindow(const QString& url) {
     if (!debugWindow) {
-        debugWindow = new DebugWindow(client, this);
+        debugWindow = new DebugWindow(client, nullptr);
+        debugWindow->setAttribute(Qt::WA_DeleteOnClose);
     }
     if (!url.isEmpty()) debugWindow->setEndpoint(url);
     debugWindow->show();
@@ -457,7 +458,7 @@ void MainWindow::showDebugWindow(const QString& url) {
 
 void MainWindow::showRepoListWindow() {
     if (!repoListWindow) {
-        repoListWindow = new RepoListWindow(client, this);
+        repoListWindow = new RepoListWindow(client, nullptr);
     }
     repoListWindow->show();
     repoListWindow->raise();
@@ -466,7 +467,7 @@ void MainWindow::showRepoListWindow() {
 
 void MainWindow::showTrendingWindow() {
     if (!trendingWindow) {
-        trendingWindow = new TrendingWindow(client, this);
+        trendingWindow = new TrendingWindow(client, nullptr);
     }
     trendingWindow->show();
     trendingWindow->raise();
@@ -986,7 +987,7 @@ void MainWindow::setupMenus() {
 void MainWindow::showWorkItems(const QString& title, int endpointType, const QString& query) {
     WorkItemWindow::EndpointType type =
         (endpointType == 0) ? WorkItemWindow::EndpointIssues : WorkItemWindow::EndpointRepositories;
-    WorkItemWindow* window = new WorkItemWindow(client, title, type, query, this);
+    WorkItemWindow* window = new WorkItemWindow(client, title, type, query, nullptr);
     window->setAttribute(Qt::WA_DeleteOnClose);
     window->show();
 }
