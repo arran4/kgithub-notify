@@ -206,7 +206,8 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
             QDateTime m_date;
         };
 
-        QTableWidgetItem* updatedItem = new DateTableItem(QLocale::system().toString(dt, QLocale::ShortFormat), dt);
+        QTableWidgetItem* updatedItem = new DateTableItem(
+            dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : updatedStr, dt);
 
         QTableWidgetItem* urlItem = new QTableWidgetItem(repo["html_url"].toString());
 

@@ -96,7 +96,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
     // Date
     // Parse date
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid() ? QLocale::system().toString(dt, QLocale::ShortFormat) : n.updatedAt;
+    QString dateStr = dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : n.updatedAt;
 
     dateLabel = new QLabel("Date: " + dateStr, this);
     contentLayout->addWidget(dateLabel);
@@ -305,7 +305,7 @@ void NotificationItemWidget::updateNotification(const Notification& n) {
     }
 
     QDateTime dt = QDateTime::fromString(n.updatedAt, Qt::ISODate);
-    QString dateStr = dt.isValid() ? QLocale::system().toString(dt, QLocale::ShortFormat) : n.updatedAt;
+    QString dateStr = dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : n.updatedAt;
     QString dateLabelText = "Date: " + dateStr;
     if (dateLabel->text() != dateLabelText) {
         dateLabel->setText(dateLabelText);
