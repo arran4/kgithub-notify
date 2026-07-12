@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -105,9 +106,9 @@ class MainWindow : public KXmlGuiWindow {
     void updateTrayIconState(int unreadCount, int newNotifications, const QList<Notification>& newlyAddedNotifications);
 
     // Member Variables
-    DebugWindow* debugWindow;
-    RepoListWindow* repoListWindow;
-    TrendingWindow* trendingWindow;
+    QPointer<DebugWindow> debugWindow;
+    QPointer<RepoListWindow> repoListWindow;
+    QPointer<TrendingWindow> trendingWindow;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
     NotificationListWidget* notificationListWidget;

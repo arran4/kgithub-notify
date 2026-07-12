@@ -263,12 +263,14 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
 
         QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
-        QString createdStr = createdDt.isValid() ? QLocale().toString(createdDt, QLocale::ShortFormat) : tr("N/A");
+        QString createdStr =
+            createdDt.isValid() ? QLocale().toString(createdDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
         m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(createdStr));
 
         QString updatedAt = obj["updated_at"].toString();
         QDateTime updatedDt = QDateTime::fromString(updatedAt, Qt::ISODate);
-        QString updatedStr = updatedDt.isValid() ? QLocale().toString(updatedDt, QLocale::ShortFormat) : tr("N/A");
+        QString updatedStr =
+            updatedDt.isValid() ? QLocale().toString(updatedDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
         m_updatedAtLabel->setText(tr("<b>Updated:</b> %1").arg(updatedStr));
 
         // Update Metadata
@@ -409,7 +411,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (!text.isEmpty()) {
                     if (!createdAt.isEmpty()) {
                         QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
-                        QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
+                        QString formattedDate =
+                            dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
                         text += tr(" on %1").arg(formattedDate);
                     }
                     QLabel* label = new QLabel(text);
@@ -549,7 +552,7 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
 
 void PullRequestWindow::addCommentToUI(const QString& author, const QString& body, const QString& createdAt) {
     QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
-    QString formattedDate = QLocale().toString(dt, QLocale::ShortFormat);
+    QString formattedDate = dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
 
     CommentWidget* widget = new CommentWidget(author, body, formattedDate);
     m_commentsContainerLayout->addWidget(widget);
