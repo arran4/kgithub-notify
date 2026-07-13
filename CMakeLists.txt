@@ -36,6 +36,19 @@ target_link_libraries(TestGitHubClient
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
 
+add_executable(TestFilterParser
+    tests/TestFilterParser.cpp
+    src/utils/FilterParser.cpp
+    src/utils/FilterParser.h
+)
+
+target_link_libraries(TestFilterParser
+        Qt6::Test
+        Qt6::Core
+)
+
+add_test(NAME TestFilterParser COMMAND TestFilterParser)
+
 add_executable(kgithub-notify
     src/main.cpp
     src/GitHubClient.cpp
@@ -47,6 +60,8 @@ add_executable(kgithub-notify
     src/SettingsDialog.h
     src/NotificationRuleEngine.cpp
     src/NotificationRuleEngine.h
+    src/utils/FilterParser.cpp
+    src/utils/FilterParser.h
     src/RulesDialog.cpp
     src/RulesDialog.h
     src/DebugWindow.cpp
