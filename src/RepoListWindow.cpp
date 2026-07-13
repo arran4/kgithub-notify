@@ -285,8 +285,8 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
             new DateTableItem(QLocale::system().toString(createdDt, QLocale::ShortFormat), createdDt);
         QTableWidgetItem* updatedItem =
             new DateTableItem(QLocale::system().toString(updatedDt, QLocale::ShortFormat), updatedDt);
-        //TODO merge QTableWidgetItem* updatedItem = new DateTableItem(
-        //    dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : updatedStr, dt);
+        // TODO merge QTableWidgetItem* updatedItem = new DateTableItem(
+        //     dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : updatedStr, dt);
 
         QTableWidgetItem* archivedItem = new QTableWidgetItem(repo["archived"].toBool() ? tr("Yes") : tr("No"));
         QTableWidgetItem* isForkItem = new QTableWidgetItem(repo["fork"].toBool() ? tr("Yes") : tr("No"));
