@@ -14,7 +14,7 @@ struct Notification {
     QString updatedAt;
     QString lastReadAt;
     QString reason;
-    bool unread;
+    bool unread = false;
     QJsonObject rawJson;
     QList<Notification> groupedNotifications;
 

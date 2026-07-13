@@ -8,7 +8,7 @@
 
 struct Token {
     enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD };
-    Type type;
+    Type type = WORD;
     QString val1;
     QString val2;
 };
