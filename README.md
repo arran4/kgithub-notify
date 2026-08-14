@@ -49,7 +49,7 @@ sudo apt install build-essential cmake qt6-base-dev qt6-tools-dev-tools qt6-svg-
   libkf6notifications-dev libkf6wallet-dev libkf6coreaddons-dev libkf6xmlgui-dev \
   libkf6configwidgets-dev libkf6i18n-dev
 ```
-> **Note:** If you are on an older distribution (like Ubuntu 24.04) that lacks standard KF6 packages, you can use the provided `.jules/Dockerfile` to compile the application inside an isolated Debian Testing container.
+> **Note:** If you are on an older distribution (like Ubuntu 24.04) that lacks standard KF6 packages, you can use the provided `.jules/bootstrap.sh` and `.jules/run.sh` to compile the application inside an isolated Debian Testing rootfs environment.
 
 ## 🚀 Build Instructions
 
