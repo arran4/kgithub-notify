@@ -166,13 +166,24 @@ jobs:
       release_tag: ${{ steps.tag.outputs.release_tag }}
       next_version: ${{ steps.tag.outputs.next_version }}
     steps:
+      - name: Ensure PAT is available
+        env:
+          PAT: ${{ secrets.OVERLAY_GITHB_TOKEN }}
+        run: |
+          if [[ -z "$PAT" ]]; then
+            echo "Error: OVERLAY_GITHB_TOKEN is missing or empty." >&2
+            echo "A PAT is strictly required to push the tag and trigger the tag-based release pipeline." >&2
+            echo "Falling back to GITHUB_TOKEN would silently fail to trigger the release workflow." >&2
+            exit 1
+          fi
+
       # We must use a PAT (OVERLAY_GITHB_TOKEN) instead of GITHUB_TOKEN for checkout.
       # GITHUB_TOKEN is restricted from triggering new workflow runs, which would silently
       # prevent the tag push from triggering the subsequent tag-based release pipeline.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.OVERLAY_GITHB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.OVERLAY_GITHB_TOKEN }}
       - name: Setup git-tag-inc
         uses: arran4/git-tag-inc-action@v1
         with:
