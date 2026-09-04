@@ -1,3 +1,8 @@
+# Agent rules for generation:
+# https://arran4.github.io/blog/post/2026/042-simplified-github-ci-release-safe/
+# Release safety details:
+# https://arran4.github.io/blog/post/2026/041-release-safe-single-owner-github-ci/
+
 name: CI/CD
 
 on:
@@ -84,6 +89,9 @@ jobs:
           case "${{ github.event_name }}" in
             push)
               run_code_checks=true
+              if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+                run_release=true
+              fi
               ;;
             pull_request)
               if [[ "${{ github.event.action }}" == "closed" ]]; then
@@ -94,13 +102,10 @@ jobs:
               fi
               ;;
             release)
-              run_release=true
+              run_release=false
               ;;
             workflow_dispatch)
               run_code_checks=true
-              if [[ "${{ inputs.mode }}" == release-* ]]; then
-                run_release=true
-              fi
               if [[ "${{ inputs.mode }}" == "monthly-maintenance" ]]; then
                 is_monthly=true
               fi
@@ -161,9 +166,24 @@ jobs:
       release_tag: ${{ steps.tag.outputs.release_tag }}
       next_version: ${{ steps.tag.outputs.next_version }}
     steps:
+      - name: Ensure PAT is available
+        env:
+          PAT: ${{ secrets.OVERLAY_GITHB_TOKEN }}
+        run: |
+          if [[ -z "$PAT" ]]; then
+            echo "Error: OVERLAY_GITHB_TOKEN is missing or empty." >&2
+            echo "A PAT is strictly required to push the tag and trigger the tag-based release pipeline." >&2
+            echo "Falling back to GITHUB_TOKEN would silently fail to trigger the release workflow." >&2
+            exit 1
+          fi
+
+      # We must use a PAT (OVERLAY_GITHB_TOKEN) instead of GITHUB_TOKEN for checkout.
+      # GITHUB_TOKEN is restricted from triggering new workflow runs, which would silently
+      # prevent the tag push from triggering the subsequent tag-based release pipeline.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.OVERLAY_GITHB_TOKEN }}
       - name: Setup git-tag-inc
         uses: arran4/git-tag-inc-action@v1
         with:
@@ -405,7 +425,7 @@ jobs:
   flatpak-build:
     name: Flatpak Build
     needs: [route, discover, prepare-release-tag]
-    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && needs.route.outputs.run_release == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -452,7 +472,7 @@ jobs:
   publish-release:
     name: Publish Release
     needs: [route, cpp-qt-build-test, prepare-release-tag, flatpak-build]
-    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (needs.flatpak-build.result == 'success' || needs.flatpak-build.result == 'skipped') }}
+    if: ${{ always() && needs.route.outputs.run_release == 'true' && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (needs.flatpak-build.result == 'success' || needs.flatpak-build.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -477,7 +497,7 @@ jobs:
       - name: Rename executable
         run: mv build/kgithub-notify build/kgithub-notify-linux-amd64
 
-      - name: Publish draft GitHub release
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
@@ -492,7 +512,7 @@ jobs:
   update-ebuild:
     name: Update Ebuild in arrans_overlay
     needs: [route, publish-release, prepare-release-tag]
-    if: ${{ always() && (needs.route.outputs.run_release == 'true' || (github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-'))) && needs.publish-release.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    if: ${{ always() && needs.route.outputs.run_release == 'true' && needs.publish-release.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout arrans_overlay
