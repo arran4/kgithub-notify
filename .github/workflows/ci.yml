@@ -272,21 +272,31 @@ jobs:
 
           CLEAN_NEXT="${next_tag#v}"
           CMAKE_NEXT_VERSION="${CLEAN_NEXT%%-*}"
-          IFS='.' read -r maj min pat <<< "$CLEAN_NEXT"
+          IFS='.' read -r maj min pat <<< "$CMAKE_NEXT_VERSION"
           NEXT_VER="${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))"
 
           if git rev-parse "$next_tag" >/dev/null 2>&1; then
-            echo "Tag $next_tag already exists. Verifying its content."
+            echo "Tag $next_tag already exists. Verifying its tree content."
             REMOTE_TAG_SHA=$(git rev-parse "$next_tag^{commit}")
-            if git show "$REMOTE_TAG_SHA:CMakeLists.txt" | grep -q "project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)"; then
-              echo "Existing tag $next_tag has the correct CMake version. Safe to retry."
+
+            # Simulate the release commit tree to compare against the existing tag
+            sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
+            git add CMakeLists.txt
+            EXPECTED_TREE=$(git write-tree)
+            git reset --hard HEAD >/dev/null
+            REMOTE_TREE=$(git rev-parse "$REMOTE_TAG_SHA^{tree}")
+
+            if [[ "$EXPECTED_TREE" == "$REMOTE_TREE" ]]; then
+              echo "Existing tag $next_tag has the expected release tree. Safe to retry."
               echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
               echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
               echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
-              git bundle create release.bundle "$REMOTE_TAG_SHA"
+              git checkout "$REMOTE_TAG_SHA"
+              git bundle create release.bundle HEAD
               exit 0
             else
-              echo "Tag $next_tag exists but does not contain the expected CMake version $CMAKE_NEXT_VERSION." >&2
+              echo "Tag $next_tag exists but its content/tree does not match the intended release for this commit." >&2
+              echo "Expected tree: $EXPECTED_TREE, Found: $REMOTE_TREE" >&2
               exit 1
             fi
           fi
@@ -438,14 +448,19 @@ jobs:
           # Only commit/push if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "chore: bump version to ${NEXT_VER} for next development cycle"
-            git push origin "$BRANCH" || echo "Branch $BRANCH may already exist."
 
-            # gh relies on apt packages not necessarily installed on ubuntu-latest unless requested, but github actions ubuntu-latest runners have gh pre-installed!
-            gh pr create \
-              --title "chore: bump version to ${NEXT_VER}" \
-              --body "Automated version bump to ${NEXT_VER} after release of ${TAG}." \
-              --base "main" \
-              --head "$BRANCH" || echo "PR for $NEXT_VER may already exist."
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "Branch $BRANCH already exists on remote. Assuming next-version bump PR is already handled."
+            else
+              git push origin "$BRANCH"
+
+              # gh relies on apt packages not necessarily installed on ubuntu-latest unless requested, but github actions ubuntu-latest runners have gh pre-installed!
+              gh pr create \
+                --title "chore: bump version to ${NEXT_VER}" \
+                --body "Automated version bump to ${NEXT_VER} after release of ${TAG}." \
+                --base "main" \
+                --head "$BRANCH"
+            fi
           else
             echo "No changes to commit for next version bump."
           fi
