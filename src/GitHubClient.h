@@ -68,6 +68,7 @@ class GitHubClient : public QObject {
     QPointer<QNetworkReply> m_activeNotificationReply;
     QTimer* m_requestTimeoutTimer;
 
+    bool isTrustedApiOrigin(const QUrl& url) const;
     QNetworkRequest createRequest(const QUrl& url) const;
 
     void handleDetailsReply(QNetworkReply* reply);

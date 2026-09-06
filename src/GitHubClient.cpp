@@ -173,6 +173,12 @@ void GitHubClient::requestRaw(const QString& endpoint, const QString& method, co
     if (m_token.isEmpty()) return;
     QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
     QUrl url(urlStr);
+
+    if (!isTrustedApiOrigin(url)) {
+        emit rawDataReceived("Error: Untrusted external destination for authenticated request.");
+        return;
+    }
+
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     if (!body.isEmpty()) {
@@ -218,33 +224,59 @@ void GitHubClient::fetchUserRepos(const QString& pageUrl) {
     reply->setProperty("type", "repos");
 }
 
+bool GitHubClient::isTrustedApiOrigin(const QUrl& url) const {
+    QUrl apiOrigin(m_apiUrl);
+
+    // Compare scheme
+    if (url.scheme().compare(apiOrigin.scheme(), Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    // Compare host
+    if (url.host().compare(apiOrigin.host(), Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    // Compare port
+    int urlPort = url.port(url.scheme() == "https" ? 443 : 80);
+    int apiPort = apiOrigin.port(apiOrigin.scheme() == "https" ? 443 : 80);
+
+    return urlPort == apiPort;
+}
+
 QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url) const { return createRequest(url); }
 
 QNetworkRequest GitHubClient::createRequest(const QUrl& url) const {
     QNetworkRequest request(url);
 
-    // Add Authorization header
-    QByteArray authHeader = "token ";
-    QByteArray tokenBytes = m_token.toQByteArray();
-    authHeader.append(tokenBytes);
+    if (isTrustedApiOrigin(url)) {
+        // Add Authorization header only for trusted origins
+        QByteArray authHeader = "token ";
+        QByteArray tokenBytes = m_token.toQByteArray();
+        authHeader.append(tokenBytes);
 
-    request.setRawHeader("Authorization", authHeader);
+        request.setRawHeader("Authorization", authHeader);
+
+        // Explicitly zero out sensitive data
+        if (!tokenBytes.isEmpty()) {
+            volatile char* p = tokenBytes.data();
+            size_t s = tokenBytes.size();
+            while (s--) *p++ = 0;
+        }
+        if (!authHeader.isEmpty()) {
+            volatile char* p = authHeader.data();
+            size_t s = authHeader.size();
+            while (s--) *p++ = 0;
+        }
+    }
+
     request.setRawHeader("Accept", "application/vnd.github.v3+json");
-
-    // Explicitly zero out sensitive data
-    if (!tokenBytes.isEmpty()) {
-        volatile char* p = tokenBytes.data();
-        size_t s = tokenBytes.size();
-        while (s--) *p++ = 0;
-    }
-    if (!authHeader.isEmpty()) {
-        volatile char* p = authHeader.data();
-        size_t s = authHeader.size();
-        while (s--) *p++ = 0;
-    }
 
     // Add user-agent header as required by GitHub API
     request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    // Check redirect behavior so credentials cannot leak to a different origin
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::SameOriginRedirectPolicy);
 
     return request;
 }
