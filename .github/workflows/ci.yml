@@ -276,42 +276,38 @@ jobs:
           NEXT_VER="${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))"
 
           if git rev-parse "$next_tag" >/dev/null 2>&1; then
-            echo "Tag $next_tag already exists. Verifying its content and provenance."
+            echo "Tag $next_tag already exists. Verifying its content and strict structural provenance."
             REMOTE_TAG_SHA=$(git rev-parse "$next_tag^{commit}")
 
             if git show "$REMOTE_TAG_SHA:CMakeLists.txt" | grep -q "project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)"; then
-              # The tag exists and has the correct CMake version. We must verify it's a valid release for our repository.
-              # Instead of restricting changes to ONLY CMakeLists.txt (which breaks when tagging an existing feature commit),
-              # we simply verify that the tagged commit is part of our legitimate repository history.
-              # If the tag is an ancestor of ANY branch in origin, it's a legitimate historical release commit.
-
-              if git branch -r --contains "$REMOTE_TAG_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/main" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/master" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$REMOTE_TAG_SHA" == "$GITHUB_SHA" ]; then
-                echo "Existing tag $next_tag is verified as part of the repository history. Safe to retry."
-                echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
-                echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
-                echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
-                git checkout "$REMOTE_TAG_SHA"
-                git bundle create release.bundle HEAD
-                exit 0
-              else
-                # Also verify if it's a standalone release bump commit (created by this workflow)
+              COMMIT_MSG=$(git log -1 --format=%B "$REMOTE_TAG_SHA" | head -n 1)
+              if [[ "$COMMIT_MSG" == "chore: release version $CMAKE_NEXT_VERSION" ]]; then
                 PARENT_SHA=$(git rev-parse "$REMOTE_TAG_SHA^" 2>/dev/null || echo "")
                 if [[ -n "$PARENT_SHA" ]]; then
                   CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "$PARENT_SHA" "$REMOTE_TAG_SHA")
                   if [[ -z "$CHANGED_FILES" || "$CHANGED_FILES" == "CMakeLists.txt" ]]; then
-                     # Ensure the parent is in our history
-                     if git branch -r --contains "$PARENT_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$PARENT_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$PARENT_SHA" == "$GITHUB_SHA" ]; then
-                       echo "Existing tag $next_tag is a valid standalone release bump. Safe to retry."
-                       echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
-                       echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
-                       echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
-                       git checkout "$REMOTE_TAG_SHA"
-                       git bundle create release.bundle HEAD
-                       exit 0
-                     fi
+                    if git branch -r --contains "$PARENT_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$PARENT_SHA" "origin/main" >/dev/null 2>&1 || git merge-base --is-ancestor "$PARENT_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$PARENT_SHA" == "$GITHUB_SHA" ]; then
+                      echo "Existing tag $next_tag is a valid standalone release bump. Safe to retry."
+                      echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
+                      echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
+                      echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
+                      git checkout "$REMOTE_TAG_SHA"
+                      git bundle create release.bundle HEAD
+                      exit 0
+                    else
+                      echo "Tag $next_tag has a valid structure but its parent lacks verifiable repository provenance (ancestry). Rejecting." >&2
+                      exit 1
+                    fi
+                  else
+                    echo "Tag $next_tag has unexpected modifications relative to its parent: $CHANGED_FILES" >&2
+                    exit 1
                   fi
+                else
+                  echo "Tag $next_tag lacks a parent commit. Rejecting." >&2
+                  exit 1
                 fi
-                echo "Tag $next_tag has correct version but lacks verifiable repository provenance (ancestry). Rejecting." >&2
+              else
+                echo "Tag $next_tag exists but lacks the required structural release commit message. Expected: 'chore: release version $CMAKE_NEXT_VERSION', Found: '$COMMIT_MSG'." >&2
                 exit 1
               fi
             else
@@ -320,16 +316,11 @@ jobs:
             fi
           fi
 
-          # Sync version source with highest existing tag first
-          CMAKE_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt || echo "0.0.0")
-          TAG_VERSION=$(git tag -l "v*" | sed 's/^v//' | sort -V | tail -n 1 || echo "0.0.0")
-          CURRENT_VERSION=$(echo -e "$CMAKE_VERSION\n$TAG_VERSION" | sort -V | tail -n 1)
-
-          if [[ "$next_tag" != "v$CURRENT_VERSION" ]]; then
-            sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
-            git add CMakeLists.txt
-            git commit -m "chore: release version $CMAKE_NEXT_VERSION"
-          fi
+          # Sync version source
+          sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
+          git add CMakeLists.txt
+          # Always create a release commit (even if empty) to guarantee structural provenance for later retries
+          git commit --allow-empty -m "chore: release version $CMAKE_NEXT_VERSION"
 
           echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
           echo "release_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
