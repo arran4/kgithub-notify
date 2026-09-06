@@ -2,6 +2,7 @@
 # https://arran4.github.io/blog/post/2026/042-simplified-github-ci-release-safe/
 # Release safety details:
 # https://arran4.github.io/blog/post/2026/041-release-safe-single-owner-github-ci/
+# Built using these posts as reference/guidance.
 
 name: CI/CD
 
@@ -36,6 +37,7 @@ on:
           - release-rc
           - release-alpha
           - monthly-maintenance
+          - publish-tag
       release_version_override:
         description: "Optional explicit release version (for example 2.4.0 or 2.4.0-rc.2)"
         required: false
@@ -70,7 +72,9 @@ jobs:
       run_code_checks: ${{ steps.route.outputs.run_code_checks }}
       run_pr_meta_checks: ${{ steps.route.outputs.run_pr_meta_checks }}
       run_cleanup: ${{ steps.route.outputs.run_cleanup }}
+      run_build: ${{ steps.route.outputs.run_build }}
       run_release: ${{ steps.route.outputs.run_release }}
+      run_tag_creation: ${{ steps.route.outputs.run_tag_creation }}
       is_monthly: ${{ steps.route.outputs.is_monthly }}
       is_nightly: ${{ steps.route.outputs.is_nightly }}
     steps:
@@ -82,7 +86,9 @@ jobs:
           run_code_checks=false
           run_pr_meta_checks=false
           run_cleanup=false
+          run_build=false
           run_release=false
+          run_tag_creation=false
           is_monthly=false
           is_nightly=false
 
@@ -90,6 +96,7 @@ jobs:
             push)
               run_code_checks=true
               if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+                run_build=true
                 run_release=true
               fi
               ;;
@@ -105,13 +112,34 @@ jobs:
               run_release=false
               ;;
             workflow_dispatch)
-              run_code_checks=true
-              if [[ "${{ inputs.mode }}" == "monthly-maintenance" ]]; then
-                is_monthly=true
-              fi
-              if [[ "${{ inputs.mode }}" == "lint-fix" ]]; then
-                is_nightly=true
-              fi
+              case "${{ inputs.mode }}" in
+                lint-fix)
+                  run_code_checks=true
+                  is_nightly=true
+                  ;;
+                build)
+                  run_code_checks=true
+                  run_build=true
+                  ;;
+                release-*)
+                  run_code_checks=true
+                  run_build=true
+                  run_tag_creation=true
+                  ;;
+                publish-tag)
+                  if [[ "${{ github.ref_type }}" != "tag" || ! "${{ github.ref }}" =~ ^refs/tags/v.* ]]; then
+                    echo "publish-tag mode requires an eligible tag context (e.g. refs/tags/v*)" >&2
+                    exit 1
+                  fi
+                  run_code_checks=true
+                  run_build=true
+                  run_release=true
+                  ;;
+                monthly-maintenance)
+                  run_code_checks=true
+                  is_monthly=true
+                  ;;
+              esac
               ;;
             schedule)
               run_code_checks=true
@@ -127,7 +155,9 @@ jobs:
           echo "run_code_checks=$run_code_checks" >> "$GITHUB_OUTPUT"
           echo "run_pr_meta_checks=$run_pr_meta_checks" >> "$GITHUB_OUTPUT"
           echo "run_cleanup=$run_cleanup" >> "$GITHUB_OUTPUT"
+          echo "run_build=$run_build" >> "$GITHUB_OUTPUT"
           echo "run_release=$run_release" >> "$GITHUB_OUTPUT"
+          echo "run_tag_creation=$run_tag_creation" >> "$GITHUB_OUTPUT"
           echo "is_monthly=$is_monthly" >> "$GITHUB_OUTPUT"
           echo "is_nightly=$is_nightly" >> "$GITHUB_OUTPUT"
 
@@ -160,30 +190,16 @@ jobs:
   prepare-release-tag:
     name: Prepare release tag
     needs: [route]
-    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.mode, 'release-') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.route.outputs.run_tag_creation == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.tag.outputs.release_tag }}
+      release_commit: ${{ steps.tag.outputs.release_commit }}
       next_version: ${{ steps.tag.outputs.next_version }}
     steps:
-      - name: Ensure PAT is available
-        env:
-          PAT: ${{ secrets.OVERLAY_GITHB_TOKEN }}
-        run: |
-          if [[ -z "$PAT" ]]; then
-            echo "Error: OVERLAY_GITHB_TOKEN is missing or empty." >&2
-            echo "A PAT is strictly required to push the tag and trigger the tag-based release pipeline." >&2
-            echo "Falling back to GITHUB_TOKEN would silently fail to trigger the release workflow." >&2
-            exit 1
-          fi
-
-      # We must use a PAT (OVERLAY_GITHB_TOKEN) instead of GITHUB_TOKEN for checkout.
-      # GITHUB_TOKEN is restricted from triggering new workflow runs, which would silently
-      # prevent the tag push from triggering the subsequent tag-based release pipeline.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.OVERLAY_GITHB_TOKEN }}
       - name: Setup git-tag-inc
         uses: arran4/git-tag-inc-action@v1
         with:
@@ -253,56 +269,70 @@ jobs:
             exit 1
           }
           git fetch --tags --force
+
+          CLEAN_NEXT="${next_tag#v}"
+          CMAKE_NEXT_VERSION="${CLEAN_NEXT%%-*}"
+          IFS='.' read -r maj min pat <<< "$CMAKE_NEXT_VERSION"
+          NEXT_VER="${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))"
+
           if git rev-parse "$next_tag" >/dev/null 2>&1; then
-            echo "Tag already exists: $next_tag" >&2
-            echo "Choose a new mode or set release_version_override." >&2
-            exit 1
+            echo "Tag $next_tag already exists. Verifying its content and strict structural provenance."
+            REMOTE_TAG_SHA=$(git rev-parse "$next_tag^{commit}")
+
+            if git show "$REMOTE_TAG_SHA:CMakeLists.txt" | grep -q "project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)"; then
+              COMMIT_MSG=$(git log -1 --format=%B "$REMOTE_TAG_SHA" | head -n 1)
+              if [[ "$COMMIT_MSG" == "chore: release version $CMAKE_NEXT_VERSION" ]]; then
+                PARENT_SHA=$(git rev-parse "$REMOTE_TAG_SHA^" 2>/dev/null || echo "")
+                if [[ -n "$PARENT_SHA" ]]; then
+                  CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "$PARENT_SHA" "$REMOTE_TAG_SHA")
+                  if [[ -z "$CHANGED_FILES" || "$CHANGED_FILES" == "CMakeLists.txt" ]]; then
+                    if git branch -r --contains "$PARENT_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$PARENT_SHA" "origin/main" >/dev/null 2>&1 || git merge-base --is-ancestor "$PARENT_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$PARENT_SHA" == "$GITHUB_SHA" ]; then
+                      echo "Existing tag $next_tag is a valid standalone release bump. Safe to retry."
+                      echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
+                      echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
+                      echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
+                      git checkout "$REMOTE_TAG_SHA"
+                      git bundle create release.bundle HEAD
+                      exit 0
+                    else
+                      echo "Tag $next_tag has a valid structure but its parent lacks verifiable repository provenance (ancestry). Rejecting." >&2
+                      exit 1
+                    fi
+                  else
+                    echo "Tag $next_tag has unexpected modifications relative to its parent: $CHANGED_FILES" >&2
+                    exit 1
+                  fi
+                else
+                  echo "Tag $next_tag lacks a parent commit. Rejecting." >&2
+                  exit 1
+                fi
+              else
+                echo "Tag $next_tag exists but lacks the required structural release commit message. Expected: 'chore: release version $CMAKE_NEXT_VERSION', Found: '$COMMIT_MSG'." >&2
+                exit 1
+              fi
+            else
+              echo "Tag $next_tag exists but does not contain the expected CMake version $CMAKE_NEXT_VERSION." >&2
+              exit 1
+            fi
           fi
 
-          # Sync version source with highest existing tag first
-          CMAKE_VERSION=$(grep -Po 'project\(kgithub-notify VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt || echo "0.0.0")
-          TAG_VERSION=$(git tag -l "v*" | sed 's/^v//' | sort -V | tail -n 1 || echo "0.0.0")
-          CURRENT_VERSION=$(echo -e "$CMAKE_VERSION\n$TAG_VERSION" | sort -V | tail -n 1)
-
-          if [[ "$next_tag" != "v$CURRENT_VERSION" ]]; then
-            CLEAN_NEXT="${next_tag#v}"
-            # Extract just major.minor.patch for CMake
-            CMAKE_NEXT_VERSION="${CLEAN_NEXT%%-*}"
-            sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
-            git add CMakeLists.txt
-            git commit -m "chore: release version $CMAKE_NEXT_VERSION"
-            git tag "$next_tag"
-            git push origin "$next_tag"
-          else
-            git tag "$next_tag"
-            git push origin "$next_tag"
-          fi
+          # Sync version source
+          sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION $CMAKE_NEXT_VERSION)/" CMakeLists.txt
+          git add CMakeLists.txt
+          # Always create a release commit (even if empty) to guarantee structural provenance for later retries
+          git commit --allow-empty -m "chore: release version $CMAKE_NEXT_VERSION"
 
           echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
-          clean_tag="${next_tag#v}"; clean_tag="${clean_tag%%-*}"
-          IFS='.' read -r maj min pat <<< "$clean_tag"
-          NEXT_VER="${maj:-0}.${min:-0}.$(( ${pat:-0} + 1 ))"
+          echo "release_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "next_version=${NEXT_VER}-SNAPSHOT" >> "$GITHUB_OUTPUT"
+          git bundle create release.bundle HEAD
 
-          # Create a PR for the next SNAPSHOT version
-          BRANCH="ci/bump-version-${NEXT_VER}"
-          git checkout -b "$BRANCH"
-          sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION ${NEXT_VER})/" CMakeLists.txt
-          git add CMakeLists.txt
-          git commit -m "chore: bump version to ${NEXT_VER} for next development cycle"
-          git push origin "$BRANCH"
-
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh -y
-
-          gh pr create \
-            --title "chore: bump version to ${NEXT_VER}" \
-            --body "Automated version bump to ${NEXT_VER} after release of ${next_tag}." \
-            --base "${{ github.ref_name }}" \
-            --head "$BRANCH"
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-${{ github.run_id }}
+          path: release.bundle
+          retention-days: 1
 
   gitleaks:
     name: Secret scan
@@ -317,10 +347,160 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  release-validation:
+    name: Release Validation Gate
+    needs: [route, cpp-qt-build-test]
+    if: |
+      !failure() && !cancelled() &&
+      needs.route.result == 'success' &&
+      needs.route.outputs.run_tag_creation == 'true' &&
+      needs.cpp-qt-build-test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required validations passed."
+
+  release-context:
+    name: Release Context
+    needs: [route, prepare-release-tag, release-validation]
+    if: ${{ !failure() && !cancelled() && needs.route.outputs.run_tag_creation == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    outputs:
+      release_tag: ${{ steps.export.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle-${{ github.run_id }}
+          path: .
+
+      - name: Checkout release commit
+        run: |
+          git pull ./release.bundle HEAD
+          git checkout ${{ needs.prepare-release-tag.outputs.release_commit }}
+
+      - name: Normalize and push tag
+        id: export
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ needs.prepare-release-tag.outputs.release_tag }}"
+          echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.mode }}" == "publish-tag" ]]; then
+            echo "Running in internal publisher mode; tag is immutable context."
+            exit 0
+          fi
+
+          git fetch --tags --force
+          REMOTE_TAG_SHA=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')
+          EXPECTED_COMMIT="${{ needs.prepare-release-tag.outputs.release_commit }}"
+
+          if [[ -n "$REMOTE_TAG_SHA" ]]; then
+            if [[ "$REMOTE_TAG_SHA" == "$EXPECTED_COMMIT" ]]; then
+              echo "Tag $TAG already exists on remote and points to the correct SHA ($EXPECTED_COMMIT). Continuing safely."
+            else
+              echo "Tag $TAG already exists on remote but points to a different commit ($REMOTE_TAG_SHA). Expected: $EXPECTED_COMMIT. Failing." >&2
+              exit 1
+            fi
+          else
+            git tag "$TAG" "$EXPECTED_COMMIT"
+            git push origin "$TAG" || (
+              VERIFY_SHA=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')
+              if [[ "$VERIFY_SHA" == "$EXPECTED_COMMIT" ]]; then
+                echo "Tag successfully verified on remote after push error."
+              else
+                echo "Tag push failed and remote verification failed." >&2
+                exit 1
+              fi
+            )
+          fi
+
+          # Explicitly dispatch the publisher workflow at the new tag ref
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            gh workflow run "ci.yml" --ref "$TAG" -f mode="publish-tag"
+          fi
+
+      - name: Open PR for next version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEXT_VER="${{ needs.prepare-release-tag.outputs.next_version }}"
+          NEXT_VER="${NEXT_VER%-SNAPSHOT}"
+          TAG="${{ needs.prepare-release-tag.outputs.release_tag }}"
+          BRANCH="ci/bump-version-${NEXT_VER}"
+
+          # Setup git identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # We are on the newly tagged commit. Branch from here.
+          git checkout -b "$BRANCH"
+          sed -i "s/project(kgithub-notify VERSION [0-9.]*)/project(kgithub-notify VERSION ${NEXT_VER})/" CMakeLists.txt
+          git add CMakeLists.txt
+
+          # Only commit/push if there are changes
+          if ! git diff --staged --quiet; then
+            EXPECTED_NEXT_TREE=$(git write-tree)
+            git commit -m "chore: bump version to ${NEXT_VER} for next development cycle"
+
+            PR_JSON=$(gh pr list --state all --head "$BRANCH" --json state,headRefOid --jq '.[0]' || echo "")
+            if [[ -n "$PR_JSON" && "$PR_JSON" != "null" ]]; then
+              PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
+              PR_HEAD_OID=$(echo "$PR_JSON" | jq -r '.headRefOid')
+
+              if [[ "$PR_STATE" == "OPEN" || "$PR_STATE" == "MERGED" ]]; then
+                git fetch origin "$PR_HEAD_OID" 2>/dev/null || true
+                PR_TREE=$(git rev-parse "$PR_HEAD_OID^{tree}" 2>/dev/null || echo "")
+
+                if [[ "$PR_TREE" == "$EXPECTED_NEXT_TREE" ]]; then
+                  echo "PR for next version already exists ($PR_STATE) and has the intended tree. Skipping creation."
+                  exit 0
+                else
+                  echo "Branch/PR $BRANCH exists but does not match expected tree. Failing to avoid silently suppressing bump." >&2
+                  exit 1
+                fi
+              fi
+            fi
+
+            # Verify remote branch if it exists but PR doesn't (or JSON parsing failed)
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "Branch $BRANCH exists but no valid PR found. Failing to avoid silently reusing an unverified branch." >&2
+              exit 1
+            fi
+
+            git push origin "$BRANCH"
+
+            # gh relies on apt packages not necessarily installed on ubuntu-latest unless requested, but github actions ubuntu-latest runners have gh pre-installed!
+            gh pr create \
+              --title "chore: bump version to ${NEXT_VER}" \
+              --body "Automated version bump to ${NEXT_VER} after release of ${TAG}." \
+              --base "main" \
+              --head "$BRANCH"
+          else
+            echo "No changes to commit for next version bump."
+          fi
+
   cpp-qt-build-test:
     name: Qt/C++ build
     needs: [route, discover, prepare-release-tag]
-    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (github.event_name != 'workflow_dispatch' || inputs.mode != 'lint-fix') }}
+    if: ${{ !failure() && !cancelled() && needs.discover.outputs.has_qt_cpp == 'true' && (needs.route.outputs.run_build == 'true' || needs.route.outputs.run_code_checks == 'true') && (github.event_name != 'workflow_dispatch' || inputs.mode != 'lint-fix') }}
     runs-on: ubuntu-latest
     container:
       image: debian:testing
@@ -333,7 +513,20 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Download release bundle
+        if: ${{ needs.route.outputs.run_tag_creation == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle-${{ github.run_id }}
+          path: .
+
+      - name: Checkout release commit
+        if: ${{ needs.route.outputs.run_tag_creation == 'true' }}
+        run: |
+          git pull ./release.bundle HEAD
+          git checkout ${{ needs.prepare-release-tag.outputs.release_commit }}
 
       - name: Install Dependencies
         run: |
@@ -424,13 +617,13 @@ jobs:
 
   flatpak-build:
     name: Flatpak Build
-    needs: [route, discover, prepare-release-tag]
-    if: ${{ always() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_code_checks == 'true' && needs.route.outputs.run_release == 'true' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    needs: [route, discover]
+    if: ${{ !failure() && !cancelled() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
+          ref: ${{ github.ref_name }}
       - name: Install xvfb and flatpak-builder
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb flatpak-builder flatpak
@@ -471,8 +664,8 @@ jobs:
 
   publish-release:
     name: Publish Release
-    needs: [route, cpp-qt-build-test, prepare-release-tag, flatpak-build]
-    if: ${{ always() && needs.route.outputs.run_release == 'true' && needs.cpp-qt-build-test.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') && (needs.flatpak-build.result == 'success' || needs.flatpak-build.result == 'skipped') }}
+    needs: [route, cpp-qt-build-test, flatpak-build]
+    if: ${{ !failure() && !cancelled() && needs.route.outputs.run_release == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -480,7 +673,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref }}
+          ref: ${{ github.ref_name }}
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -500,8 +693,8 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
-          name: Release ${{ needs.prepare-release-tag.outputs.release_tag || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           files: |
             build/kgithub-notify-linux-amd64
             kgithub-notify.flatpak
@@ -511,8 +704,8 @@ jobs:
 
   update-ebuild:
     name: Update Ebuild in arrans_overlay
-    needs: [route, publish-release, prepare-release-tag]
-    if: ${{ always() && needs.route.outputs.run_release == 'true' && needs.publish-release.result == 'success' && (needs.prepare-release-tag.result == 'success' || needs.prepare-release-tag.result == 'skipped') }}
+    needs: [route, publish-release]
+    if: ${{ !failure() && !cancelled() && needs.route.outputs.run_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout arrans_overlay
@@ -540,12 +733,7 @@ jobs:
       - name: Update ebuild and manifest
         run: |
           cd arrans_overlay
-          VERSION="${{ needs.prepare-release-tag.outputs.release_tag }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            VERSION="${VERSION#v}"
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
 
           EBUILD_DIR="dev-vcs/kgithub-notify"
           LATEST_EBUILD=$(ls -1 $EBUILD_DIR/*.ebuild | sort -V | tail -n 1)
@@ -563,12 +751,7 @@ jobs:
           GH_TOKEN: ${{ secrets.OVERLAY_GITHB_TOKEN }}
         run: |
           cd arrans_overlay
-          VERSION="${{ needs.prepare-release-tag.outputs.release_tag }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            VERSION="${VERSION#v}"
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
           BRANCH_NAME="update-kgithub-notify-${VERSION}"
 
           git checkout -b $BRANCH_NAME
