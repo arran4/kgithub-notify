@@ -285,7 +285,7 @@ jobs:
               # we simply verify that the tagged commit is part of our legitimate repository history.
               # If the tag is an ancestor of ANY branch in origin, it's a legitimate historical release commit.
 
-              if git branch -r --contains "$REMOTE_TAG_SHA" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/main" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/master" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$REMOTE_TAG_SHA" == "$GITHUB_SHA" ]; then
+              if git branch -r --contains "$REMOTE_TAG_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/main" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "origin/master" >/dev/null 2>&1 || git merge-base --is-ancestor "$REMOTE_TAG_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$REMOTE_TAG_SHA" == "$GITHUB_SHA" ]; then
                 echo "Existing tag $next_tag is verified as part of the repository history. Safe to retry."
                 echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
                 echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
@@ -300,7 +300,7 @@ jobs:
                   CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "$PARENT_SHA" "$REMOTE_TAG_SHA")
                   if [[ -z "$CHANGED_FILES" || "$CHANGED_FILES" == "CMakeLists.txt" ]]; then
                      # Ensure the parent is in our history
-                     if git branch -r --contains "$PARENT_SHA" >/dev/null 2>&1 || git merge-base --is-ancestor "$PARENT_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$PARENT_SHA" == "$GITHUB_SHA" ]; then
+                     if git branch -r --contains "$PARENT_SHA" 2>/dev/null | grep -q . || git merge-base --is-ancestor "$PARENT_SHA" "$GITHUB_SHA" >/dev/null 2>&1 || [ "$PARENT_SHA" == "$GITHUB_SHA" ]; then
                        echo "Existing tag $next_tag is a valid standalone release bump. Safe to retry."
                        echo "release_tag=$next_tag" >> "$GITHUB_OUTPUT"
                        echo "release_commit=$REMOTE_TAG_SHA" >> "$GITHUB_OUTPUT"
@@ -466,26 +466,42 @@ jobs:
 
           # Only commit/push if there are changes
           if ! git diff --staged --quiet; then
+            EXPECTED_NEXT_TREE=$(git write-tree)
             git commit -m "chore: bump version to ${NEXT_VER} for next development cycle"
 
-            PR_STATE=$(gh pr list --state all --head "$BRANCH" --json state --jq '.[0].state' || echo "")
-            if [[ "$PR_STATE" == "OPEN" || "$PR_STATE" == "MERGED" ]]; then
-              echo "PR for next version already exists ($PR_STATE). Skipping creation."
-            else
-              # Verify remote branch if it exists but PR doesn't
-              if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-                echo "Branch $BRANCH exists but no valid PR found. Failing to avoid silently reusing an unverified branch." >&2
-                exit 1
-              fi
-              git push origin "$BRANCH"
+            PR_JSON=$(gh pr list --state all --head "$BRANCH" --json state,headRefOid --jq '.[0]' || echo "")
+            if [[ -n "$PR_JSON" && "$PR_JSON" != "null" ]]; then
+              PR_STATE=$(echo "$PR_JSON" | jq -r '.state')
+              PR_HEAD_OID=$(echo "$PR_JSON" | jq -r '.headRefOid')
 
-              # gh relies on apt packages not necessarily installed on ubuntu-latest unless requested, but github actions ubuntu-latest runners have gh pre-installed!
-              gh pr create \
-                --title "chore: bump version to ${NEXT_VER}" \
-                --body "Automated version bump to ${NEXT_VER} after release of ${TAG}." \
-                --base "main" \
-                --head "$BRANCH"
+              if [[ "$PR_STATE" == "OPEN" || "$PR_STATE" == "MERGED" ]]; then
+                git fetch origin "$PR_HEAD_OID" 2>/dev/null || true
+                PR_TREE=$(git rev-parse "$PR_HEAD_OID^{tree}" 2>/dev/null || echo "")
+
+                if [[ "$PR_TREE" == "$EXPECTED_NEXT_TREE" ]]; then
+                  echo "PR for next version already exists ($PR_STATE) and has the intended tree. Skipping creation."
+                  exit 0
+                else
+                  echo "Branch/PR $BRANCH exists but does not match expected tree. Failing to avoid silently suppressing bump." >&2
+                  exit 1
+                fi
+              fi
             fi
+
+            # Verify remote branch if it exists but PR doesn't (or JSON parsing failed)
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "Branch $BRANCH exists but no valid PR found. Failing to avoid silently reusing an unverified branch." >&2
+              exit 1
+            fi
+
+            git push origin "$BRANCH"
+
+            # gh relies on apt packages not necessarily installed on ubuntu-latest unless requested, but github actions ubuntu-latest runners have gh pre-installed!
+            gh pr create \
+              --title "chore: bump version to ${NEXT_VER}" \
+              --body "Automated version bump to ${NEXT_VER} after release of ${TAG}." \
+              --base "main" \
+              --head "$BRANCH"
           else
             echo "No changes to commit for next version bump."
           fi
