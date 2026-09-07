@@ -2,6 +2,7 @@
 #include <QtTest>
 
 #include "../src/GitHubClient.h"
+#include "FakeNetworkAccessManager.h"
 #include "MockNetworkReply.h"
 
 // Declare Q_DECLARE_METATYPE for QList<Notification> so QSignalSpy can handle it
@@ -13,6 +14,197 @@ class TestGitHubClient : public QObject {
     void initTestCase() {
         // Register metatype for QList<Notification>
         qRegisterMetaType<QList<Notification>>("QList<Notification>");
+    }
+
+    void testTrustedOrigin() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+        client.setToken("dummy_token");
+
+        // Helper to extract authorization header using invokeMethod
+        auto getAuthHeader = [](GitHubClient& c, const QString& urlStr) -> QByteArray {
+            QNetworkRequest request = c.createAuthenticatedRequest(QUrl(urlStr));
+            return request.rawHeader("Authorization");
+        };
+
+        // 1. Configured API origin
+        QCOMPARE(getAuthHeader(client, "https://api.github.com/user"), QByteArray("token dummy_token"));
+
+        // 2. Relative URL simulation (in practice it prepends m_apiUrl, so same as above)
+        QCOMPARE(getAuthHeader(client, "https://api.github.com/notifications"), QByteArray("token dummy_token"));
+
+        // 3. Different host
+        QCOMPARE(getAuthHeader(client, "https://external.example.com/api"), QByteArray(""));
+
+        // 4. api.github.com.evil.example
+        QCOMPARE(getAuthHeader(client, "https://api.github.com.evil.example/user"), QByteArray(""));
+
+        // 5. HTTPS-to-HTTP downgrade
+        QCOMPARE(getAuthHeader(client, "http://api.github.com/user"), QByteArray(""));
+
+        // 6. Explicit/default ports
+        QCOMPARE(getAuthHeader(client, "https://api.github.com:443/user"), QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "https://api.github.com:8443/user"), QByteArray(""));
+
+        // 7. Configured test API origin (Enterprise base)
+        client.setApiUrl("https://git.example.internal/api/v3");
+        QCOMPARE(getAuthHeader(client, "https://git.example.internal/api/v3/user"), QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "https://git.example.internal:443/api/v3/user"),
+                 QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "http://git.example.internal/api/v3/user"), QByteArray(""));
+    }
+
+    void testProductionRequests() {
+        GitHubClient client;
+        FakeNetworkAccessManager* fakeManager = new FakeNetworkAccessManager(&client);
+
+        // Replace the default manager with our fake
+        // Since test is a friend class, we can just replace the member
+        QNetworkAccessManager* oldManager = client.manager;
+        client.manager = fakeManager;
+        oldManager->deleteLater();
+
+        client.setApiUrl("https://api.github.com");
+        client.setToken("dummy_token");
+
+        QSignalSpy rawDataSpy(&client, &GitHubClient::rawDataReceived);
+        QSignalSpy errorSpy(&client, &GitHubClient::errorOccurred);
+
+        // 1. requestRaw("/user") resolves against configured API base and carries token
+        client.requestRaw("/user");
+        QCOMPARE(fakeManager->requests.size(), 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/user"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+        QCOMPARE(fakeManager->requests.last().request.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(),
+                 QNetworkRequest::SameOriginRedirectPolicy);
+
+        // 2. external debug destination emits clear error and dispatches zero requests
+        int reqCountBefore = fakeManager->requests.size();
+        client.requestRaw("https://external.example.com/api");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
+
+        // 3. external next links / direct pagination inputs dispatch zero requests
+        client.m_nextPageUrl = "https://evil.com/notifications?page=2";
+        QSignalSpy loadMoreNotifySpy(&client, &GitHubClient::notificationsReceived);
+        client.loadMore();
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+
+        // Assert notificationsReceived happens BEFORE errorOccurred
+        // QSignalSpy only gives counts, but we can verify both fired
+        QCOMPARE(loadMoreNotifySpy.count(), 1);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted pagination URL rejected."));
+
+        client.fetchUserRepos("https://evil.com/user/repos?page=2");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted repository pagination URL rejected."));
+
+        client.fetchNotificationDetails("https://evil.com/notifications/threads/123", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted notification details URL rejected."));
+
+        // 4. trusted pagination still carries auth
+        client.m_nextPageUrl = "https://api.github.com/notifications?page=2";
+        client.loadMore();
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/notifications?page=2"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+        QCOMPARE(fakeManager->requests.last().request.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(),
+                 QNetworkRequest::SameOriginRedirectPolicy);
+
+        // 5. actual fetchImage() requests omit Authorization, including an image hosted on the trusted origin
+        reqCountBefore = fakeManager->requests.size();
+        client.fetchImage("https://avatars.githubusercontent.com/u/12345?v=4", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://avatars.githubusercontent.com/u/12345?v=4"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray(""));
+
+        client.fetchImage("https://api.github.com/image.png", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 2);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/image.png"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray(""));
+
+        // 6. Enterprise cases (trusted origin)
+        client.setApiUrl("https://git.example.internal/api/v3");
+        client.requestRaw("/user");
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://git.example.internal/api/v3/user"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+
+        // Scheme / Host / Port mismatch checks
+        client.requestRaw("http://git.example.internal/api/v3/user");  // Downgrade
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
+
+        client.requestRaw("https://git.example.internal:8443/api/v3/user");  // Wrong port
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
+    }
+
+    void testUntrustedPaginationLinkHeaders() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+
+        QSignalSpy notifySpy(&client, &GitHubClient::notificationsReceived);
+        QSignalSpy repoSpy(&client, &GitHubClient::userReposReceived);
+        QSignalSpy errorSpy(&client, &GitHubClient::errorOccurred);
+
+        // Test untrusted link header in notifications
+        QByteArray jsonNotifications = "[]";
+        MockNetworkReply* replyNotifications = new MockNetworkReply(jsonNotifications, &client);
+        replyNotifications->setProperty("type", "notifications");
+        replyNotifications->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyNotifications->setRawHeader("Link", "<https://external.example/notifications?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection,
+                                  Q_ARG(QNetworkReply*, replyNotifications));
+
+        QCOMPARE(notifySpy.count(), 1);
+        QList<QVariant> argsNotify = notifySpy.takeFirst();
+        bool hasMoreNotify = argsNotify.at(2).toBool();
+        QCOMPARE(hasMoreNotify, false);
+
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted pagination URL rejected."));
+
+        // Test untrusted link header in user repos
+        QByteArray jsonRepos = "[]";
+        MockNetworkReply* replyRepos = new MockNetworkReply(jsonRepos, &client);
+        replyRepos->setProperty("type", "repos");
+        replyRepos->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyRepos->setRawHeader("Link", "<https://external.example/repos?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, replyRepos));
+
+        QCOMPARE(repoSpy.count(), 1);
+        QList<QVariant> argsRepo = repoSpy.takeFirst();
+        QString nextUrlRepo = argsRepo.at(1).toString();
+        QCOMPARE(nextUrlRepo, QString(""));
+
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted repository pagination URL rejected."));
+
+        // Test trusted link header in notifications
+        MockNetworkReply* replyNotificationsTrusted = new MockNetworkReply(jsonNotifications, &client);
+        replyNotificationsTrusted->setProperty("type", "notifications");
+        replyNotificationsTrusted->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyNotificationsTrusted->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection,
+                                  Q_ARG(QNetworkReply*, replyNotificationsTrusted));
+
+        QCOMPARE(notifySpy.count(), 1);
+        QList<QVariant> argsNotifyTrusted = notifySpy.takeFirst();
+        bool hasMoreNotifyTrusted = argsNotifyTrusted.at(2).toBool();
+        QCOMPARE(hasMoreNotifyTrusted, true);
+
+        QCOMPARE(errorSpy.count(), 0);  // No error for trusted pagination
     }
 
     void testNotificationsDispatch() {

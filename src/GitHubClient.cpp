@@ -87,6 +87,16 @@ void GitHubClient::loadMore() {
     }
 
     QUrl url(m_nextPageUrl);
+
+    if (!isTrustedApiOrigin(url)) {
+        m_nextPageUrl.clear();
+        // Signal completion with empty data and no more pages before emitting error
+        // so completion handlers do not overwrite the error status
+        emit notificationsReceived(QList<Notification>(), true, false);
+        emit errorOccurred("Untrusted pagination URL rejected.");
+        return;
+    }
+
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->get(request);
@@ -151,6 +161,12 @@ void GitHubClient::fetchNotificationDetails(const QString& url, const QString& n
     if (m_token.isEmpty() || url.isEmpty()) return;
     QUrl qUrl(url);
     if (!qUrl.isValid()) return;
+
+    if (!isTrustedApiOrigin(qUrl)) {
+        emit errorOccurred("Untrusted notification details URL rejected.");
+        return;
+    }
+
     QNetworkRequest request = createRequest(qUrl);
     QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "details");
@@ -173,6 +189,12 @@ void GitHubClient::requestRaw(const QString& endpoint, const QString& method, co
     if (m_token.isEmpty()) return;
     QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
     QUrl url(urlStr);
+
+    if (!isTrustedApiOrigin(url)) {
+        emit rawDataReceived("Error: Untrusted external destination for authenticated request.");
+        return;
+    }
+
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     if (!body.isEmpty()) {
@@ -213,9 +235,34 @@ void GitHubClient::fetchUserRepos(const QString& pageUrl) {
         url = QUrl(pageUrl);
     }
 
+    if (!isTrustedApiOrigin(url)) {
+        emit errorOccurred("Untrusted repository pagination URL rejected.");
+        return;
+    }
+
     QNetworkRequest request = createAuthenticatedRequest(url);
     QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "repos");
+}
+
+bool GitHubClient::isTrustedApiOrigin(const QUrl& url) const {
+    QUrl apiOrigin(m_apiUrl);
+
+    // Compare scheme
+    if (url.scheme().compare(apiOrigin.scheme(), Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    // Compare host
+    if (url.host().compare(apiOrigin.host(), Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    // Compare port
+    int urlPort = url.port(url.scheme() == "https" ? 443 : 80);
+    int apiPort = apiOrigin.port(apiOrigin.scheme() == "https" ? 443 : 80);
+
+    return urlPort == apiPort;
 }
 
 QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url) const { return createRequest(url); }
@@ -223,28 +270,34 @@ QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url) const 
 QNetworkRequest GitHubClient::createRequest(const QUrl& url) const {
     QNetworkRequest request(url);
 
-    // Add Authorization header
-    QByteArray authHeader = "token ";
-    QByteArray tokenBytes = m_token.toQByteArray();
-    authHeader.append(tokenBytes);
+    if (isTrustedApiOrigin(url)) {
+        // Add Authorization header only for trusted origins
+        QByteArray authHeader = "token ";
+        QByteArray tokenBytes = m_token.toQByteArray();
+        authHeader.append(tokenBytes);
 
-    request.setRawHeader("Authorization", authHeader);
+        request.setRawHeader("Authorization", authHeader);
+
+        // Explicitly zero out sensitive data
+        if (!tokenBytes.isEmpty()) {
+            volatile char* p = tokenBytes.data();
+            size_t s = tokenBytes.size();
+            while (s--) *p++ = 0;
+        }
+        if (!authHeader.isEmpty()) {
+            volatile char* p = authHeader.data();
+            size_t s = authHeader.size();
+            while (s--) *p++ = 0;
+        }
+    }
+
     request.setRawHeader("Accept", "application/vnd.github.v3+json");
-
-    // Explicitly zero out sensitive data
-    if (!tokenBytes.isEmpty()) {
-        volatile char* p = tokenBytes.data();
-        size_t s = tokenBytes.size();
-        while (s--) *p++ = 0;
-    }
-    if (!authHeader.isEmpty()) {
-        volatile char* p = authHeader.data();
-        size_t s = authHeader.size();
-        while (s--) *p++ = 0;
-    }
 
     // Add user-agent header as required by GitHub API
     request.setRawHeader("User-Agent", "Kgithub-notify");
+
+    // Check redirect behavior so credentials cannot leak to a different origin
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::SameOriginRedirectPolicy);
 
     return request;
 }
@@ -395,16 +448,24 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
     }
 
     QString nextPageUrl;
+    bool linkRejected = false;
     if (reply->hasRawHeader("Link")) {
         QString linkHeader = reply->rawHeader("Link");
         QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
         QRegularExpressionMatch match = re.match(linkHeader);
         if (match.hasMatch()) {
             nextPageUrl = match.captured(1);
+            if (!isTrustedApiOrigin(QUrl(nextPageUrl))) {
+                nextPageUrl.clear();
+                linkRejected = true;
+            }
         }
     }
 
     emit userReposReceived(doc.array(), nextPageUrl);
+    if (linkRejected) {
+        emit errorOccurred("Untrusted repository pagination URL rejected.");
+    }
 }
 
 void GitHubClient::handlePatchReply(QNetworkReply* reply) {
@@ -491,6 +552,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
 
     // Parse Link header
     m_nextPageUrl.clear();
+    bool linkRejected = false;
     if (reply->hasRawHeader("Link")) {
         QString linkHeader = reply->rawHeader("Link");
         // Example: <https://api.github.com/resource?page=2>; rel="next", <https://api.github.com/resource?page=5>;
@@ -499,11 +561,18 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
         QRegularExpressionMatch match = re.match(linkHeader);
         if (match.hasMatch()) {
             m_nextPageUrl = match.captured(1);
+            if (!isTrustedApiOrigin(QUrl(m_nextPageUrl))) {
+                m_nextPageUrl.clear();
+                linkRejected = true;
+            }
         }
     }
 
     bool append = reply->property("append").toBool();
     emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
+    if (linkRejected) {
+        emit errorOccurred("Untrusted pagination URL rejected.");
+    }
 }
 
 void GitHubClient::onRequestTimeout() {
