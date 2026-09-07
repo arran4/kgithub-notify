@@ -88,8 +88,13 @@ class TestGitHubClient : public QObject {
 
         // 3. external next links / direct pagination inputs dispatch zero requests
         client.m_nextPageUrl = "https://evil.com/notifications?page=2";
+        QSignalSpy loadMoreNotifySpy(&client, &GitHubClient::notificationsReceived);
         client.loadMore();
         QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+
+        // Assert notificationsReceived happens BEFORE errorOccurred
+        // QSignalSpy only gives counts, but we can verify both fired
+        QCOMPARE(loadMoreNotifySpy.count(), 1);
         QCOMPARE(errorSpy.count(), 1);
         QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted pagination URL rejected."));
 
@@ -148,6 +153,7 @@ class TestGitHubClient : public QObject {
 
         QSignalSpy notifySpy(&client, &GitHubClient::notificationsReceived);
         QSignalSpy repoSpy(&client, &GitHubClient::userReposReceived);
+        QSignalSpy errorSpy(&client, &GitHubClient::errorOccurred);
 
         // Test untrusted link header in notifications
         QByteArray jsonNotifications = "[]";
@@ -164,6 +170,9 @@ class TestGitHubClient : public QObject {
         bool hasMoreNotify = argsNotify.at(2).toBool();
         QCOMPARE(hasMoreNotify, false);
 
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted pagination URL rejected."));
+
         // Test untrusted link header in user repos
         QByteArray jsonRepos = "[]";
         MockNetworkReply* replyRepos = new MockNetworkReply(jsonRepos, &client);
@@ -178,6 +187,9 @@ class TestGitHubClient : public QObject {
         QString nextUrlRepo = argsRepo.at(1).toString();
         QCOMPARE(nextUrlRepo, QString(""));
 
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted repository pagination URL rejected."));
+
         // Test trusted link header in notifications
         MockNetworkReply* replyNotificationsTrusted = new MockNetworkReply(jsonNotifications, &client);
         replyNotificationsTrusted->setProperty("type", "notifications");
@@ -191,6 +203,8 @@ class TestGitHubClient : public QObject {
         QList<QVariant> argsNotifyTrusted = notifySpy.takeFirst();
         bool hasMoreNotifyTrusted = argsNotifyTrusted.at(2).toBool();
         QCOMPARE(hasMoreNotifyTrusted, true);
+
+        QCOMPARE(errorSpy.count(), 0);  // No error for trusted pagination
     }
 
     void testNotificationsDispatch() {

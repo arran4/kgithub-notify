@@ -90,9 +90,10 @@ void GitHubClient::loadMore() {
 
     if (!isTrustedApiOrigin(url)) {
         m_nextPageUrl.clear();
-        emit errorOccurred("Untrusted pagination URL rejected.");
-        // Signal completion with empty data and no more pages
+        // Signal completion with empty data and no more pages before emitting error
+        // so completion handlers do not overwrite the error status
         emit notificationsReceived(QList<Notification>(), true, false);
+        emit errorOccurred("Untrusted pagination URL rejected.");
         return;
     }
 
@@ -447,6 +448,7 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
     }
 
     QString nextPageUrl;
+    bool linkRejected = false;
     if (reply->hasRawHeader("Link")) {
         QString linkHeader = reply->rawHeader("Link");
         QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
@@ -455,11 +457,15 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
             nextPageUrl = match.captured(1);
             if (!isTrustedApiOrigin(QUrl(nextPageUrl))) {
                 nextPageUrl.clear();
+                linkRejected = true;
             }
         }
     }
 
     emit userReposReceived(doc.array(), nextPageUrl);
+    if (linkRejected) {
+        emit errorOccurred("Untrusted repository pagination URL rejected.");
+    }
 }
 
 void GitHubClient::handlePatchReply(QNetworkReply* reply) {
@@ -546,6 +552,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
 
     // Parse Link header
     m_nextPageUrl.clear();
+    bool linkRejected = false;
     if (reply->hasRawHeader("Link")) {
         QString linkHeader = reply->rawHeader("Link");
         // Example: <https://api.github.com/resource?page=2>; rel="next", <https://api.github.com/resource?page=5>;
@@ -556,12 +563,16 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
             m_nextPageUrl = match.captured(1);
             if (!isTrustedApiOrigin(QUrl(m_nextPageUrl))) {
                 m_nextPageUrl.clear();
+                linkRejected = true;
             }
         }
     }
 
     bool append = reply->property("append").toBool();
     emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
+    if (linkRejected) {
+        emit errorOccurred("Untrusted pagination URL rejected.");
+    }
 }
 
 void GitHubClient::onRequestTimeout() {
