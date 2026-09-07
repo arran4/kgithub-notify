@@ -3,6 +3,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+NotificationRule::NotificationRule() : id(QUuid::createUuid().toString()) {}
+
 QJsonObject NotificationRule::toJson() const {
     QJsonObject obj;
     obj["repoFilter"] = repoFilter;
@@ -10,6 +12,7 @@ QJsonObject NotificationRule::toJson() const {
     obj["reasonFilter"] = reasonFilter;
     obj["titleFilter"] = titleFilter;
     obj["action"] = action;
+    obj["id"] = id;
     return obj;
 }
 
@@ -20,6 +23,9 @@ NotificationRule NotificationRule::fromJson(const QJsonObject& obj) {
     rule.reasonFilter = obj["reasonFilter"].toString();
     rule.titleFilter = obj["titleFilter"].toString();
     rule.action = obj["action"].toString();
+    if (obj.contains("id")) {
+        rule.id = obj["id"].toString();
+    }
 
     // Backwards compatibility for the string based "condition"
     if (obj.contains("condition")) {

@@ -50,6 +50,29 @@ target_link_libraries(TestFilterParser
 
 add_test(NAME TestFilterParser COMMAND TestFilterParser)
 
+add_executable(TestRulesDialog
+    tests/TestRulesDialog.cpp
+    src/RulesDialog.cpp
+    src/RulesDialog.h
+    src/NotificationRuleEngine.cpp
+    src/NotificationRuleEngine.h
+    src/Notification.cpp
+    src/Notification.h
+    src/utils/FilterParser.cpp
+    src/utils/FilterParser.h
+)
+
+target_link_libraries(TestRulesDialog
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Test
+        Qt6::Core
+        Qt6::Gui
+)
+
+add_test(NAME TestRulesDialog COMMAND TestRulesDialog)
+
+
 add_executable(kgithub-notify
     src/main.cpp
     src/GitHubClient.cpp

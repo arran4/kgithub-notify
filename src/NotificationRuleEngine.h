@@ -7,6 +7,7 @@
 #include <QList>
 #include <QSettings>
 #include <QString>
+#include <QUuid>
 
 #include "Notification.h"
 
@@ -17,6 +18,8 @@ class NotificationRule {
     QString reasonFilter;  // mention, review_requested, etc
     QString titleFilter;   // general text matching title
 
+    NotificationRule();
+    QString id;
     QString action;  // "Mute", "AlwaysIndividual", "NeverIndividual", "AlwaysSummarize", "Default"
 
     QJsonObject toJson() const;
