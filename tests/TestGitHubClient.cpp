@@ -2,6 +2,7 @@
 #include <QtTest>
 
 #include "../src/GitHubClient.h"
+#include "FakeNetworkAccessManager.h"
 #include "MockNetworkReply.h"
 
 // Declare Q_DECLARE_METATYPE for QList<Notification> so QSignalSpy can handle it
@@ -15,84 +16,92 @@ class TestGitHubClient : public QObject {
         qRegisterMetaType<QList<Notification>>("QList<Notification>");
     }
 
-    void testTrustedOrigin() {
+    void testProductionRequests() {
         GitHubClient client;
+        FakeNetworkAccessManager* fakeManager = new FakeNetworkAccessManager(&client);
+
+        // Replace the default manager with our fake
+        // Since test is a friend class, we can just replace the member
+        QNetworkAccessManager* oldManager = client.manager;
+        client.manager = fakeManager;
+        oldManager->deleteLater();
+
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        // Helper to extract authorization header
-        auto getAuthHeader = [](GitHubClient& c, const QString& urlStr) -> QByteArray {
-            QNetworkRequest request = c.createAuthenticatedRequest(QUrl(urlStr));
-            return request.rawHeader("Authorization");
-        };
+        QSignalSpy rawDataSpy(&client, &GitHubClient::rawDataReceived);
+        QSignalSpy errorSpy(&client, &GitHubClient::errorOccurred);
 
-        // 1. Configured API origin
-        QCOMPARE(getAuthHeader(client, "https://api.github.com/user"), QByteArray("token dummy_token"));
-
-        // 2. Relative URL simulation (in practice it prepends m_apiUrl, so same as above)
-        QCOMPARE(getAuthHeader(client, "https://api.github.com/notifications"), QByteArray("token dummy_token"));
-
-        // 3. Different host
-        QCOMPARE(getAuthHeader(client, "https://external.example.com/api"), QByteArray(""));
-
-        // 4. api.github.com.evil.example
-        QCOMPARE(getAuthHeader(client, "https://api.github.com.evil.example/user"), QByteArray(""));
-
-        // 5. HTTPS-to-HTTP downgrade
-        QCOMPARE(getAuthHeader(client, "http://api.github.com/user"), QByteArray(""));
-
-        // 6. Explicit/default ports
-        QCOMPARE(getAuthHeader(client, "https://api.github.com:443/user"), QByteArray("token dummy_token"));
-        QCOMPARE(getAuthHeader(client, "https://api.github.com:8443/user"), QByteArray(""));
-
-        // 7. Configured test API origin (Enterprise base)
-        client.setApiUrl("https://git.example.internal/api/v3");
-        QCOMPARE(getAuthHeader(client, "https://git.example.internal/api/v3/user"), QByteArray("token dummy_token"));
-        QCOMPARE(getAuthHeader(client, "https://git.example.internal:443/api/v3/user"),
-                 QByteArray("token dummy_token"));
-        QCOMPARE(getAuthHeader(client, "http://git.example.internal/api/v3/user"), QByteArray(""));
-    }
-
-    void testUntrustedPaginationAndAvatars() {
-        GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        // Simulate untrusted pagination URL
-        QNetworkRequest req = client.createAuthenticatedRequest(QUrl("https://evil.com/notifications?page=2"));
-        QCOMPARE(req.rawHeader("Authorization"), QByteArray(""));
-
-        // Let's verify same origin redirect policy is applied
-        QCOMPARE(req.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(),
+        // 1. requestRaw("/user") resolves against configured API base and carries token
+        client.requestRaw("/user");
+        QCOMPARE(fakeManager->requests.size(), 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/user"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+        QCOMPARE(fakeManager->requests.last().request.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(),
                  QNetworkRequest::SameOriginRedirectPolicy);
 
-        // Avatar request having no Authorization header
-        QNetworkRequest reqAvatar;
-        // fetchImage uses QNetworkRequest directly, but it just calls manager->get with that request.
-        // We can use a spy or similar to inspect it if manager was injectable, or we can just mock it.
-        // Actually, fetchImage doesn't use createAuthenticatedRequest, it just does:
-        // QNetworkRequest request(QUrl(imageUrl));
-        // We can't easily intercept the request inside fetchImage without a full MockNetworkAccessManager.
-        // However, we can simulate the logic here, or we can use the MockNetworkReply pattern if it intercepts.
-        // Let's create a subclass of QNetworkAccessManager or just check what the code does.
-        // Since we can't easily test internal requests without refactoring GitHubClient to inject a factory,
-        // let's verify fetchImage doesn't call createAuthenticatedRequest. It's evident from the code.
-        // We'll write a simple test for avatar fetching that ensures it triggers network request.
-        QSignalSpy spyDetails(&client, &GitHubClient::detailsReceived);
+        // 2. external debug destination emits clear error and dispatches zero requests
+        int reqCountBefore = fakeManager->requests.size();
+        client.requestRaw("https://external.example.com/api");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
 
-        // Wait, fetchImage emits detailsReceived? No, it's handled by handleImageReply.
-        // Let's test it using MockNetworkReply if possible.
-        // Actually we just skip the complex MockNetworkAccessManager and just mock the reply for fetchImage.
-        MockNetworkReply* reply = new MockNetworkReply(QByteArray("image_data"), &client);
-        reply->setProperty("type", "image");
-        reply->setProperty("notificationId", "123");
+        // 3. external next links / direct pagination inputs dispatch zero requests
+        client.m_nextPageUrl = "https://evil.com/notifications?page=2";
+        client.loadMore();
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted pagination URL rejected."));
 
-        // Emitting finished on a mocked reply doesn't test the request header.
-        // For the scope of this unit test, let's just make sure `createRequest` handles an untrusted avatar URL
-        // correctly if it were used:
-        QNetworkRequest reqAvatarFallback =
-            client.createAuthenticatedRequest(QUrl("https://avatars.githubusercontent.com/u/12345?v=4"));
-        QCOMPARE(reqAvatarFallback.rawHeader("Authorization"), QByteArray(""));
+        client.fetchUserRepos("https://evil.com/user/repos?page=2");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted repository pagination URL rejected."));
+
+        client.fetchNotificationDetails("https://evil.com/notifications/threads/123", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore);
+        QCOMPARE(errorSpy.count(), 1);
+        QCOMPARE(errorSpy.takeFirst().at(0).toString(), QString("Untrusted notification details URL rejected."));
+
+        // 4. trusted pagination still carries auth
+        client.m_nextPageUrl = "https://api.github.com/notifications?page=2";
+        client.loadMore();
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/notifications?page=2"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+        QCOMPARE(fakeManager->requests.last().request.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(),
+                 QNetworkRequest::SameOriginRedirectPolicy);
+
+        // 5. actual fetchImage() requests omit Authorization, including an image hosted on the trusted origin
+        reqCountBefore = fakeManager->requests.size();
+        client.fetchImage("https://avatars.githubusercontent.com/u/12345?v=4", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 1);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://avatars.githubusercontent.com/u/12345?v=4"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray(""));
+
+        client.fetchImage("https://api.github.com/image.png", "123");
+        QCOMPARE(fakeManager->requests.size(), reqCountBefore + 2);
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://api.github.com/image.png"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray(""));
+
+        // 6. Enterprise cases (trusted origin)
+        client.setApiUrl("https://git.example.internal/api/v3");
+        client.requestRaw("/user");
+        QCOMPARE(fakeManager->requests.last().request.url(), QUrl("https://git.example.internal/api/v3/user"));
+        QCOMPARE(fakeManager->requests.last().request.rawHeader("Authorization"), QByteArray("token dummy_token"));
+
+        // Scheme / Host / Port mismatch checks
+        client.requestRaw("http://git.example.internal/api/v3/user");  // Downgrade
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
+
+        client.requestRaw("https://git.example.internal:8443/api/v3/user");  // Wrong port
+        QCOMPARE(rawDataSpy.count(), 1);
+        QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
+                 QString("Error: Untrusted external destination for authenticated request."));
     }
 
     void testNotificationsDispatch() {

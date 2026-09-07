@@ -19,6 +19,7 @@ enable_testing()
 add_executable(TestGitHubClient
     tests/TestGitHubClient.cpp
     tests/MockNetworkReply.cpp
+    tests/FakeNetworkAccessManager.cpp
     tests/MockNetworkReply.h
     src/GitHubClient.cpp
     src/GitHubClient.h

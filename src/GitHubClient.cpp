@@ -87,6 +87,15 @@ void GitHubClient::loadMore() {
     }
 
     QUrl url(m_nextPageUrl);
+
+    if (!isTrustedApiOrigin(url)) {
+        m_nextPageUrl.clear();
+        emit errorOccurred("Untrusted pagination URL rejected.");
+        // Signal completion with empty data and no more pages
+        emit notificationsReceived(QList<Notification>(), true, false);
+        return;
+    }
+
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->get(request);
@@ -151,6 +160,12 @@ void GitHubClient::fetchNotificationDetails(const QString& url, const QString& n
     if (m_token.isEmpty() || url.isEmpty()) return;
     QUrl qUrl(url);
     if (!qUrl.isValid()) return;
+
+    if (!isTrustedApiOrigin(qUrl)) {
+        emit errorOccurred("Untrusted notification details URL rejected.");
+        return;
+    }
+
     QNetworkRequest request = createRequest(qUrl);
     QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "details");
@@ -217,6 +232,11 @@ void GitHubClient::fetchUserRepos(const QString& pageUrl) {
         url.setQuery(query);
     } else {
         url = QUrl(pageUrl);
+    }
+
+    if (!isTrustedApiOrigin(url)) {
+        emit errorOccurred("Untrusted repository pagination URL rejected.");
+        return;
     }
 
     QNetworkRequest request = createAuthenticatedRequest(url);
