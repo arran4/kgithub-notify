@@ -16,6 +16,44 @@ class TestGitHubClient : public QObject {
         qRegisterMetaType<QList<Notification>>("QList<Notification>");
     }
 
+    void testTrustedOrigin() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+        client.setToken("dummy_token");
+
+        // Helper to extract authorization header using invokeMethod
+        auto getAuthHeader = [](GitHubClient& c, const QString& urlStr) -> QByteArray {
+            QNetworkRequest request = c.createAuthenticatedRequest(QUrl(urlStr));
+            return request.rawHeader("Authorization");
+        };
+
+        // 1. Configured API origin
+        QCOMPARE(getAuthHeader(client, "https://api.github.com/user"), QByteArray("token dummy_token"));
+
+        // 2. Relative URL simulation (in practice it prepends m_apiUrl, so same as above)
+        QCOMPARE(getAuthHeader(client, "https://api.github.com/notifications"), QByteArray("token dummy_token"));
+
+        // 3. Different host
+        QCOMPARE(getAuthHeader(client, "https://external.example.com/api"), QByteArray(""));
+
+        // 4. api.github.com.evil.example
+        QCOMPARE(getAuthHeader(client, "https://api.github.com.evil.example/user"), QByteArray(""));
+
+        // 5. HTTPS-to-HTTP downgrade
+        QCOMPARE(getAuthHeader(client, "http://api.github.com/user"), QByteArray(""));
+
+        // 6. Explicit/default ports
+        QCOMPARE(getAuthHeader(client, "https://api.github.com:443/user"), QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "https://api.github.com:8443/user"), QByteArray(""));
+
+        // 7. Configured test API origin (Enterprise base)
+        client.setApiUrl("https://git.example.internal/api/v3");
+        QCOMPARE(getAuthHeader(client, "https://git.example.internal/api/v3/user"), QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "https://git.example.internal:443/api/v3/user"),
+                 QByteArray("token dummy_token"));
+        QCOMPARE(getAuthHeader(client, "http://git.example.internal/api/v3/user"), QByteArray(""));
+    }
+
     void testProductionRequests() {
         GitHubClient client;
         FakeNetworkAccessManager* fakeManager = new FakeNetworkAccessManager(&client);
@@ -102,6 +140,57 @@ class TestGitHubClient : public QObject {
         QCOMPARE(rawDataSpy.count(), 1);
         QCOMPARE(rawDataSpy.takeFirst().at(0).toString(),
                  QString("Error: Untrusted external destination for authenticated request."));
+    }
+
+    void testUntrustedPaginationLinkHeaders() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+
+        QSignalSpy notifySpy(&client, &GitHubClient::notificationsReceived);
+        QSignalSpy repoSpy(&client, &GitHubClient::userReposReceived);
+
+        // Test untrusted link header in notifications
+        QByteArray jsonNotifications = "[]";
+        MockNetworkReply* replyNotifications = new MockNetworkReply(jsonNotifications, &client);
+        replyNotifications->setProperty("type", "notifications");
+        replyNotifications->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyNotifications->setRawHeader("Link", "<https://external.example/notifications?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection,
+                                  Q_ARG(QNetworkReply*, replyNotifications));
+
+        QCOMPARE(notifySpy.count(), 1);
+        QList<QVariant> argsNotify = notifySpy.takeFirst();
+        bool hasMoreNotify = argsNotify.at(2).toBool();
+        QCOMPARE(hasMoreNotify, false);
+
+        // Test untrusted link header in user repos
+        QByteArray jsonRepos = "[]";
+        MockNetworkReply* replyRepos = new MockNetworkReply(jsonRepos, &client);
+        replyRepos->setProperty("type", "repos");
+        replyRepos->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyRepos->setRawHeader("Link", "<https://external.example/repos?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, replyRepos));
+
+        QCOMPARE(repoSpy.count(), 1);
+        QList<QVariant> argsRepo = repoSpy.takeFirst();
+        QString nextUrlRepo = argsRepo.at(1).toString();
+        QCOMPARE(nextUrlRepo, QString(""));
+
+        // Test trusted link header in notifications
+        MockNetworkReply* replyNotificationsTrusted = new MockNetworkReply(jsonNotifications, &client);
+        replyNotificationsTrusted->setProperty("type", "notifications");
+        replyNotificationsTrusted->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        replyNotificationsTrusted->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\"");
+
+        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection,
+                                  Q_ARG(QNetworkReply*, replyNotificationsTrusted));
+
+        QCOMPARE(notifySpy.count(), 1);
+        QList<QVariant> argsNotifyTrusted = notifySpy.takeFirst();
+        bool hasMoreNotifyTrusted = argsNotifyTrusted.at(2).toBool();
+        QCOMPARE(hasMoreNotifyTrusted, true);
     }
 
     void testNotificationsDispatch() {

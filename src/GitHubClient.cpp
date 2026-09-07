@@ -453,6 +453,9 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
         QRegularExpressionMatch match = re.match(linkHeader);
         if (match.hasMatch()) {
             nextPageUrl = match.captured(1);
+            if (!isTrustedApiOrigin(QUrl(nextPageUrl))) {
+                nextPageUrl.clear();
+            }
         }
     }
 
@@ -551,6 +554,9 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
         QRegularExpressionMatch match = re.match(linkHeader);
         if (match.hasMatch()) {
             m_nextPageUrl = match.captured(1);
+            if (!isTrustedApiOrigin(QUrl(m_nextPageUrl))) {
+                m_nextPageUrl.clear();
+            }
         }
     }
 
