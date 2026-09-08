@@ -137,20 +137,13 @@ void NotificationRuleEngine::prependRule(const NotificationRule& rule) {
     saveRules(rules);
 }
 
-NotificationRuleModel::NotificationRuleModel() {
-}
+NotificationRuleModel::NotificationRuleModel() {}
 
-void NotificationRuleModel::load() {
-    m_rules = NotificationRuleEngine::loadRules();
-}
+void NotificationRuleModel::load() { m_rules = NotificationRuleEngine::loadRules(); }
 
-void NotificationRuleModel::save() {
-    NotificationRuleEngine::saveRules(m_rules);
-}
+void NotificationRuleModel::save() { NotificationRuleEngine::saveRules(m_rules); }
 
-void NotificationRuleModel::addRule(const NotificationRule& rule) {
-    m_rules.append(rule);
-}
+void NotificationRuleModel::addRule(const NotificationRule& rule) { m_rules.append(rule); }
 
 void NotificationRuleModel::updateRule(const NotificationRule& rule) {
     for (int i = 0; i < m_rules.size(); ++i) {

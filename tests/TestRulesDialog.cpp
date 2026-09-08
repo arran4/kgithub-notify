@@ -163,9 +163,9 @@ class TestRulesDialog : public QObject {
 
         RulesDialog dialog(nullptr, "repoA");  // scoped
 
-        // Test that if we try to move up via the UI slot, it doesn't do anything because the table item selection and validation logic
-        // But since we are asked to assert the scoped reordering contract properly...
-        // Let's assert that the UI slot disables the button. We exposed btnUp.
+        // Test that if we try to move up via the UI slot, it doesn't do anything because the table item selection and
+        // validation logic But since we are asked to assert the scoped reordering contract properly... Let's assert
+        // that the UI slot disables the button. We exposed btnUp.
 
         // However btnUp is private, so we can check it via findChildren.
         // Instead of doing that, let's assert that btnUp is disabled directly if we expose it or find it.

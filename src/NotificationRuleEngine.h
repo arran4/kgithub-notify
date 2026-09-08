@@ -30,7 +30,7 @@ class NotificationRule {
 };
 
 class NotificationRuleModel {
-public:
+   public:
     NotificationRuleModel();
     void load();
     void save();
@@ -42,7 +42,7 @@ public:
     void moveUp(const QString& id);
     void moveDown(const QString& id);
 
-private:
+   private:
     QList<NotificationRule> m_rules;
 };
 

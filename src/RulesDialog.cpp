@@ -62,8 +62,8 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
 
 void RulesDialog::loadRules(const QString& filterRepo) {
     rulesTable->setRowCount(0);
-    m_allRules = NotificationRuleEngine::loadRules();
-    for (const NotificationRule& rule : m_allRules) {
+    m_model.load();
+    for (const NotificationRule& rule : m_model.allRules()) {
         if (!filterRepo.isEmpty() && !rule.repoFilter.contains(filterRepo)) continue;
 
         int row = rulesTable->rowCount();
@@ -125,7 +125,7 @@ void RulesDialog::addRule(const QString& prepopulateRepo) {
         rule.titleFilter = titleEdit.text().trimmed();
         rule.action = actionCombo.currentText();
 
-        m_allRules.append(rule);
+        m_model.addRule(rule);
 
         if (m_filterRepo.isEmpty() || rule.repoFilter.contains(m_filterRepo)) {
             int row = rulesTable->rowCount();
@@ -186,12 +186,7 @@ void RulesDialog::editRule() {
         rule.titleFilter = titleEdit.text().trimmed();
         rule.action = actionCombo.currentText();
 
-        for (int i = 0; i < m_allRules.size(); ++i) {
-            if (m_allRules[i].id == rule.id) {
-                m_allRules[i] = rule;
-                break;
-            }
-        }
+        m_model.updateRule(rule);
 
         rulesTable->item(row, 0)->setText(rule.displayCondition());
         rulesTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(rule.toJson()));
@@ -203,34 +198,19 @@ void RulesDialog::removeRule() {
     if (row >= 0) {
         QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
         QString id = obj["id"].toString();
-        for (int i = 0; i < m_allRules.size(); ++i) {
-            if (m_allRules[i].id == id) {
-                m_allRules.removeAt(i);
-                break;
-            }
-        }
+        m_model.removeRule(id);
         rulesTable->removeRow(row);
     }
 }
 
-void RulesDialog::saveRules() { NotificationRuleEngine::saveRules(m_allRules); }
+void RulesDialog::saveRules() { m_model.save(); }
 void RulesDialog::moveUp() {
     int row = rulesTable->currentRow();
     if (row > 0) {
         QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
         QString id = obj["id"].toString();
 
-        int allRulesIndex = -1;
-        for (int i = 0; i < m_allRules.size(); ++i) {
-            if (m_allRules[i].id == id) {
-                allRulesIndex = i;
-                break;
-            }
-        }
-
-        if (allRulesIndex > 0) {
-            m_allRules.swapItemsAt(allRulesIndex, allRulesIndex - 1);
-        }
+        m_model.moveUp(id);
 
         QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
         QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
@@ -248,17 +228,7 @@ void RulesDialog::moveDown() {
         QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
         QString id = obj["id"].toString();
 
-        int allRulesIndex = -1;
-        for (int i = 0; i < m_allRules.size(); ++i) {
-            if (m_allRules[i].id == id) {
-                allRulesIndex = i;
-                break;
-            }
-        }
-
-        if (allRulesIndex >= 0 && allRulesIndex < m_allRules.size() - 1) {
-            m_allRules.swapItemsAt(allRulesIndex, allRulesIndex + 1);
-        }
+        m_model.moveDown(id);
 
         QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
         QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
@@ -268,43 +238,4 @@ void RulesDialog::moveDown() {
         rulesTable->setItem(row + 1, 1, actionItem);
         rulesTable->selectRow(row + 1);
     }
-}
-
-void RulesDialog::addRuleModel(const NotificationRule& rule) {
-    m_allRules.append(rule);
-}
-
-void RulesDialog::updateRuleModel(const NotificationRule& rule) {
-    for (int i = 0; i < m_allRules.size(); ++i) {
-        if (m_allRules[i].id == rule.id) {
-            m_allRules[i] = rule;
-            break;
-        }
-    }
-}
-
-void RulesDialog::removeRuleModel(const QString& id) {
-    for (int i = 0; i < m_allRules.size(); ++i) {
-        if (m_allRules[i].id == id) {
-            m_allRules.removeAt(i);
-            break;
-        }
-    }
-}
-
-void RulesDialog::moveUpModel(const QString& id) {
-    int allRulesIndex = -1;
-    for (int i = 0; i < m_allRules.size(); ++i) {
-        if (m_allRules[i].id == id) {
-            allRulesIndex = i;
-            break;
-        }
-    }
-    if (allRulesIndex > 0) {
-        m_allRules.swapItemsAt(allRulesIndex, allRulesIndex - 1);
-    }
-}
-
-void RulesDialog::saveRulesModel() {
-    NotificationRuleEngine::saveRules(m_allRules);
 }
