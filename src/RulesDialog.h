@@ -5,6 +5,8 @@
 #include <QPushButton>
 #include <QTableWidget>
 
+#include "NotificationRuleEngine.h"
+
 class RulesDialog : public QDialog {
     Q_OBJECT
    public:
@@ -24,8 +26,12 @@ class RulesDialog : public QDialog {
    private:
     void loadRules(const QString& filterRepo = QString());
     QString m_prepopulateCondition;
+    QString m_filterRepo;
+    NotificationRuleModel m_model;
 
     QTableWidget* rulesTable;
+    QPushButton* btnUp;
+    QPushButton* btnDown;
 };
 
 #endif  // RULESDIALOG_H

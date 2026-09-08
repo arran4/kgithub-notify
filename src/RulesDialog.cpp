@@ -13,7 +13,7 @@
 #include "NotificationRuleEngine.h"
 
 RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QString& prepopulateCondition)
-    : QDialog(parent), m_prepopulateCondition(prepopulateCondition) {
+    : QDialog(parent), m_prepopulateCondition(prepopulateCondition), m_filterRepo(preFilterRepo) {
     setWindowTitle(tr("Notification Rules"));
     resize(600, 400);
 
@@ -30,8 +30,8 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     QPushButton* btnAdd = new QPushButton(tr("Add"), this);
     QPushButton* btnEdit = new QPushButton(tr("Edit"), this);
-    QPushButton* btnUp = new QPushButton(tr("Move Up"), this);
-    QPushButton* btnDown = new QPushButton(tr("Move Down"), this);
+    btnUp = new QPushButton(tr("Move Up"), this);
+    btnDown = new QPushButton(tr("Move Down"), this);
     QPushButton* btnRemove = new QPushButton(tr("Remove"), this);
     QPushButton* btnSave = new QPushButton(tr("Save"), this);
     QPushButton* btnClose = new QPushButton(tr("Close"), this);
@@ -62,8 +62,8 @@ RulesDialog::RulesDialog(QWidget* parent, const QString& preFilterRepo, const QS
 
 void RulesDialog::loadRules(const QString& filterRepo) {
     rulesTable->setRowCount(0);
-    QList<NotificationRule> rules = NotificationRuleEngine::loadRules();
-    for (const NotificationRule& rule : rules) {
+    m_model.load();
+    for (const NotificationRule& rule : m_model.allRules()) {
         if (!filterRepo.isEmpty() && !rule.repoFilter.contains(filterRepo)) continue;
 
         int row = rulesTable->rowCount();
@@ -71,6 +71,13 @@ void RulesDialog::loadRules(const QString& filterRepo) {
         rulesTable->setItem(row, 0, new QTableWidgetItem(rule.displayCondition()));
         rulesTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(rule.toJson()));
         rulesTable->setItem(row, 1, new QTableWidgetItem(rule.action));
+    }
+
+    if (!filterRepo.isEmpty()) {
+        btnUp->setEnabled(false);
+        btnDown->setEnabled(false);
+        btnUp->setToolTip(tr("Reordering is disabled when viewing a filtered list of rules."));
+        btnDown->setToolTip(tr("Reordering is disabled when viewing a filtered list of rules."));
     }
 }
 
@@ -118,11 +125,15 @@ void RulesDialog::addRule(const QString& prepopulateRepo) {
         rule.titleFilter = titleEdit.text().trimmed();
         rule.action = actionCombo.currentText();
 
-        int row = rulesTable->rowCount();
-        rulesTable->insertRow(row);
-        rulesTable->setItem(row, 0, new QTableWidgetItem(rule.displayCondition()));
-        rulesTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(rule.toJson()));
-        rulesTable->setItem(row, 1, new QTableWidgetItem(rule.action));
+        m_model.addRule(rule);
+
+        if (m_filterRepo.isEmpty() || rule.repoFilter.contains(m_filterRepo)) {
+            int row = rulesTable->rowCount();
+            rulesTable->insertRow(row);
+            rulesTable->setItem(row, 0, new QTableWidgetItem(rule.displayCondition()));
+            rulesTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(rule.toJson()));
+            rulesTable->setItem(row, 1, new QTableWidgetItem(rule.action));
+        }
     }
 }
 void RulesDialog::editRule() {
@@ -175,6 +186,8 @@ void RulesDialog::editRule() {
         rule.titleFilter = titleEdit.text().trimmed();
         rule.action = actionCombo.currentText();
 
+        m_model.updateRule(rule);
+
         rulesTable->item(row, 0)->setText(rule.displayCondition());
         rulesTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(rule.toJson()));
         rulesTable->item(row, 1)->setText(rule.action);
@@ -183,22 +196,22 @@ void RulesDialog::editRule() {
 void RulesDialog::removeRule() {
     int row = rulesTable->currentRow();
     if (row >= 0) {
+        QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
+        QString id = obj["id"].toString();
+        m_model.removeRule(id);
         rulesTable->removeRow(row);
     }
 }
 
-void RulesDialog::saveRules() {
-    QList<NotificationRule> rules;
-    for (int i = 0; i < rulesTable->rowCount(); ++i) {
-        QJsonObject obj = rulesTable->item(i, 0)->data(Qt::UserRole).toJsonObject();
-        NotificationRule rule = NotificationRule::fromJson(obj);
-        rules.append(rule);
-    }
-    NotificationRuleEngine::saveRules(rules);
-}
+void RulesDialog::saveRules() { m_model.save(); }
 void RulesDialog::moveUp() {
     int row = rulesTable->currentRow();
     if (row > 0) {
+        QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
+        QString id = obj["id"].toString();
+
+        m_model.moveUp(id);
+
         QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
         QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
         rulesTable->removeRow(row);
@@ -212,6 +225,11 @@ void RulesDialog::moveUp() {
 void RulesDialog::moveDown() {
     int row = rulesTable->currentRow();
     if (row >= 0 && row < rulesTable->rowCount() - 1) {
+        QJsonObject obj = rulesTable->item(row, 0)->data(Qt::UserRole).toJsonObject();
+        QString id = obj["id"].toString();
+
+        m_model.moveDown(id);
+
         QTableWidgetItem* conditionItem = rulesTable->takeItem(row, 0);
         QTableWidgetItem* actionItem = rulesTable->takeItem(row, 1);
         rulesTable->removeRow(row);

@@ -3,6 +3,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+NotificationRule::NotificationRule() : id(QUuid::createUuid().toString()) {}
+
 QJsonObject NotificationRule::toJson() const {
     QJsonObject obj;
     obj["repoFilter"] = repoFilter;
@@ -10,6 +12,7 @@ QJsonObject NotificationRule::toJson() const {
     obj["reasonFilter"] = reasonFilter;
     obj["titleFilter"] = titleFilter;
     obj["action"] = action;
+    obj["id"] = id;
     return obj;
 }
 
@@ -20,6 +23,9 @@ NotificationRule NotificationRule::fromJson(const QJsonObject& obj) {
     rule.reasonFilter = obj["reasonFilter"].toString();
     rule.titleFilter = obj["titleFilter"].toString();
     rule.action = obj["action"].toString();
+    if (obj.contains("id")) {
+        rule.id = obj["id"].toString();
+    }
 
     // Backwards compatibility for the string based "condition"
     if (obj.contains("condition")) {
@@ -129,4 +135,56 @@ void NotificationRuleEngine::prependRule(const NotificationRule& rule) {
     QList<NotificationRule> rules = loadRules();
     rules.prepend(rule);
     saveRules(rules);
+}
+
+NotificationRuleModel::NotificationRuleModel() {}
+
+void NotificationRuleModel::load() { m_rules = NotificationRuleEngine::loadRules(); }
+
+void NotificationRuleModel::save() { NotificationRuleEngine::saveRules(m_rules); }
+
+void NotificationRuleModel::addRule(const NotificationRule& rule) { m_rules.append(rule); }
+
+void NotificationRuleModel::updateRule(const NotificationRule& rule) {
+    for (int i = 0; i < m_rules.size(); ++i) {
+        if (m_rules[i].id == rule.id) {
+            m_rules[i] = rule;
+            break;
+        }
+    }
+}
+
+void NotificationRuleModel::removeRule(const QString& id) {
+    for (int i = 0; i < m_rules.size(); ++i) {
+        if (m_rules[i].id == id) {
+            m_rules.removeAt(i);
+            break;
+        }
+    }
+}
+
+void NotificationRuleModel::moveUp(const QString& id) {
+    int idx = -1;
+    for (int i = 0; i < m_rules.size(); ++i) {
+        if (m_rules[i].id == id) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx > 0) {
+        m_rules.swapItemsAt(idx, idx - 1);
+    }
+}
+
+void NotificationRuleModel::moveDown(const QString& id) {
+    int idx = -1;
+    for (int i = 0; i < m_rules.size(); ++i) {
+        if (m_rules[i].id == id) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx >= 0 && idx < m_rules.size() - 1) {
+        m_rules.swapItemsAt(idx, idx + 1);
+    }
 }
