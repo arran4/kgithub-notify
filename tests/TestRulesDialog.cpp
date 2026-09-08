@@ -27,14 +27,12 @@ class TestRulesDialog : public QObject {
         QList<NotificationRule> initial = {a, b, c};
         NotificationRuleEngine::saveRules(initial);
 
-        // Open with scope "repoA"
-        RulesDialog dialog(nullptr, "repoA");
+        NotificationRuleModel model;
+        model.load();
 
-        // Edit rule A via the model seam
         a.typeFilter = "PullRequest";
-        dialog.updateRuleModel(a);
-
-        dialog.saveRulesModel();
+        model.updateRule(a);
+        model.save();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 3);
@@ -50,15 +48,15 @@ class TestRulesDialog : public QObject {
         b.repoFilter = "repoB";
         NotificationRuleEngine::saveRules({a, b});
 
-        RulesDialog dialog(nullptr, "repoA");
+        NotificationRuleModel model;
+        model.load();
 
-        // Add a new rule for repoA via the model seam
         NotificationRule newRule;
         newRule.repoFilter = "repoA";
         newRule.typeFilter = "Issue";
-        dialog.addRuleModel(newRule);
+        model.addRule(newRule);
 
-        dialog.saveRulesModel();
+        model.save();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 3);
@@ -74,12 +72,11 @@ class TestRulesDialog : public QObject {
         b.repoFilter = "repoB";
         NotificationRuleEngine::saveRules({a, b});
 
-        RulesDialog dialog(nullptr, "repoA");
+        NotificationRuleModel model;
+        model.load();
 
-        // Remove rule A via the model seam
-        dialog.removeRuleModel(a.id);
-
-        dialog.saveRulesModel();
+        model.removeRule(a.id);
+        model.save();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
@@ -115,12 +112,11 @@ class TestRulesDialog : public QObject {
         QVERIFY(a1.id != a2.id);  // distinct IDs
         NotificationRuleEngine::saveRules({a1, a2});
 
-        RulesDialog dialog(nullptr, "repoA");
+        NotificationRuleModel model;
+        model.load();
 
-        // Remove specifically a1
-        dialog.removeRuleModel(a1.id);
-
-        dialog.saveRulesModel();
+        model.removeRule(a1.id);
+        model.save();
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
         QCOMPARE(saved[0].id, a2.id);
@@ -148,11 +144,11 @@ class TestRulesDialog : public QObject {
         b.repoFilter = "repoB";
         NotificationRuleEngine::saveRules({a, b});
 
-        RulesDialog dialog;  // unscoped
+        NotificationRuleModel model;
+        model.load();
 
-        // Remove a
-        dialog.removeRuleModel(a.id);
-        dialog.saveRulesModel();
+        model.removeRule(a.id);
+        model.save();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
@@ -193,12 +189,11 @@ class TestRulesDialog : public QObject {
         b.repoFilter = "repoB";
         NotificationRuleEngine::saveRules({a, b});
 
-        RulesDialog dialog;
+        NotificationRuleModel model;
+        model.load();
 
-        // Move rule B up using model seam
-        dialog.moveUpModel(b.id);
-
-        dialog.saveRulesModel();
+        model.moveUp(b.id);
+        model.save();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 2);

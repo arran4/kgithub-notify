@@ -29,6 +29,23 @@ class NotificationRule {
     QString displayCondition() const;
 };
 
+class NotificationRuleModel {
+public:
+    NotificationRuleModel();
+    void load();
+    void save();
+
+    QList<NotificationRule> allRules() const { return m_rules; }
+    void addRule(const NotificationRule& rule);
+    void updateRule(const NotificationRule& rule);
+    void removeRule(const QString& id);
+    void moveUp(const QString& id);
+    void moveDown(const QString& id);
+
+private:
+    QList<NotificationRule> m_rules;
+};
+
 class NotificationRuleEngine {
    public:
     static QList<NotificationRule> loadRules();
