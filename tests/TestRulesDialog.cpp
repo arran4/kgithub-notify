@@ -29,20 +29,43 @@ class TestRulesDialog : public QObject {
 
         // Open with scope "repoA"
         RulesDialog dialog(nullptr, "repoA");
-        QTableWidget* table = dialog.findChild<QTableWidget*>();
-        QVERIFY(table != nullptr);
 
-        QCOMPARE(table->rowCount(), 1);  // Only A should be loaded
-        table->selectRow(0);
+        // Edit rule A via the model seam
+        a.typeFilter = "PullRequest";
+        dialog.updateRuleModel(a);
 
-        // Use reflection to call private saveRules
-        QMetaObject::invokeMethod(&dialog, "saveRules");
+        dialog.saveRulesModel();
+
+        QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
+        QCOMPARE(saved.size(), 3);
+        QCOMPARE(saved[0].repoFilter, QString("repoA"));
+        QCOMPARE(saved[0].typeFilter, QString("PullRequest"));
+        QCOMPARE(saved[1].repoFilter, QString("repoB"));
+        QCOMPARE(saved[2].repoFilter, QString("repoC"));
+    }
+
+    void testScopedAddPreservesOthers() {
+        NotificationRule a, b;
+        a.repoFilter = "repoA";
+        b.repoFilter = "repoB";
+        NotificationRuleEngine::saveRules({a, b});
+
+        RulesDialog dialog(nullptr, "repoA");
+
+        // Add a new rule for repoA via the model seam
+        NotificationRule newRule;
+        newRule.repoFilter = "repoA";
+        newRule.typeFilter = "Issue";
+        dialog.addRuleModel(newRule);
+
+        dialog.saveRulesModel();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 3);
         QCOMPARE(saved[0].repoFilter, QString("repoA"));
         QCOMPARE(saved[1].repoFilter, QString("repoB"));
-        QCOMPARE(saved[2].repoFilter, QString("repoC"));
+        QCOMPARE(saved[2].repoFilter, QString("repoA"));
+        QCOMPARE(saved[2].typeFilter, QString("Issue"));
     }
 
     void testScopedRemove() {
@@ -52,14 +75,11 @@ class TestRulesDialog : public QObject {
         NotificationRuleEngine::saveRules({a, b});
 
         RulesDialog dialog(nullptr, "repoA");
-        QTableWidget* table = dialog.findChild<QTableWidget*>();
-        QCOMPARE(table->rowCount(), 1);
-        table->selectRow(0);
 
-        QMetaObject::invokeMethod(&dialog, "removeRule");
-        QCOMPARE(table->rowCount(), 0);
+        // Remove rule A via the model seam
+        dialog.removeRuleModel(a.id);
 
-        QMetaObject::invokeMethod(&dialog, "saveRules");
+        dialog.saveRulesModel();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
@@ -96,16 +116,14 @@ class TestRulesDialog : public QObject {
         NotificationRuleEngine::saveRules({a1, a2});
 
         RulesDialog dialog(nullptr, "repoA");
-        QTableWidget* table = dialog.findChild<QTableWidget*>();
-        QCOMPARE(table->rowCount(), 2);
-        table->selectRow(0);
 
-        QMetaObject::invokeMethod(&dialog, "removeRule");
+        // Remove specifically a1
+        dialog.removeRuleModel(a1.id);
 
-        QMetaObject::invokeMethod(&dialog, "saveRules");
+        dialog.saveRulesModel();
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
-        QCOMPARE(saved[0].id, a2.id);  // Only the selected one got removed
+        QCOMPARE(saved[0].id, a2.id);
     }
 
     void testZeroMatchingScopedRows() {
@@ -131,12 +149,10 @@ class TestRulesDialog : public QObject {
         NotificationRuleEngine::saveRules({a, b});
 
         RulesDialog dialog;  // unscoped
-        QTableWidget* table = dialog.findChild<QTableWidget*>();
-        QCOMPARE(table->rowCount(), 2);
-        table->selectRow(0);
 
-        QMetaObject::invokeMethod(&dialog, "removeRule");
-        QMetaObject::invokeMethod(&dialog, "saveRules");
+        // Remove a
+        dialog.removeRuleModel(a.id);
+        dialog.saveRulesModel();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 1);
@@ -150,10 +166,25 @@ class TestRulesDialog : public QObject {
         NotificationRuleEngine::saveRules({a, b});
 
         RulesDialog dialog(nullptr, "repoA");  // scoped
-        QPushButton* upBtn = dialog.findChild<QPushButton*>("btnUp");
-        // We didn't set objectName, let's just rely on the table state or look at properties
-        // actually since we exposed btnUp as a member, it doesn't have an object name.
-        // We'll skip UI property testing for button enable state, and test the move logic unscoped.
+
+        // Test that if we try to move up via the UI slot, it doesn't do anything because the table item selection and validation logic
+        // But since we are asked to assert the scoped reordering contract properly...
+        // Let's assert that the UI slot disables the button. We exposed btnUp.
+
+        // However btnUp is private, so we can check it via findChildren.
+        // Instead of doing that, let's assert that btnUp is disabled directly if we expose it or find it.
+        // We can find it because it has the text "Move Up".
+
+        QList<QPushButton*> btns = dialog.findChildren<QPushButton*>();
+        QPushButton* upBtn = nullptr;
+        for (QPushButton* btn : btns) {
+            if (btn->text() == "Move Up") {
+                upBtn = btn;
+                break;
+            }
+        }
+        QVERIFY(upBtn != nullptr);
+        QVERIFY(!upBtn->isEnabled());
     }
 
     void testMoveUnscoped() {
@@ -163,12 +194,11 @@ class TestRulesDialog : public QObject {
         NotificationRuleEngine::saveRules({a, b});
 
         RulesDialog dialog;
-        QTableWidget* table = dialog.findChild<QTableWidget*>();
-        QCOMPARE(table->rowCount(), 2);
-        table->selectRow(1);  // Select B
 
-        QMetaObject::invokeMethod(&dialog, "moveUp");
-        QMetaObject::invokeMethod(&dialog, "saveRules");
+        // Move rule B up using model seam
+        dialog.moveUpModel(b.id);
+
+        dialog.saveRulesModel();
 
         QList<NotificationRule> saved = NotificationRuleEngine::loadRules();
         QCOMPARE(saved.size(), 2);

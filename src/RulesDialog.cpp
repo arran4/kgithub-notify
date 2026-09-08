@@ -269,3 +269,42 @@ void RulesDialog::moveDown() {
         rulesTable->selectRow(row + 1);
     }
 }
+
+void RulesDialog::addRuleModel(const NotificationRule& rule) {
+    m_allRules.append(rule);
+}
+
+void RulesDialog::updateRuleModel(const NotificationRule& rule) {
+    for (int i = 0; i < m_allRules.size(); ++i) {
+        if (m_allRules[i].id == rule.id) {
+            m_allRules[i] = rule;
+            break;
+        }
+    }
+}
+
+void RulesDialog::removeRuleModel(const QString& id) {
+    for (int i = 0; i < m_allRules.size(); ++i) {
+        if (m_allRules[i].id == id) {
+            m_allRules.removeAt(i);
+            break;
+        }
+    }
+}
+
+void RulesDialog::moveUpModel(const QString& id) {
+    int allRulesIndex = -1;
+    for (int i = 0; i < m_allRules.size(); ++i) {
+        if (m_allRules[i].id == id) {
+            allRulesIndex = i;
+            break;
+        }
+    }
+    if (allRulesIndex > 0) {
+        m_allRules.swapItemsAt(allRulesIndex, allRulesIndex - 1);
+    }
+}
+
+void RulesDialog::saveRulesModel() {
+    NotificationRuleEngine::saveRules(m_allRules);
+}

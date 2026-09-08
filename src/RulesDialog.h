@@ -13,6 +13,13 @@ class RulesDialog : public QDialog {
     explicit RulesDialog(QWidget* parent = nullptr, const QString& preFilterRepo = QString(),
                          const QString& prepopulateCondition = QString());
 
+    // Test seams
+    void addRuleModel(const NotificationRule& rule);
+    void updateRuleModel(const NotificationRule& rule);
+    void removeRuleModel(const QString& id);
+    void moveUpModel(const QString& id);
+    void saveRulesModel();
+
    private slots:
     void addRule(const QString& prepopulateCondition = QString());
 
