@@ -163,3 +163,13 @@ install(FILES src/kgithub-notifyui.rc
 install(FILES src/com.arran4.kgithub_notify.metainfo.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
 )
+
+# Exercise the real consumers with manually completed network replies.
+get_target_property(consumer_sources kgithub-notify SOURCES)
+list(REMOVE_ITEM consumer_sources src/main.cpp)
+add_executable(TestRequestConsumers tests/TestRequestConsumers.cpp
+    tests/FakeNetworkAccessManager.cpp ${consumer_sources})
+get_target_property(consumer_libraries kgithub-notify LINK_LIBRARIES)
+target_link_libraries(TestRequestConsumers PRIVATE ${consumer_libraries} Qt6::Test)
+add_test(NAME TestRequestConsumers COMMAND TestRequestConsumers)
+set_tests_properties(TestRequestConsumers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

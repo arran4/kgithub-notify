@@ -14,6 +14,7 @@
 
 class NewIssueDialog : public QDialog {
     Q_OBJECT
+    friend class TestRequestConsumers;
 
    public:
     explicit NewIssueDialog(GitHubClient* client, QWidget* parent = nullptr);
@@ -38,6 +39,7 @@ class NewIssueDialog : public QDialog {
     QUuid m_repoLoadRequestId;
     QUuid m_verifyRequestId;
     QUuid m_createIssueRequestId;
+    bool m_repositoryVerified = false;
     QComboBox* m_repoComboBox;
     QLineEdit* m_titleEdit;
     QTextEdit* m_bodyEdit;

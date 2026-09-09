@@ -16,6 +16,7 @@
 
 class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
 
    public:
     enum Column {

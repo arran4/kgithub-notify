@@ -20,8 +20,11 @@
 
 class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
-    explicit PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr);
+    explicit PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr,
+                               QNetworkAccessManager* networkManager = nullptr);
 
    private slots:
     void fetchPrDetails();
@@ -49,6 +52,10 @@ class PullRequestWindow : public KXmlGuiWindow {
     Notification m_notification;
     GitHubClient* m_client;
     QNetworkAccessManager* m_manager;
+    QUuid m_detailsGeneration;
+    QUuid m_commentRequestId;
+    QLabel* m_requestStatus;
+    QPushButton* m_retryButton;
 
     QTabWidget* m_tabWidget;
 

@@ -22,6 +22,8 @@ struct ApiPreset {
 
 class DebugWindow : public QDialog {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
     explicit DebugWindow(GitHubClient* client, QWidget* parent = nullptr);
     void setEndpoint(const QString& url);

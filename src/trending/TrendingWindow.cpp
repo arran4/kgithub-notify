@@ -233,26 +233,31 @@ void TrendingWindow::onRefreshClicked() {
 
     lastRequestedUrl = endpoint;
     refreshButton->setEnabled(false);
-    m_currentReqId = m_client->requestRaw(endpoint);
+    m_currentReqId = QUuid::createUuid();
+    m_client->requestRaw(endpoint, "GET", QByteArray(), m_currentReqId);
 }
 
 void TrendingWindow::onRawDataReceived(const QUuid& reqId, const QByteArray& data) {
-    if (reqId != m_currentReqId) return;
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
     refreshButton->setEnabled(true);
-    // Only process if it looks like a search response. We use lastRequestedUrl to match loosely if possible.
-    // In our client, requestRaw doesn't pass back the endpoint it requested.
-    // So we'll try to parse and check if it's the right format.
 
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(data, &error);
 
     if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-        return;  // Ignore invalid JSON (might be for something else)
+        tableWidget->setRowCount(1);
+        tableWidget->setColumnCount(1);
+        tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Invalid search response.")));
+        return;
     }
 
     QJsonObject root = doc.object();
     if (!root.contains("items")) {
-        return;  // Not a search result
+        tableWidget->setRowCount(1);
+        tableWidget->setColumnCount(1);
+        tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Invalid search response.")));
+        return;
     }
 
     // Clear the loading text
@@ -453,6 +458,11 @@ void TrendingWindow::onItemSelectionChanged() {
 }
 
 void TrendingWindow::onErrorOccurred(const QUuid& reqId, const QString& error) {
-    if (reqId != m_currentReqId) return;
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
     refreshButton->setEnabled(true);
+    tableWidget->clear();
+    tableWidget->setColumnCount(1);
+    tableWidget->setRowCount(1);
+    tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Error: %1").arg(error)));
 }

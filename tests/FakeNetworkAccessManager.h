@@ -5,19 +5,20 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QTimer>
-
-#include "MockNetworkReply.h"  // We will reuse or just modify FakeNetworkReply. Wait, let's just make FakeNetworkReply controllable.
+#include <cstring>
 
 class ControlledFakeReply : public QNetworkReply {
     Q_OBJECT
    public:
-    explicit ControlledFakeReply(QObject* parent = nullptr) : QNetworkReply(parent) {
+    ControlledFakeReply(const QNetworkRequest& request, QNetworkAccessManager::Operation operation, QObject* parent)
+        : QNetworkReply(parent) {
+        setRequest(request);
+        setUrl(request.url());
+        setOperation(operation);
         setOpenMode(QIODevice::ReadOnly);
-        // Do NOT immediately queue finished.
     }
 
-    void abort() override {}
+    void abort() override { completeWithError(OperationCanceledError, "Request cancelled"); }
 
     qint64 readData(char* data, qint64 maxlen) override {
         qint64 len = qMin(maxlen, static_cast<qint64>(m_data.size()));
@@ -31,6 +32,8 @@ class ControlledFakeReply : public QNetworkReply {
     void setReplyData(const QByteArray& data) { m_data = data; }
 
     void complete(const QByteArray& data, int httpStatus = 200) {
+        if (isFinished()) return;
+        setFinished(true);
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, httpStatus);
         setReplyData(data);
         emit readyRead();
@@ -38,9 +41,14 @@ class ControlledFakeReply : public QNetworkReply {
     }
 
     void completeWithError(NetworkError code, const QString& errorString) {
+        if (isFinished()) return;
+        setFinished(true);
         setError(code, errorString);
+        emit errorOccurred(code);
         emit finished();
     }
+
+    using QNetworkReply::setRawHeader;
 
     QByteArray m_data;
 };
@@ -62,10 +70,10 @@ class FakeNetworkAccessManager : public QNetworkAccessManager {
     QNetworkReply* createRequest(Operation op, const QNetworkRequest& request,
                                  QIODevice* outgoingData = nullptr) override {
         Q_UNUSED(outgoingData);
-        ControlledFakeReply* reply = new ControlledFakeReply(this);
+        ControlledFakeReply* reply = new ControlledFakeReply(request, op, this);
         requests.append({op, request, reply});
         if (autoEmitFinished) {
-            QMetaObject::invokeMethod(reply, "finished", Qt::QueuedConnection);
+            QMetaObject::invokeMethod(reply, [reply]() { reply->complete(QByteArray()); }, Qt::QueuedConnection);
         }
         return reply;
     }

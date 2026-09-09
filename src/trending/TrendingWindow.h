@@ -18,6 +18,7 @@ class GitHubClient;
 
 class TrendingWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
 
    public:
     explicit TrendingWindow(GitHubClient* client, QWidget* parent = nullptr);

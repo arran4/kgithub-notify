@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QFuture>
 #include <QLineEdit>
+#include <QUuid>
 
 class QComboBox;
 class QPushButton;
@@ -13,6 +14,8 @@ class QCheckBox;
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
     explicit SettingsDialog(QWidget* parent = nullptr);
     enum GetDataOption { Manual, FillScreen, GetAll, Infinite };
@@ -53,6 +56,7 @@ class SettingsDialog : public QDialog {
     QPushButton* testButton;
     QLabel* statusLabel;
     GitHubClient* testClient;
+    QUuid m_verificationRequestId;
 };
 
 #endif  // SETTINGSDIALOG_H

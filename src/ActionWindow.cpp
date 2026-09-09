@@ -5,17 +5,25 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QStatusBar>
 
-ActionWindow::ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent)
+ActionWindow::ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent,
+                           QNetworkAccessManager* networkManager)
     : KXmlGuiWindow(parent, Qt::Window),
       m_notification(n),
       m_client(client),
-      m_manager(new QNetworkAccessManager(this)) {
+      m_manager(networkManager ? networkManager : new QNetworkAccessManager(this)) {
     setWindowTitle(tr("Action Run - %1").arg(n.title));
     resize(700, 500);
 
     setupUi();
 
+    m_requestStatus = new QLabel(this);
+    m_requestStatus->setTextFormat(Qt::PlainText);
+    statusBar()->addWidget(m_requestStatus, 1);
+    m_retryButton = new QPushButton(tr("Retry"), this);
+    statusBar()->addPermanentWidget(m_retryButton);
+    connect(m_retryButton, &QPushButton::clicked, this, &ActionWindow::fetchRunDetails);
     fetchRunDetails();
 }
 
@@ -43,14 +51,24 @@ void ActionWindow::setupUi() {
 }
 
 void ActionWindow::fetchRunDetails() {
+    m_detailsGeneration = QUuid::createUuid();
+    m_requestStatus->setText(tr("Loading action details..."));
+    m_retryButton->setEnabled(false);
     QUrl url(m_notification.url);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onRunDetailsReply(reply); });
 }
 
 void ActionWindow::onRunDetailsReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
+    m_retryButton->setEnabled(true);
     if (reply->error() == QNetworkReply::NoError) {
+        m_requestStatus->setText(tr("Action details loaded."));
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonObject obj = doc.object();
@@ -66,7 +84,9 @@ void ActionWindow::onRunDetailsReply(QNetworkReply* reply) {
 
         fetchJobs();
     } else {
-        QMessageBox::warning(this, tr("Error"), tr("Failed to fetch action details: %1").arg(reply->errorString()));
+        m_statusLabel->setText(tr("Action details unavailable."));
+        m_requestStatus->setText(
+            tr("Failed to fetch action details: %1. Retry to try again.").arg(reply->errorString()));
     }
     reply->deleteLater();
 }
@@ -77,10 +97,15 @@ void ActionWindow::fetchJobs() {
     QUrl url(m_jobsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onJobsReply(reply); });
 }
 
 void ActionWindow::onJobsReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);

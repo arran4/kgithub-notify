@@ -74,6 +74,7 @@ RepoListWindow::RepoListWindow(GitHubClient* client, QWidget* parent)
 
     connect(m_client, &GitHubClient::userReposReceived, this, &RepoListWindow::onReposReceived);
     connect(m_client, &GitHubClient::errorOccurred, this, &RepoListWindow::onError);
+    connect(m_client, &GitHubClient::authError, this, &RepoListWindow::onError);
 
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &RepoListWindow::updateTimerLabel);
@@ -167,8 +168,9 @@ void RepoListWindow::setupUI() {
 void RepoListWindow::onRefreshClicked() {
     m_allRepos = QJsonArray();  // Clear previous
     if (m_refreshAction) m_refreshAction->setEnabled(false);
-    m_refreshRequestId = m_client->fetchUserRepos();
+    m_refreshRequestId = QUuid::createUuid();
     if (m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
+    m_client->fetchUserRepos(QString(), m_refreshRequestId);
 }
 
 void RepoListWindow::onFilterChanged() { addReposToTable(m_allRepos); }
@@ -210,7 +212,7 @@ void RepoListWindow::onExportClicked() {
 }
 
 void RepoListWindow::onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl) {
-    if (reqId != m_refreshRequestId) return;
+    if (reqId.isNull() || reqId != m_refreshRequestId) return;
 
     for (const QJsonValue& val : repos) {
         m_allRepos.append(val);
@@ -219,6 +221,7 @@ void RepoListWindow::onReposReceived(const QUuid& reqId, const QJsonArray& repos
     if (!nextPageUrl.isEmpty()) {
         m_client->fetchUserRepos(nextPageUrl, reqId);
     } else {
+        m_refreshRequestId = QUuid();
         m_lastRefresh = QDateTime::currentDateTime();
         saveCache();
         addReposToTable(m_allRepos);
@@ -364,7 +367,8 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
 }
 
 void RepoListWindow::onError(const QUuid& reqId, const QString& error) {
-    if (reqId != m_refreshRequestId) return;
+    if (reqId.isNull() || reqId != m_refreshRequestId) return;
+    m_refreshRequestId = QUuid();
     if (m_refreshAction) m_refreshAction->setEnabled(true);
 
     if (m_statusBar) {

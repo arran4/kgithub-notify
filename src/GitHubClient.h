@@ -8,7 +8,6 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
-#include <QTimer>
 #include <QUuid>
 
 #include "Notification.h"
@@ -16,16 +15,17 @@
 
 class GitHubClient : public QObject {
     Q_OBJECT
+    friend class TestRequestConsumers;
     friend class TestGitHubClient;
 
    public:
+    // Construction and request dispatch
     explicit GitHubClient(QObject* parent = nullptr);
     static QString apiToHtmlUrl(const QString& apiUrl, const QString& notificationId = "");
     void setToken(const QString& token);
     void setApiUrl(const QString& url);
     void setShowAll(bool all);
     QUuid checkNotifications(QUuid reqId = QUuid());
-    QUuid checkNotificationsWithUrl(const QUrl& url, QUuid reqId = QUuid());
     QUuid loadMore(QUuid reqId = QUuid());
     QUuid verifyToken(QUuid reqId = QUuid());
     QUuid markAsRead(const QString& id, QUuid reqId = QUuid());
@@ -42,6 +42,9 @@ class GitHubClient : public QObject {
     QNetworkRequest createAuthenticatedRequest(const QUrl& url) const;
 
    signals:
+    // Request-scoped results
+    void mutationSucceeded(const QUuid& reqId);
+    void notificationsChanged();
     void loadingStarted(const QUuid& reqId);
     void notificationsReceived(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore);
     void detailsReceived(const QUuid& reqId, const QString& notificationId, const QString& authorName,
@@ -60,13 +63,16 @@ class GitHubClient : public QObject {
     void onReplyFinished(QNetworkReply* reply);
 
    private:
+    // Network and notification session state
     QNetworkAccessManager* manager;
     SecureString m_token;
     QString m_apiUrl;
     bool m_showAll;
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
+    QUuid m_notificationSessionId;
 
+    // Request construction and reply handling
     bool isTrustedApiOrigin(const QUrl& url) const;
     QNetworkRequest createRequest(const QUrl& url) const;
 

@@ -87,6 +87,7 @@ class TestGitHubClient : public QObject {
                  QString("Error: Untrusted external destination for authenticated request."));
 
         // 3. external next links / direct pagination inputs dispatch zero requests
+        client.m_notificationSessionId = QUuid::createUuid();
         client.m_nextPageUrl = "https://evil.com/notifications?page=2";
         QSignalSpy loadMoreNotifySpy(&client, &GitHubClient::notificationsReceived);
         client.loadMore();
@@ -109,6 +110,7 @@ class TestGitHubClient : public QObject {
         QCOMPARE(errorSpy.takeFirst().at(1).toString(), QString("Untrusted notification details URL rejected."));
 
         // 4. trusted pagination still carries auth
+        client.m_notificationSessionId = QUuid::createUuid();
         client.m_nextPageUrl = "https://api.github.com/notifications?page=2";
         client.loadMore();
         QCOMPARE(fakeManager->requests.size(), reqCountBefore + 1);
@@ -159,7 +161,8 @@ class TestGitHubClient : public QObject {
         QByteArray jsonNotifications = "[]";
         MockNetworkReply* replyNotifications = new MockNetworkReply(jsonNotifications, &client);
         replyNotifications->setProperty("type", "notifications");
-        replyNotifications->setProperty("reqId", QUuid::createUuid());
+        client.m_notificationSessionId = QUuid::createUuid();
+        replyNotifications->setProperty("reqId", client.m_notificationSessionId);
         replyNotifications->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
         replyNotifications->setRawHeader("Link", "<https://external.example/notifications?page=2>; rel=\"next\"");
 
@@ -168,7 +171,7 @@ class TestGitHubClient : public QObject {
 
         QCOMPARE(notifySpy.count(), 1);
         QList<QVariant> argsNotify = notifySpy.takeFirst();
-        bool hasMoreNotify = argsNotify.at(2).toBool();
+        bool hasMoreNotify = argsNotify.at(3).toBool();
         QCOMPARE(hasMoreNotify, false);
 
         QCOMPARE(errorSpy.count(), 1);
@@ -186,7 +189,7 @@ class TestGitHubClient : public QObject {
 
         QCOMPARE(repoSpy.count(), 1);
         QList<QVariant> argsRepo = repoSpy.takeFirst();
-        QString nextUrlRepo = argsRepo.at(1).toString();
+        QString nextUrlRepo = argsRepo.at(2).toString();
         QCOMPARE(nextUrlRepo, QString(""));
 
         QCOMPARE(errorSpy.count(), 1);
@@ -195,6 +198,7 @@ class TestGitHubClient : public QObject {
         // Test trusted link header in notifications
         MockNetworkReply* replyNotificationsTrusted = new MockNetworkReply(jsonNotifications, &client);
         replyNotificationsTrusted->setProperty("type", "notifications");
+        replyNotificationsTrusted->setProperty("reqId", client.m_notificationSessionId);
         replyNotificationsTrusted->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
         replyNotificationsTrusted->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\"");
 
@@ -218,8 +222,10 @@ class TestGitHubClient : public QObject {
             "\"type\":\"Issue\"}, \"repository\":{\"full_name\":\"foo/bar\"}, \"updated_at\":\"2023-01-01T00:00:00Z\", "
             "\"unread\":true}]";
         MockNetworkReply* reply = new MockNetworkReply(json, &client);
+        client.m_notificationSessionId = QUuid::createUuid();
         reply->setProperty("type", "notifications");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
         QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
@@ -245,8 +251,10 @@ class TestGitHubClient : public QObject {
             "[{\"id\":\"2\", \"subject\":{\"title\":\"Test2\", \"url\":\"url\", \"type\":\"Issue\"}, "
             "\"repository\":{\"full_name\":\"repo\"}, \"updated_at\":\"date\", \"unread\":true}]";
         MockNetworkReply* reply = new MockNetworkReply(json, &client);
+        client.m_notificationSessionId = QUuid::createUuid();
         reply->setProperty("type", "notifications");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
         reply->setRawHeader("Link",
                             "<https://api.github.com/notifications?page=2>; rel=\"next\", "
@@ -274,7 +282,8 @@ class TestGitHubClient : public QObject {
             "{\"html_url\":\"http://github.com/foo/bar\", \"user\":{\"login\":\"user\", \"avatar_url\":\"url\"}}";
         MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "details");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setProperty("notificationId", "123");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
@@ -293,7 +302,8 @@ class TestGitHubClient : public QObject {
 
         MockNetworkReply* reply = new MockNetworkReply("", &client);
         reply->setProperty("type", "details");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setProperty("notificationId", "123");
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 404);
         reply->setError(QNetworkReply::ContentNotFoundError, "Not Found");
@@ -314,7 +324,8 @@ class TestGitHubClient : public QObject {
         QByteArray json = "{\"login\":\"user\"}";
         MockNetworkReply* reply = new MockNetworkReply(json, &client);
         reply->setProperty("type", "verification");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
         QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
@@ -363,8 +374,10 @@ class TestGitHubClient : public QObject {
         QJsonDocument doc(array);
 
         MockNetworkReply* reply = new MockNetworkReply(doc.toJson(), &client);
+        client.m_notificationSessionId = QUuid::createUuid();
         reply->setProperty("type", "notifications");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
         QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
@@ -459,8 +472,10 @@ class TestGitHubClient : public QObject {
         QJsonDocument doc(array);
 
         MockNetworkReply* reply = new MockNetworkReply(doc.toJson(), &client);
+        client.m_notificationSessionId = QUuid::createUuid();
         reply->setProperty("type", "notifications");
-        reply->setProperty("reqId", QUuid::createUuid());
+        reply->setProperty(
+            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
         reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
 
         QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
@@ -487,172 +502,43 @@ class TestGitHubClient : public QObject {
         QCOMPARE(notifications[3].unread, false);
     }
 
-    void testDebugAndTrendingSimultaneous() {
+    void testEveryOperationRetainsIdentityOnTimeout() {
         GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        auto* fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false;  // We want to control finishing
-
-        QNetworkAccessManager* oldManager = client.manager;
-        client.manager = fakeManager;
-        oldManager->deleteLater();
-
-        // Disconnect old, connect new, similar to constructor
-        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-
-        // We can use signal spy to observe what happens
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
-
-        QUuid debugId = client.requestRaw("/user", "GET", QByteArray());
-        QUuid trendingId = client.requestRaw("/search", "GET", QByteArray());
-
-        QCOMPARE(fakeManager->requests.size(), 2);
-
-        auto debugReply = fakeManager->requests.at(0).reply;
-        auto trendingReply = fakeManager->requests.at(1).reply;
-
-        QVERIFY(!debugId.isNull());
-        QVERIFY(!trendingId.isNull());
-        QVERIFY(debugId != trendingId);
-
-        // Complete Trending first (out of order)
-        trendingReply->complete("{\"items\":[]}");
-
-        QCOMPARE(spyRaw.count(), 1);
-        QList<QVariant> args1 = spyRaw.takeFirst();
-        QCOMPARE(args1.at(0).toUuid(), trendingId);
-        QCOMPARE(args1.at(1).toByteArray(), QByteArray("{\"items\":[]}"));
-
-        // Complete Debug next
-        debugReply->complete("{\"login\":\"user\"}");
-
-        QCOMPARE(spyRaw.count(), 1);
-        QList<QVariant> args2 = spyRaw.takeFirst();
-        QCOMPARE(args2.at(0).toUuid(), debugId);
-        QCOMPARE(args2.at(1).toByteArray(), QByteArray("{\"login\":\"user\"}"));
-    }
-
-    void testIndependentSimultaneousTimeouts() {
-        GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        auto* fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false;
-
-        QNetworkAccessManager* oldManager = client.manager;
-        client.manager = fakeManager;
-        oldManager->deleteLater();
-
-        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
-        // Note: requestRaw emits rawDataReceived with the error string instead of errorOccurred.
-        // Let's use checkNotifications to get an errorOccurred.
-
-        QUuid id1 = client.checkNotifications();
-        QUuid id2 = client.checkNotifications();
-
-        QCOMPARE(fakeManager->requests.size(), 2);
-
-        auto reply1 = fakeManager->requests.at(0).reply;
-        auto reply2 = fakeManager->requests.at(1).reply;
-
-        QSignalSpy spyError(&client, SIGNAL(errorOccurred(QUuid, QString)));
-        QSignalSpy spyNotif(&client, SIGNAL(notificationsReceived(QUuid, QList<Notification>, bool, bool)));
-
-        // complete id1 with error (simulating timeout)
-        reply1->completeWithError(QNetworkReply::TimeoutError, "Timeout");
-
-        QCOMPARE(spyError.count(), 1);
-        QList<QVariant> args = spyError.takeFirst();
-        QCOMPARE(args.at(0).toUuid(), id1);
-
-        // complete id2 successfully
-        reply2->complete("[]");
-
-        QCOMPARE(spyNotif.count(), 1);
-        args = spyNotif.takeFirst();
-        QCOMPARE(args.at(0).toUuid(), id2);
-        QCOMPARE(spyError.count(), 0);
-    }
-
-    void testRefreshBeforeOldReplyCompletes() {
-        GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        auto* fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false;
-
-        QNetworkAccessManager* oldManager = client.manager;
-        client.manager = fakeManager;
-        oldManager->deleteLater();
-
-        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
-
-        QUuid req1 = client.requestRaw("/data", "GET", QByteArray());
-        QUuid req2 = client.requestRaw("/data", "GET", QByteArray());
-
-        QCOMPARE(fakeManager->requests.size(), 2);
-
-        auto reply1 = fakeManager->requests.at(0).reply;
-        auto reply2 = fakeManager->requests.at(1).reply;
-
-        // Old reply completes
-        reply1->complete("{\"data\":\"old\"}");
-
-        QCOMPARE(spyRaw.count(), 1);
-        QList<QVariant> args1 = spyRaw.takeFirst();
-        QCOMPARE(args1.at(0).toUuid(), req1);
-        QCOMPARE(args1.at(1).toByteArray(), QByteArray("{\"data\":\"old\"}"));
-
-        // New reply completes
-        reply2->complete("{\"data\":\"new\"}");
-
-        QCOMPARE(spyRaw.count(), 1);
-        QList<QVariant> args2 = spyRaw.takeFirst();
-        QCOMPARE(args2.at(0).toUuid(), req2);
-        QCOMPARE(args2.at(1).toByteArray(), QByteArray("{\"data\":\"new\"}"));
-    }
-
-    void testWindowDestructionBeforeReply() {
-        GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        auto* fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false;
-
-        QNetworkAccessManager* oldManager = client.manager;
-        client.manager = fakeManager;
-        oldManager->deleteLater();
-
-        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
-
-        QUuid req = client.requestRaw("/data", "GET", QByteArray());
-
-        QCOMPARE(fakeManager->requests.size(), 1);
-        auto reply = fakeManager->requests.at(0).reply;
-
-        // Window gets destroyed, its slot wouldn't be called, but client handles reply safely
-        reply->complete("{\"data\":\"valid\"}");
-
-        // Ensure signal is emitted, memory is cleaned up
-        QCOMPARE(spyRaw.count(), 1);
-        QList<QVariant> args = spyRaw.takeFirst();
-        QCOMPARE(args.at(0).toUuid(), req);
-        QCOMPARE(args.at(1).toByteArray(), QByteArray("{\"data\":\"valid\"}"));
+        delete client.manager;
+        auto* network = new FakeNetworkAccessManager(&client);
+        network->autoEmitFinished = false;
+        client.manager = network;
+        connect(network, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
+        client.setToken("test-token");
+        QList<QUuid> completions;
+        connect(&client, &GitHubClient::errorOccurred, this,
+                [&](const QUuid& id, const QString&) { completions.append(id); });
+        connect(&client, &GitHubClient::detailsError, this,
+                [&](const QUuid& id, const QString&, const QString&) { completions.append(id); });
+        connect(&client, &GitHubClient::tokenVerified, this, [&](const QUuid& id, bool valid, const QString&) {
+            QVERIFY(!valid);
+            completions.append(id);
+        });
+        QList<QUuid> ids{client.checkNotifications(),
+                         client.verifyToken(),
+                         client.markAsRead("1"),
+                         client.markAsDone("2"),
+                         client.markAsReadAndDone("3"),
+                         client.fetchNotificationDetails("https://api.github.com/repos/o/r/issues/1", "1"),
+                         client.fetchImage("https://avatars.example/avatar.png", "1"),
+                         client.requestRaw("/user"),
+                         client.fetchUserRepos(),
+                         client.verifyRepo("o/r"),
+                         client.createIssue("o/r", "title", "body")};
+        QCOMPARE(network->requests.size(), ids.size());
+        for (int i = ids.size() - 1; i >= 0; --i) {
+            QVERIFY(!ids[i].isNull());
+            QCOMPARE(network->requests[i].reply->property("reqId").toUuid(), ids[i]);
+            QCOMPARE(network->requests[i].request.transferTimeout(), 30000);
+            network->requests[i].reply->completeWithError(QNetworkReply::TimeoutError, "Request timed out");
+            QCOMPARE(completions.last(), ids[i]);
+        }
+        QCOMPARE(completions.size(), ids.size());
     }
 
     void testRequestTimeoutPolicy() {
@@ -660,10 +546,10 @@ class TestGitHubClient : public QObject {
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        auto* fakeManager = new FakeNetworkAccessManager(&client);
         fakeManager->autoEmitFinished = false;
 
-        QNetworkAccessManager *oldManager = client.manager;
+        QNetworkAccessManager* oldManager = client.manager;
         client.manager = fakeManager;
         oldManager->deleteLater();
 
@@ -675,52 +561,6 @@ class TestGitHubClient : public QObject {
         // Assert native timeout is 30 seconds
         QCOMPARE(request.transferTimeout(), 30000);
     }
-
-
-    void testTwoNewIssueDialogInstancesSimultaneous() {
-        GitHubClient client;
-        client.setApiUrl("https://api.github.com");
-        client.setToken("dummy_token");
-
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false;
-
-        QNetworkAccessManager *oldManager = client.manager;
-        client.manager = fakeManager;
-        oldManager->deleteLater();
-
-        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
-
-        QSignalSpy spyVerified(&client, SIGNAL(repoVerified(QUuid,QString,bool)));
-
-        QUuid id1 = client.verifyRepo("owner/repo1");
-        QUuid id2 = client.verifyRepo("owner/repo2");
-
-        QCOMPARE(fakeManager->requests.size(), 2);
-
-        auto reply1 = fakeManager->requests.at(0).reply;
-        auto reply2 = fakeManager->requests.at(1).reply;
-
-        // Verify repo2
-        reply2->complete("{\"id\":123}");
-
-        QCOMPARE(spyVerified.count(), 1);
-        QList<QVariant> args2 = spyVerified.takeFirst();
-        QCOMPARE(args2.at(0).toUuid(), id2);
-        QCOMPARE(args2.at(1).toString(), QString("owner/repo2"));
-        QCOMPARE(args2.at(2).toBool(), true);
-
-        // Fail to verify repo1
-        reply1->completeWithError(QNetworkReply::ContentNotFoundError, "Not Found");
-
-        QCOMPARE(spyVerified.count(), 1);
-        QList<QVariant> args1 = spyVerified.takeFirst();
-        QCOMPARE(args1.at(0).toUuid(), id1);
-        QCOMPARE(args1.at(1).toString(), QString("owner/repo1"));
-        QCOMPARE(args1.at(2).toBool(), false);
-    }
-
 };
 
 QTEST_MAIN(TestGitHubClient)
