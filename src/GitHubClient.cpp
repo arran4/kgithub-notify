@@ -116,6 +116,7 @@ QUuid GitHubClient::markAsRead(const QString& id, QUuid reqId) {
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "patch");
     return reqId;
 }
@@ -130,6 +131,7 @@ QUuid GitHubClient::markAsDone(const QString& id, QUuid reqId) {
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->deleteResource(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "delete");
     return reqId;
 }
@@ -144,12 +146,14 @@ QUuid GitHubClient::markAsReadAndDone(const QString& id, QUuid reqId) {
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "read_and_done");
     reply->setProperty("notificationId", id);
     return reqId;
 }
 
 QUuid GitHubClient::fetchNotificationDetails(const QString& url, const QString& notificationId, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
     if (m_token.isEmpty() || url.isEmpty()) return reqId;
     QUrl qUrl(url);
     if (!qUrl.isValid()) return reqId;
@@ -161,6 +165,7 @@ QUuid GitHubClient::fetchNotificationDetails(const QString& url, const QString& 
 
     QNetworkRequest request = createRequest(qUrl);
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "details");
     reply->setProperty("notificationId", notificationId);
     return reqId;
@@ -242,6 +247,7 @@ QUuid GitHubClient::fetchUserRepos(const QString& pageUrl, QUuid reqId) {
 
     QNetworkRequest request = createAuthenticatedRequest(url);
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "repos");
     return reqId;
 }
@@ -327,7 +333,14 @@ void GitHubClient::onReplyFinished(QNetworkReply* reply) {
         if (reply->error() == QNetworkReply::NoError) {
             emit issueCreated(reqId, reply->readAll());
         } else {
-            emit issueCreated(reqId, reply->readAll());
+            QByteArray errorData = reply->readAll();
+            QString errorString = reply->errorString();
+
+            QJsonDocument doc = QJsonDocument::fromJson(errorData);
+            if (doc.isObject() && doc.object().contains("message")) {
+                errorString += " - " + doc.object()["message"].toString();
+            }
+            emit errorOccurred(reqId, errorString);
         }
     } else if (type == "raw") {
         if (reply->error() == QNetworkReply::NoError) {

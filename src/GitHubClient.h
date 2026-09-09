@@ -25,6 +25,7 @@ class GitHubClient : public QObject {
     void setApiUrl(const QString& url);
     void setShowAll(bool all);
     QUuid checkNotifications(QUuid reqId = QUuid());
+    QUuid checkNotificationsWithUrl(const QUrl& url, QUuid reqId = QUuid());
     QUuid loadMore(QUuid reqId = QUuid());
     QUuid verifyToken(QUuid reqId = QUuid());
     QUuid markAsRead(const QString& id, QUuid reqId = QUuid());

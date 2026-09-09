@@ -130,7 +130,7 @@ void MainWindow::setClient(GitHubClient* c) {
             [this]() { this->client->loadMore(); });
 
     if (refreshTimer) {
-        connect(refreshTimer, &QTimer::timeout, this, [this]() { this->client->checkNotifications(); });
+        connect(refreshTimer, &QTimer::timeout, this, [this]() { this->m_currentRefreshId = QUuid::createUuid(); this->client->checkNotifications(this->m_currentRefreshId); });
         int interval = SettingsDialog::getInterval();
         refreshTimer->setInterval(calculateSafeInterval(interval));
         refreshTimer->start();
@@ -138,7 +138,7 @@ void MainWindow::setClient(GitHubClient* c) {
 
     if (!m_loadedToken.isEmpty()) {
         client->setToken(m_loadedToken);
-        client->checkNotifications();
+        this->m_currentRefreshId = QUuid::createUuid(); client->checkNotifications(this->m_currentRefreshId);
     }
 }
 
@@ -166,8 +166,8 @@ void MainWindow::showDesktopFileWarning(const QString& desktopFileName, const QS
 
 void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append,
                                      bool hasMore) {
-    if (!m_notificationRequests.contains(reqId)) return;
-    if (!hasMore) m_notificationRequests.remove(reqId);
+    if (reqId != m_currentRefreshId) return;
+    if (!hasMore) m_currentRefreshId = QUuid(); // clear current if done
     m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
@@ -222,8 +222,8 @@ void MainWindow::onListStatusMessage(const QString& message) {
 }
 
 void MainWindow::showError(const QUuid& reqId, const QString& error) {
-    if (!m_notificationRequests.contains(reqId)) return;
-    m_notificationRequests.remove(reqId);
+    if (reqId != m_currentRefreshId) return;
+    m_currentRefreshId = QUuid();
     if (error == lastError) return;
     lastError = error;
 
@@ -257,8 +257,8 @@ void MainWindow::showError(const QUuid& reqId, const QString& error) {
 }
 
 void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
-    if (!m_notificationRequests.contains(reqId)) return;
-    m_notificationRequests.remove(reqId);
+    if (reqId != m_currentRefreshId) return;
+    m_currentRefreshId = QUuid();
     pendingAuthError = true;
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
@@ -317,7 +317,7 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
-            client->checkNotifications();
+            this->m_currentRefreshId = QUuid::createUuid(); client->checkNotifications(this->m_currentRefreshId);
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
@@ -328,7 +328,7 @@ void MainWindow::showSettings() {
 }
 
 void MainWindow::onLoadingStarted(const QUuid& reqId) {
-    m_notificationRequests.insert(reqId);
+    m_currentRefreshId = reqId;
     if (!notificationListWidget) return;
 
     if (statusLabel) {
@@ -364,7 +364,7 @@ void MainWindow::onTokenLoaded() {
         stackWidget->setCurrentWidget(notificationListWidget);
         if (client) {
             client->setToken(m_loadedToken);
-            client->checkNotifications();
+            this->m_currentRefreshId = QUuid::createUuid(); client->checkNotifications(this->m_currentRefreshId);
         }
     }
 }
@@ -372,7 +372,7 @@ void MainWindow::onTokenLoaded() {
 void MainWindow::onRefreshClicked() {
     if (!client) return;
 
-    client->checkNotifications();
+    this->m_currentRefreshId = QUuid::createUuid(); client->checkNotifications(this->m_currentRefreshId);
 
     if (refreshTimer) {
         refreshTimer->start();
