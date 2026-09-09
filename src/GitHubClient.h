@@ -8,9 +8,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
-
-#include <QUuid>
 #include <QTimer>
+#include <QUuid>
 
 #include "Notification.h"
 #include "SecureString.h"
@@ -33,18 +32,19 @@ class GitHubClient : public QObject {
     QUuid markAsReadAndDone(const QString& id, QUuid reqId = QUuid());
     QUuid fetchNotificationDetails(const QString& url, const QString& notificationId, QUuid reqId = QUuid());
     QUuid fetchImage(const QString& imageUrl, const QString& notificationId, QUuid reqId = QUuid());
-    QUuid requestRaw(const QString& endpoint, const QString& method = "GET", const QByteArray& body = QByteArray(), QUuid reqId = QUuid());
+    QUuid requestRaw(const QString& endpoint, const QString& method = "GET", const QByteArray& body = QByteArray(),
+                     QUuid reqId = QUuid());
     QUuid fetchUserRepos(const QString& pageUrl = QString(), QUuid reqId = QUuid());
     QUuid verifyRepo(const QString& repoFullName, QUuid reqId = QUuid());
     QUuid createIssue(const QString& repoFullName, const QString& title, const QString& body,
-                     const QString& assignee = "", QUuid reqId = QUuid());
+                      const QString& assignee = "", QUuid reqId = QUuid());
     QNetworkRequest createAuthenticatedRequest(const QUrl& url) const;
 
    signals:
     void loadingStarted(const QUuid& reqId);
     void notificationsReceived(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore);
-    void detailsReceived(const QUuid& reqId, const QString& notificationId, const QString& authorName, const QString& avatarUrl,
-                         const QString& htmlUrl);
+    void detailsReceived(const QUuid& reqId, const QString& notificationId, const QString& authorName,
+                         const QString& avatarUrl, const QString& htmlUrl);
     void detailsError(const QUuid& reqId, const QString& notificationId, const QString& error);
     void imageReceived(const QUuid& reqId, const QString& notificationId, const QPixmap& avatar);
     void rawDataReceived(const QUuid& reqId, const QByteArray& data);
@@ -65,7 +65,6 @@ class GitHubClient : public QObject {
     bool m_showAll;
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
-
 
     bool isTrustedApiOrigin(const QUrl& url) const;
     QNetworkRequest createRequest(const QUrl& url) const;

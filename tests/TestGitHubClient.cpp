@@ -492,10 +492,10 @@ class TestGitHubClient : public QObject {
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
-        fakeManager->autoEmitFinished = false; // We want to control finishing
+        auto* fakeManager = new FakeNetworkAccessManager(&client);
+        fakeManager->autoEmitFinished = false;  // We want to control finishing
 
-        QNetworkAccessManager *oldManager = client.manager;
+        QNetworkAccessManager* oldManager = client.manager;
         client.manager = fakeManager;
         oldManager->deleteLater();
 
@@ -504,7 +504,7 @@ class TestGitHubClient : public QObject {
         connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
 
         // We can use signal spy to observe what happens
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid,QByteArray)));
+        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
 
         QUuid debugId = client.requestRaw("/user", "GET", QByteArray());
         QUuid trendingId = client.requestRaw("/search", "GET", QByteArray());
@@ -540,17 +540,17 @@ class TestGitHubClient : public QObject {
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        auto* fakeManager = new FakeNetworkAccessManager(&client);
         fakeManager->autoEmitFinished = false;
 
-        QNetworkAccessManager *oldManager = client.manager;
+        QNetworkAccessManager* oldManager = client.manager;
         client.manager = fakeManager;
         oldManager->deleteLater();
 
         disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
         connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
 
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid,QByteArray)));
+        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
         // Note: requestRaw emits rawDataReceived with the error string instead of errorOccurred.
         // Let's use checkNotifications to get an errorOccurred.
 
@@ -562,8 +562,8 @@ class TestGitHubClient : public QObject {
         auto reply1 = fakeManager->requests.at(0).reply;
         auto reply2 = fakeManager->requests.at(1).reply;
 
-        QSignalSpy spyError(&client, SIGNAL(errorOccurred(QUuid,QString)));
-        QSignalSpy spyNotif(&client, SIGNAL(notificationsReceived(QUuid,QList<Notification>,bool,bool)));
+        QSignalSpy spyError(&client, SIGNAL(errorOccurred(QUuid, QString)));
+        QSignalSpy spyNotif(&client, SIGNAL(notificationsReceived(QUuid, QList<Notification>, bool, bool)));
 
         // complete id1 with error (simulating timeout)
         reply1->completeWithError(QNetworkReply::TimeoutError, "Timeout");
@@ -581,23 +581,22 @@ class TestGitHubClient : public QObject {
         QCOMPARE(spyError.count(), 0);
     }
 
-
     void testRefreshBeforeOldReplyCompletes() {
         GitHubClient client;
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        auto* fakeManager = new FakeNetworkAccessManager(&client);
         fakeManager->autoEmitFinished = false;
 
-        QNetworkAccessManager *oldManager = client.manager;
+        QNetworkAccessManager* oldManager = client.manager;
         client.manager = fakeManager;
         oldManager->deleteLater();
 
         disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
         connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
 
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid,QByteArray)));
+        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
 
         QUuid req1 = client.requestRaw("/data", "GET", QByteArray());
         QUuid req2 = client.requestRaw("/data", "GET", QByteArray());
@@ -624,23 +623,22 @@ class TestGitHubClient : public QObject {
         QCOMPARE(args2.at(1).toByteArray(), QByteArray("{\"data\":\"new\"}"));
     }
 
-
     void testWindowDestructionBeforeReply() {
         GitHubClient client;
         client.setApiUrl("https://api.github.com");
         client.setToken("dummy_token");
 
-        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        auto* fakeManager = new FakeNetworkAccessManager(&client);
         fakeManager->autoEmitFinished = false;
 
-        QNetworkAccessManager *oldManager = client.manager;
+        QNetworkAccessManager* oldManager = client.manager;
         client.manager = fakeManager;
         oldManager->deleteLater();
 
         disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
         connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
 
-        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid,QByteArray)));
+        QSignalSpy spyRaw(&client, SIGNAL(rawDataReceived(QUuid, QByteArray)));
 
         QUuid req = client.requestRaw("/data", "GET", QByteArray());
 
@@ -656,7 +654,6 @@ class TestGitHubClient : public QObject {
         QCOMPARE(args.at(0).toUuid(), req);
         QCOMPARE(args.at(1).toByteArray(), QByteArray("{\"data\":\"valid\"}"));
     }
-
 };
 
 QTEST_MAIN(TestGitHubClient)

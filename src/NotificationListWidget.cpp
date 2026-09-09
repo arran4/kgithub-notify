@@ -1,5 +1,4 @@
 #include "NotificationListWidget.h"
-#include <QPointer>
 
 #include <QApplication>
 #include <QClipboard>
@@ -11,6 +10,7 @@
 #include <QJsonDocument>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollBar>

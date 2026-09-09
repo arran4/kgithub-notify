@@ -6,7 +6,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QTimer>
-#include "MockNetworkReply.h" // We will reuse or just modify FakeNetworkReply. Wait, let's just make FakeNetworkReply controllable.
+
+#include "MockNetworkReply.h"  // We will reuse or just modify FakeNetworkReply. Wait, let's just make FakeNetworkReply controllable.
 
 class ControlledFakeReply : public QNetworkReply {
     Q_OBJECT
@@ -25,13 +26,9 @@ class ControlledFakeReply : public QNetworkReply {
         return len;
     }
 
-    qint64 bytesAvailable() const override {
-        return m_data.size() + QNetworkReply::bytesAvailable();
-    }
+    qint64 bytesAvailable() const override { return m_data.size() + QNetworkReply::bytesAvailable(); }
 
-    void setReplyData(const QByteArray& data) {
-        m_data = data;
-    }
+    void setReplyData(const QByteArray& data) { m_data = data; }
 
     void complete(const QByteArray& data, int httpStatus = 200) {
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, httpStatus);
@@ -59,7 +56,7 @@ class FakeNetworkAccessManager : public QNetworkAccessManager {
         ControlledFakeReply* reply;
     };
     QList<RequestRecord> requests;
-    bool autoEmitFinished = true; // backward compatibility
+    bool autoEmitFinished = true;  // backward compatibility
 
    protected:
     QNetworkReply* createRequest(Operation op, const QNetworkRequest& request,

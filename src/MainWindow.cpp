@@ -102,18 +102,32 @@ void MainWindow::setClient(GitHubClient* c) {
 
     notificationListWidget->setClient(client);
 
-    connect(client, &GitHubClient::detailsError, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QString& err) { this->notificationListWidget->updateError(id, err); });
-    connect(client, &GitHubClient::detailsReceived, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QString& author, const QString& avatar, const QString& htmlUrl) { this->notificationListWidget->updateDetails(id, author, avatar, htmlUrl); });
-    connect(client, &GitHubClient::imageReceived, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QPixmap& img) { this->notificationListWidget->updateImage(id, img); });
+    connect(client, &GitHubClient::detailsError, notificationListWidget,
+            [this](const QUuid& reqId, const QString& id, const QString& err) {
+                this->notificationListWidget->updateError(id, err);
+            });
+    connect(
+        client, &GitHubClient::detailsReceived, notificationListWidget,
+        [this](const QUuid& reqId, const QString& id, const QString& author, const QString& avatar,
+               const QString& htmlUrl) { this->notificationListWidget->updateDetails(id, author, avatar, htmlUrl); });
+    connect(client, &GitHubClient::imageReceived, notificationListWidget,
+            [this](const QUuid& reqId, const QString& id, const QPixmap& img) {
+                this->notificationListWidget->updateImage(id, img);
+            });
 
     // Wire up ListWidget requests
-    connect(notificationListWidget, &NotificationListWidget::requestDetails, this, [this](const QString& url, const QString& id) { this->client->fetchNotificationDetails(url, id); });
-    connect(notificationListWidget, &NotificationListWidget::requestImage, this, [this](const QString& url, const QString& id) { this->client->fetchImage(url, id); });
-    connect(notificationListWidget, &NotificationListWidget::markAsRead, this, [this](const QString& id) { this->client->markAsRead(id); });
+    connect(notificationListWidget, &NotificationListWidget::requestDetails, this,
+            [this](const QString& url, const QString& id) { this->client->fetchNotificationDetails(url, id); });
+    connect(notificationListWidget, &NotificationListWidget::requestImage, this,
+            [this](const QString& url, const QString& id) { this->client->fetchImage(url, id); });
+    connect(notificationListWidget, &NotificationListWidget::markAsRead, this,
+            [this](const QString& id) { this->client->markAsRead(id); });
     connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this,
             [this](const QString& url) { showDebugWindow(url); });
-    connect(notificationListWidget, &NotificationListWidget::markAsDone, this, [this](const QString& id) { this->client->markAsDone(id); });
-    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this, [this]() { this->client->loadMore(); });
+    connect(notificationListWidget, &NotificationListWidget::markAsDone, this,
+            [this](const QString& id) { this->client->markAsDone(id); });
+    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this,
+            [this]() { this->client->loadMore(); });
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, this, [this]() { this->client->checkNotifications(); });
@@ -150,7 +164,8 @@ void MainWindow::showDesktopFileWarning(const QString& desktopFileName, const QS
 // Slots
 // -----------------------------------------------------------------------------
 
-void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore) {
+void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append,
+                                     bool hasMore) {
     if (!m_notificationRequests.contains(reqId)) return;
     if (!hasMore) m_notificationRequests.remove(reqId);
     m_lastCheckTime = QDateTime::currentDateTime();

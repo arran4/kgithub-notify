@@ -316,7 +316,10 @@ void SettingsDialog::onTestClicked() {
 
     if (!testClient) {
         testClient = new GitHubClient(this);
-        connect(testClient, &GitHubClient::tokenVerified, this, [this](const QUuid& reqId, bool valid, const QString& message) { this->onVerificationResult(reqId, valid, message); });
+        connect(testClient, &GitHubClient::tokenVerified, this,
+                [this](const QUuid& reqId, bool valid, const QString& message) {
+                    this->onVerificationResult(reqId, valid, message);
+                });
     }
 
     testClient->setToken(tokenEdit->text());
