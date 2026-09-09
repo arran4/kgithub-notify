@@ -170,6 +170,7 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
 
     if (m_client) {
         connect(m_client, &GitHubClient::rawDataReceived, this, &TrendingWindow::onRawDataReceived);
+        connect(m_client, &GitHubClient::errorOccurred, this, &TrendingWindow::onErrorOccurred);
     }
 
     QSettings settings("arran4", "kgithub-notify-trending");
@@ -231,10 +232,13 @@ void TrendingWindow::onRefreshClicked() {
     }
 
     lastRequestedUrl = endpoint;
-    m_client->requestRaw(endpoint);
+    refreshButton->setEnabled(false);
+    m_currentReqId = m_client->requestRaw(endpoint);
 }
 
-void TrendingWindow::onRawDataReceived(const QByteArray& data) {
+void TrendingWindow::onRawDataReceived(const QUuid& reqId, const QByteArray& data) {
+    if (reqId != m_currentReqId) return;
+    refreshButton->setEnabled(true);
     // Only process if it looks like a search response. We use lastRequestedUrl to match loosely if possible.
     // In our client, requestRaw doesn't pass back the endpoint it requested.
     // So we'll try to parse and check if it's the right format.
@@ -446,4 +450,9 @@ void TrendingWindow::onItemSelectionChanged() {
         QSettings settings("arran4", "kgithub-notify-trending");
         settings.setValue("seen_urls", QStringList(m_selectedUrls.begin(), m_selectedUrls.end()));
     }
+}
+
+void TrendingWindow::onErrorOccurred(const QUuid& reqId, const QString& error) {
+    if (reqId != m_currentReqId) return;
+    refreshButton->setEnabled(true);
 }

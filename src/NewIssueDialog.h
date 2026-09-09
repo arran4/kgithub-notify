@@ -22,12 +22,12 @@ class NewIssueDialog : public QDialog {
    private slots:
     void onRepoTextChanged(const QString& text);
     void verifyRepo();
-    void onRepoVerified(const QString& repoFullName, bool exists);
+    void onRepoVerified(const QUuid& reqId, const QString& repoFullName, bool exists);
     void onCreateClicked();
     void onRefreshClicked();
-    void onReposReceived(const QJsonArray& repos, const QString& nextPageUrl);
-    void onIssueCreated(const QByteArray& data);
-    void onErrorOccurred(const QString& error);
+    void onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl);
+    void onIssueCreated(const QUuid& reqId, const QByteArray& data);
+    void onErrorOccurred(const QUuid& reqId, const QString& error);
 
    private:
     void setupUI();
@@ -35,6 +35,9 @@ class NewIssueDialog : public QDialog {
     void saveCache();
 
     GitHubClient* m_client;
+    QUuid m_repoLoadRequestId;
+    QUuid m_verifyRequestId;
+    QUuid m_createIssueRequestId;
     QComboBox* m_repoComboBox;
     QLineEdit* m_titleEdit;
     QTextEdit* m_bodyEdit;

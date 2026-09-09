@@ -43,15 +43,15 @@ class MainWindow : public KXmlGuiWindow {
     void showDesktopFileWarning(const QString& desktopFileName, const QStringList& appPaths);
 
    public slots:
-    void updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore);
-    void showError(const QString& error);
-    void onAuthError(const QString& message);
+    void updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore);
+    void showError(const QUuid& reqId, const QString& error);
+    void onAuthError(const QUuid& reqId, const QString& message);
 
    private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayMessageClicked();
     void showSettings();
-    void onLoadingStarted();
+    void onLoadingStarted(const QUuid& reqId);
     void onAuthNotificationSettingsClicked();
     void dismissAllNotifications();
     void onTokenLoaded();
@@ -109,6 +109,7 @@ class MainWindow : public KXmlGuiWindow {
     QPointer<DebugWindow> debugWindow;
     QPointer<RepoListWindow> repoListWindow;
     QPointer<TrendingWindow> trendingWindow;
+    QSet<QUuid> m_notificationRequests;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
     NotificationListWidget* notificationListWidget;

@@ -20,10 +20,7 @@ GitHubClient::GitHubClient(QObject* parent) : QObject(parent) {
     m_showAll = false;
     m_nextPageUrl = "";
 
-    m_requestTimeoutTimer = new QTimer(this);
-    m_requestTimeoutTimer->setSingleShot(true);
-    connect(m_requestTimeoutTimer, &QTimer::timeout, this, &GitHubClient::onRequestTimeout);
-}
+    }
 
 QString GitHubClient::apiToHtmlUrl(const QString& apiUrl, const QString& notificationId) {
     QString htmlUrl = apiUrl;
@@ -47,81 +44,72 @@ void GitHubClient::setApiUrl(const QString& url) { m_apiUrl = url; }
 
 void GitHubClient::setShowAll(bool all) { m_showAll = all; }
 
-void GitHubClient::checkNotifications() {
-    emit loadingStarted();
+QUuid GitHubClient::checkNotifications(QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    emit loadingStarted(reqId);
 
-    m_nextPageUrl.clear();
-
-    if (m_token.isEmpty()) {
-        emit authError("No token provided");
-        return;
-    }
+    if (m_token.isEmpty()) return reqId;
 
     QUrl url(m_apiUrl + "/notifications");
-    // Always fetch all notifications (including read ones) to support client-side filtering
     QUrlQuery query;
-    query.addQueryItem("all", "true");
+    if (m_showAll) {
+        query.addQueryItem("all", "true");
+    }
     url.setQuery(query);
 
     QNetworkRequest request = createAuthenticatedRequest(url);
 
-    if (m_activeNotificationReply) {
-        m_activeNotificationReply->abort();
-    }
-
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", false);
-    m_activeNotificationReply = reply;
-
-    m_requestTimeoutTimer->start(30000);  // 30 seconds timeout
+    m_nextPageUrl.clear();
+    return reqId;
 }
 
-void GitHubClient::loadMore() {
-    if (m_nextPageUrl.isEmpty()) return;
+QUuid GitHubClient::loadMore(QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_nextPageUrl.isEmpty()) return reqId;
 
-    emit loadingStarted();
-
-    if (m_activeNotificationReply) {
-        m_activeNotificationReply->abort();
-    }
+    emit loadingStarted(reqId);
 
     QUrl url(m_nextPageUrl);
 
     if (!isTrustedApiOrigin(url)) {
         m_nextPageUrl.clear();
-        // Signal completion with empty data and no more pages before emitting error
-        // so completion handlers do not overwrite the error status
-        emit notificationsReceived(QList<Notification>(), true, false);
-        emit errorOccurred("Untrusted pagination URL rejected.");
-        return;
+        emit notificationsReceived(reqId, QList<Notification>(), true, false);
+        emit errorOccurred(reqId, "Untrusted pagination URL rejected.");
+        return reqId;
     }
 
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "notifications");
     reply->setProperty("append", true);
-    m_activeNotificationReply = reply;
-
-    m_requestTimeoutTimer->start(30000);  // 30 seconds timeout
+    return reqId;
 }
 
-void GitHubClient::verifyToken() {
+QUuid GitHubClient::verifyToken(QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
     if (m_token.isEmpty()) {
-        emit tokenVerified(false, "No token provided");
-        return;
+        emit tokenVerified(reqId, false, "No token provided");
+        return reqId;
     }
 
     QUrl url(m_apiUrl + "/user");
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "verification");
+    return reqId;
 }
 
-void GitHubClient::markAsRead(const QString& id) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::markAsRead(const QString& id, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     m_pendingPatchRequests++;
 
@@ -130,10 +118,12 @@ void GitHubClient::markAsRead(const QString& id) {
 
     QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
     reply->setProperty("type", "patch");
+    return reqId;
 }
 
-void GitHubClient::markAsDone(const QString& id) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::markAsDone(const QString& id, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     m_pendingPatchRequests++;
 
@@ -142,10 +132,12 @@ void GitHubClient::markAsDone(const QString& id) {
 
     QNetworkReply* reply = manager->deleteResource(request);
     reply->setProperty("type", "delete");
+    return reqId;
 }
 
-void GitHubClient::markAsReadAndDone(const QString& id) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::markAsReadAndDone(const QString& id, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     m_pendingPatchRequests++;
 
@@ -155,74 +147,83 @@ void GitHubClient::markAsReadAndDone(const QString& id) {
     QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
     reply->setProperty("type", "read_and_done");
     reply->setProperty("notificationId", id);
+    return reqId;
 }
 
-void GitHubClient::fetchNotificationDetails(const QString& url, const QString& notificationId) {
-    if (m_token.isEmpty() || url.isEmpty()) return;
+QUuid GitHubClient::fetchNotificationDetails(const QString& url, const QString& notificationId, QUuid reqId) {
+    if (m_token.isEmpty() || url.isEmpty()) return reqId;
     QUrl qUrl(url);
-    if (!qUrl.isValid()) return;
+    if (!qUrl.isValid()) return reqId;
 
     if (!isTrustedApiOrigin(qUrl)) {
-        emit errorOccurred("Untrusted notification details URL rejected.");
-        return;
+        emit errorOccurred(reqId, "Untrusted notification details URL rejected.");
+        return reqId;
     }
 
     QNetworkRequest request = createRequest(qUrl);
     QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "details");
     reply->setProperty("notificationId", notificationId);
+    return reqId;
 }
 
-void GitHubClient::fetchImage(const QString& imageUrl, const QString& notificationId) {
-    QUrl qUrl(imageUrl);
-    QNetworkRequest request(qUrl);
-    // Images (avatars) are usually public, so no auth header needed.
-    // Also, User-Agent is good practice.
-    request.setRawHeader("User-Agent", "Kgithub-notify");
+QUuid GitHubClient::fetchImage(const QString& imageUrl, const QString& notificationId, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (imageUrl.isEmpty()) return reqId;
 
+    QUrl url(imageUrl);
+    QNetworkRequest request = createRequest(url);
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "image");
     reply->setProperty("notificationId", notificationId);
+    return reqId;
 }
 
-void GitHubClient::requestRaw(const QString& endpoint, const QString& method, const QByteArray& body) {
-    if (m_token.isEmpty()) return;
-    QString urlStr = endpoint.startsWith("http") ? endpoint : m_apiUrl + endpoint;
-    QUrl url(urlStr);
+QUuid GitHubClient::requestRaw(const QString& endpoint, const QString& method, const QByteArray& body, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
+    QString urlStr = endpoint;
+    if (!urlStr.startsWith("http")) {
+        if (!urlStr.startsWith("/")) urlStr = "/" + urlStr;
+        urlStr = m_apiUrl + urlStr;
+    }
+
+    QUrl url(urlStr);
     if (!isTrustedApiOrigin(url)) {
-        emit rawDataReceived("Error: Untrusted external destination for authenticated request.");
-        return;
+        emit rawDataReceived(reqId, "Error: Untrusted external destination for authenticated request.");
+        return reqId;
     }
 
     QNetworkRequest request = createAuthenticatedRequest(url);
-
-    if (!body.isEmpty()) {
-        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    }
-
     QNetworkReply* reply = nullptr;
-    QString m = method.toUpper();
 
-    if (m == "GET") {
+    if (method.toUpper() == "GET") {
         reply = manager->get(request);
-    } else if (m == "POST") {
+    } else if (method.toUpper() == "POST") {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         reply = manager->post(request, body);
-    } else if (m == "PUT") {
+    } else if (method.toUpper() == "PATCH") {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        reply = manager->sendCustomRequest(request, "PATCH", body);
+    } else if (method.toUpper() == "PUT") {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         reply = manager->put(request, body);
-    } else if (m == "DELETE") {
+    } else if (method.toUpper() == "DELETE") {
         reply = manager->deleteResource(request);
-    } else {
-        reply = manager->sendCustomRequest(request, method.toUtf8(), body);
     }
 
     if (reply) {
+        reply->setProperty("reqId", reqId);
         reply->setProperty("type", "raw");
     }
+    return reqId;
 }
 
-void GitHubClient::fetchUserRepos(const QString& pageUrl) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::fetchUserRepos(const QString& pageUrl, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     QUrl url;
     if (pageUrl.isEmpty()) {
@@ -236,13 +237,14 @@ void GitHubClient::fetchUserRepos(const QString& pageUrl) {
     }
 
     if (!isTrustedApiOrigin(url)) {
-        emit errorOccurred("Untrusted repository pagination URL rejected.");
-        return;
+        emit errorOccurred(reqId, "Untrusted repository pagination URL rejected.");
+        return reqId;
     }
 
     QNetworkRequest request = createAuthenticatedRequest(url);
     QNetworkReply* reply = manager->get(request);
     reply->setProperty("type", "repos");
+    return reqId;
 }
 
 bool GitHubClient::isTrustedApiOrigin(const QUrl& url) const {
@@ -269,6 +271,7 @@ QNetworkRequest GitHubClient::createAuthenticatedRequest(const QUrl& url) const 
 
 QNetworkRequest GitHubClient::createRequest(const QUrl& url) const {
     QNetworkRequest request(url);
+    request.setTransferTimeout(30000);
 
     if (isTrustedApiOrigin(url)) {
         // Add Authorization header only for trusted origins
@@ -303,17 +306,13 @@ QNetworkRequest GitHubClient::createRequest(const QUrl& url) const {
 }
 
 void GitHubClient::onReplyFinished(QNetworkReply* reply) {
-    if (reply == m_activeNotificationReply) {
-        m_requestTimeoutTimer->stop();
-        m_activeNotificationReply = nullptr;
-    }
-
     if (reply->error() == QNetworkReply::OperationCanceledError) {
         reply->deleteLater();
         return;
     }
 
     QString type = reply->property("type").toString();
+    QUuid reqId = reply->property("reqId").toUuid();
 
     if (type == "details") {
         handleDetailsReply(reply);
@@ -327,15 +326,15 @@ void GitHubClient::onReplyFinished(QNetworkReply* reply) {
         handleRepoVerifyReply(reply);
     } else if (type == "createIssue") {
         if (reply->error() == QNetworkReply::NoError) {
-            emit issueCreated(reply->readAll());
+            emit issueCreated(reqId, reply->readAll());
         } else {
-            emit errorOccurred(reply->errorString());
+            emit issueCreated(reqId, reply->readAll());
         }
     } else if (type == "raw") {
         if (reply->error() == QNetworkReply::NoError) {
-            emit rawDataReceived(reply->readAll());
+            emit rawDataReceived(reqId, reply->readAll());
         } else {
-            emit rawDataReceived(reply->errorString().toUtf8());
+            emit rawDataReceived(reqId, reply->errorString().toUtf8());
         }
     } else if (type == "patch" || type == "delete") {
         handlePatchReply(reply);
@@ -345,17 +344,17 @@ void GitHubClient::onReplyFinished(QNetworkReply* reply) {
         if (m_pendingPatchRequests < 0) m_pendingPatchRequests = 0;
 
         if (reply->error() == QNetworkReply::NoError) {
-            markAsDone(id);
+            markAsDone(id, reqId);
         } else {
             if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-                emit authError("Invalid Token");
+                emit authError(reqId, "Invalid Token");
             } else {
-                emit errorOccurred(reply->errorString());
+                emit errorOccurred(reqId, reply->errorString());
             }
         }
 
         if (m_pendingPatchRequests == 0) {
-            checkNotifications();
+            checkNotifications(reqId);
         }
     } else if (type == "notifications") {
         handleNotificationsReply(reply);
@@ -368,9 +367,10 @@ void GitHubClient::onReplyFinished(QNetworkReply* reply) {
 
 void GitHubClient::handleDetailsReply(QNetworkReply* reply) {
     QString notificationId = reply->property("notificationId").toString();
+    QUuid reqId = reply->property("reqId").toUuid();
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Error fetching details:" << reply->errorString();
-        emit detailsError(notificationId, reply->errorString());
+        emit detailsError(reqId, notificationId, reply->errorString());
         return;
     }
 
@@ -393,12 +393,13 @@ void GitHubClient::handleDetailsReply(QNetworkReply* reply) {
 
         QString htmlUrl = obj["html_url"].toString();
 
-        emit detailsReceived(notificationId, authorName, avatarUrl, htmlUrl);
+        emit detailsReceived(reqId, notificationId, authorName, avatarUrl, htmlUrl);
     }
 }
 
 void GitHubClient::handleImageReply(QNetworkReply* reply) {
     QString notificationId = reply->property("notificationId").toString();
+    QUuid reqId = reply->property("reqId").toUuid();
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Error fetching image:" << reply->errorString();
         return;
@@ -407,34 +408,36 @@ void GitHubClient::handleImageReply(QNetworkReply* reply) {
     QByteArray data = reply->readAll();
     QPixmap pixmap;
     if (pixmap.loadFromData(data)) {
-        emit imageReceived(notificationId, pixmap);
+        emit imageReceived(reqId, notificationId, pixmap);
     }
 }
 
 void GitHubClient::handleVerificationReply(QNetworkReply* reply) {
+    QUuid reqId = reply->property("reqId").toUuid();
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         if (doc.isObject()) {
             QJsonObject obj = doc.object();
             QString login = obj["login"].toString();
-            emit tokenVerified(true, "Token valid for user: " + login);
+            emit tokenVerified(reqId, true, "Token valid for user: " + login);
         } else {
-            emit tokenVerified(true, "Token valid");
+            emit tokenVerified(reqId, true, "Token valid");
         }
     } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-        emit tokenVerified(false, "Invalid Token");
+        emit tokenVerified(reqId, false, "Invalid Token");
     } else {
-        emit tokenVerified(false, reply->errorString());
+        emit tokenVerified(reqId, false, reply->errorString());
     }
 }
 
 void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
+    QUuid reqId = reply->property("reqId").toUuid();
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            emit authError("Invalid Token");
+            emit authError(reqId, "Invalid Token");
         } else {
-            emit errorOccurred(reply->errorString());
+            emit errorOccurred(reqId, reply->errorString());
         }
         return;
     }
@@ -443,7 +446,7 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
     if (!doc.isArray()) {
-        emit errorOccurred("Invalid JSON response (expected array)");
+        emit errorOccurred(reqId, "Invalid JSON response (expected array)");
         return;
     }
 
@@ -462,13 +465,14 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
         }
     }
 
-    emit userReposReceived(doc.array(), nextPageUrl);
+    emit userReposReceived(reqId, doc.array(), nextPageUrl);
     if (linkRejected) {
-        emit errorOccurred("Untrusted repository pagination URL rejected.");
+        emit errorOccurred(reqId, "Untrusted repository pagination URL rejected.");
     }
 }
 
 void GitHubClient::handlePatchReply(QNetworkReply* reply) {
+    QUuid reqId = reply->property("reqId").toUuid();
     m_pendingPatchRequests--;
     if (m_pendingPatchRequests < 0) {
         m_pendingPatchRequests = 0;
@@ -476,24 +480,25 @@ void GitHubClient::handlePatchReply(QNetworkReply* reply) {
 
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            emit authError("Invalid Token");
+            emit authError(reqId, "Invalid Token");
         } else {
-            emit errorOccurred(reply->errorString());
+            emit errorOccurred(reqId, reply->errorString());
         }
         return;
     }
 
     if (m_pendingPatchRequests == 0) {
-        checkNotifications();
+        checkNotifications(reqId);
     }
 }
 
 void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
+    QUuid reqId = reply->property("reqId").toUuid();
     if (reply->error() != QNetworkReply::NoError) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            emit authError("Invalid Token");
+            emit authError(reqId, "Invalid Token");
         } else {
-            emit errorOccurred(reply->errorString());
+            emit errorOccurred(reqId, reply->errorString());
         }
         return;
     }
@@ -502,7 +507,7 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
     if (!doc.isArray()) {
-        emit errorOccurred("Invalid JSON response (expected array)");
+        emit errorOccurred(reqId, "Invalid JSON response (expected array)");
         return;
     }
 
@@ -569,41 +574,39 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
     }
 
     bool append = reply->property("append").toBool();
-    emit notificationsReceived(notifications, append, !m_nextPageUrl.isEmpty());
+    emit notificationsReceived(reqId, notifications, append, !m_nextPageUrl.isEmpty());
     if (linkRejected) {
-        emit errorOccurred("Untrusted pagination URL rejected.");
+        emit errorOccurred(reqId, "Untrusted pagination URL rejected.");
     }
 }
 
-void GitHubClient::onRequestTimeout() {
-    emit errorOccurred("Request timed out");
-    if (m_activeNotificationReply) {
-        m_activeNotificationReply->abort();
-    }
-}
-
-void GitHubClient::verifyRepo(const QString& repoFullName) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::verifyRepo(const QString& repoFullName, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     QUrl url(m_apiUrl + "/repos/" + repoFullName);
     QNetworkRequest request = createAuthenticatedRequest(url);
     QNetworkReply* reply = manager->get(request);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "verifyRepo");
     reply->setProperty("repoFullName", repoFullName);
+    return reqId;
 }
 
 void GitHubClient::handleRepoVerifyReply(QNetworkReply* reply) {
+    QUuid reqId = reply->property("reqId").toUuid();
     QString repoFullName = reply->property("repoFullName").toString();
     if (reply->error() == QNetworkReply::NoError) {
-        emit repoVerified(repoFullName, true);
+        emit repoVerified(reqId, repoFullName, true);
     } else {
-        emit repoVerified(repoFullName, false);
+        emit repoVerified(reqId, repoFullName, false);
     }
 }
 
-void GitHubClient::createIssue(const QString& repoFullName, const QString& title, const QString& body,
-                               const QString& assignee) {
-    if (m_token.isEmpty()) return;
+QUuid GitHubClient::createIssue(const QString& repoFullName, const QString& title, const QString& body,
+                               const QString& assignee, QUuid reqId) {
+    if (reqId.isNull()) reqId = QUuid::createUuid();
+    if (m_token.isEmpty()) return reqId;
 
     QUrl url(m_apiUrl + "/repos/" + repoFullName + "/issues");
     QNetworkRequest request = createAuthenticatedRequest(url);
@@ -624,5 +627,7 @@ void GitHubClient::createIssue(const QString& repoFullName, const QString& title
     QByteArray postData = doc.toJson(QJsonDocument::Compact);
 
     QNetworkReply* reply = manager->post(request, postData);
+    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "createIssue");
+    return reqId;
 }
