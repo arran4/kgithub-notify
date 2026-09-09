@@ -654,11 +654,74 @@ class TestGitHubClient : public QObject {
         QCOMPARE(args.at(0).toUuid(), req);
         QCOMPARE(args.at(1).toByteArray(), QByteArray("{\"data\":\"valid\"}"));
     }
+
+    void testRequestTimeoutPolicy() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+        client.setToken("dummy_token");
+
+        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        fakeManager->autoEmitFinished = false;
+
+        QNetworkAccessManager *oldManager = client.manager;
+        client.manager = fakeManager;
+        oldManager->deleteLater();
+
+        client.requestRaw("/1", "GET", QByteArray());
+
+        QCOMPARE(fakeManager->requests.size(), 1);
+        auto request = fakeManager->requests.at(0).request;
+
+        // Assert native timeout is 30 seconds
+        QCOMPARE(request.transferTimeout(), 30000);
+    }
+
+
+    void testTwoNewIssueDialogInstancesSimultaneous() {
+        GitHubClient client;
+        client.setApiUrl("https://api.github.com");
+        client.setToken("dummy_token");
+
+        auto *fakeManager = new FakeNetworkAccessManager(&client);
+        fakeManager->autoEmitFinished = false;
+
+        QNetworkAccessManager *oldManager = client.manager;
+        client.manager = fakeManager;
+        oldManager->deleteLater();
+
+        disconnect(oldManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
+        connect(fakeManager, &QNetworkAccessManager::finished, &client, &GitHubClient::onReplyFinished);
+
+        QSignalSpy spyVerified(&client, SIGNAL(repoVerified(QUuid,QString,bool)));
+
+        QUuid id1 = client.verifyRepo("owner/repo1");
+        QUuid id2 = client.verifyRepo("owner/repo2");
+
+        QCOMPARE(fakeManager->requests.size(), 2);
+
+        auto reply1 = fakeManager->requests.at(0).reply;
+        auto reply2 = fakeManager->requests.at(1).reply;
+
+        // Verify repo2
+        reply2->complete("{\"id\":123}");
+
+        QCOMPARE(spyVerified.count(), 1);
+        QList<QVariant> args2 = spyVerified.takeFirst();
+        QCOMPARE(args2.at(0).toUuid(), id2);
+        QCOMPARE(args2.at(1).toString(), QString("owner/repo2"));
+        QCOMPARE(args2.at(2).toBool(), true);
+
+        // Fail to verify repo1
+        reply1->completeWithError(QNetworkReply::ContentNotFoundError, "Not Found");
+
+        QCOMPARE(spyVerified.count(), 1);
+        QList<QVariant> args1 = spyVerified.takeFirst();
+        QCOMPARE(args1.at(0).toUuid(), id1);
+        QCOMPARE(args1.at(1).toString(), QString("owner/repo1"));
+        QCOMPARE(args1.at(2).toBool(), false);
+    }
+
 };
 
 QTEST_MAIN(TestGitHubClient)
 #include "TestGitHubClient.moc"
-
-// appending more tests
-
-// additional tests

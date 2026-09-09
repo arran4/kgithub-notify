@@ -109,7 +109,7 @@ class MainWindow : public KXmlGuiWindow {
     QPointer<DebugWindow> debugWindow;
     QPointer<RepoListWindow> repoListWindow;
     QPointer<TrendingWindow> trendingWindow;
-    QSet<QUuid> m_notificationRequests;
+    QUuid m_currentRefreshId;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
     NotificationListWidget* notificationListWidget;
