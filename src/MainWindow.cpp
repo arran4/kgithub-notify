@@ -146,8 +146,10 @@ void MainWindow::setClient(GitHubClient* c) {
             [this](const QString& url) { showDebugWindow(url); });
     connect(notificationListWidget, &NotificationListWidget::markAsDone, this,
             [this](const QString& id) { this->client->markAsDone(id); });
-    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this,
-            [this]() { this->client->loadMore(m_currentRefreshId); });
+    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this, [this]() {
+        if (m_notificationLoading) return;
+        client->loadMore(m_currentRefreshId);
+    });
 
     if (refreshTimer) {
         connect(refreshTimer, &QTimer::timeout, this, [this]() { startNotificationRefresh(); });
@@ -196,7 +198,7 @@ void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notificatio
 
     updateSelectionComboBox();
 
-    if (statusLabel) {
+    if (statusLabel && !m_notificationLoading) {
         statusLabel->setText(tr("Updated"));
     }
 }

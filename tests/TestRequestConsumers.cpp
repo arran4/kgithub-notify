@@ -335,6 +335,9 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(window.statusLabel->text(), QString("Updated"));
         window.onRefreshClicked();
         window.onRefreshClicked();
+        window.notificationListWidget->loadMoreRequested();
+        QCOMPARE(network->requests.size(), 5);
+        QVERIFY(window.m_notificationLoading);
         network->requests[4].reply->complete("[]");
         network->requests[3].reply->completeWithError(QNetworkReply::NetworkError(error), "stale failed");
         QCOMPARE(window.statusLabel->text(), QString("Updated"));
@@ -422,6 +425,9 @@ class TestRequestConsumers : public QObject {
         window.notificationListWidget->onLoadMoreClicked();
         QCOMPARE(network->requests[3].reply->property("reqId").toUuid(), session);
         window.onRefreshClicked();
+        window.notificationListWidget->loadMoreRequested();
+        QCOMPARE(network->requests.size(), 5);
+        QVERIFY(window.m_notificationLoading);
         network->requests[4].reply->complete("[]");
         network->requests[3].reply->setRawHeader("Link", "<https://api.github.com/notifications?page=4>; rel=\"next\"");
         network->requests[3].reply->complete("[{\"id\":\"stale-page\"}]");
