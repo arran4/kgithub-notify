@@ -74,6 +74,7 @@ RepoListWindow::RepoListWindow(GitHubClient* client, QWidget* parent)
 
     connect(m_client, &GitHubClient::userReposReceived, this, &RepoListWindow::onReposReceived);
     connect(m_client, &GitHubClient::errorOccurred, this, &RepoListWindow::onError);
+    connect(m_client, &GitHubClient::authError, this, &RepoListWindow::onError);
 
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &RepoListWindow::updateTimerLabel);
@@ -106,7 +107,7 @@ void RepoListWindow::setupUI() {
     setCentralWidget(m_table);
 
     // Actions
-    QAction* refreshAction = KStandardAction::redisplay(this, &RepoListWindow::onRefreshClicked, actionCollection());
+    m_refreshAction = KStandardAction::redisplay(this, &RepoListWindow::onRefreshClicked, actionCollection());
 
     QAction* exportAction = new QAction(QIcon::fromTheme("document-export"), tr("Export to CSV"), this);
     connect(exportAction, &QAction::triggered, this, &RepoListWindow::onExportClicked);
@@ -151,7 +152,7 @@ void RepoListWindow::setupUI() {
     });
     connect(m_filterEdit, &QLineEdit::textChanged, this, &RepoListWindow::onFilterChanged);
 
-    m_toolbar->addAction(refreshAction);
+    m_toolbar->addAction(m_refreshAction);
     m_toolbar->addAction(exportAction);
     m_toolbar->addSeparator();
     m_toolbar->addWidget(new QLabel(tr("Filter: "), this));
@@ -166,8 +167,10 @@ void RepoListWindow::setupUI() {
 
 void RepoListWindow::onRefreshClicked() {
     m_allRepos = QJsonArray();  // Clear previous
-    m_client->fetchUserRepos();
+    if (m_refreshAction) m_refreshAction->setEnabled(false);
+    m_refreshRequestId = QUuid::createUuid();
     if (m_statusBar) m_statusBar->showMessage(tr("Fetching repositories..."));
+    m_client->fetchUserRepos(QString(), m_refreshRequestId);
 }
 
 void RepoListWindow::onFilterChanged() { addReposToTable(m_allRepos); }
@@ -208,19 +211,23 @@ void RepoListWindow::onExportClicked() {
     m_statusBar->showMessage(tr("Exported to %1").arg(fileName), 5000);
 }
 
-void RepoListWindow::onReposReceived(const QJsonArray& repos, const QString& nextPageUrl) {
+void RepoListWindow::onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl) {
+    if (reqId.isNull() || reqId != m_refreshRequestId) return;
+
     for (const QJsonValue& val : repos) {
         m_allRepos.append(val);
     }
 
     if (!nextPageUrl.isEmpty()) {
-        m_client->fetchUserRepos(nextPageUrl);
+        m_client->fetchUserRepos(nextPageUrl, reqId);
     } else {
+        m_refreshRequestId = QUuid();
         m_lastRefresh = QDateTime::currentDateTime();
         saveCache();
         addReposToTable(m_allRepos);
         updateTimerLabel();
         if (m_statusBar) m_statusBar->showMessage(tr("Finished fetching repositories."), 5000);
+        if (m_refreshAction) m_refreshAction->setEnabled(true);
     }
 }
 
@@ -359,7 +366,11 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
     }
 }
 
-void RepoListWindow::onError(const QString& error) {
+void RepoListWindow::onError(const QUuid& reqId, const QString& error) {
+    if (reqId.isNull() || reqId != m_refreshRequestId) return;
+    m_refreshRequestId = QUuid();
+    if (m_refreshAction) m_refreshAction->setEnabled(true);
+
     if (m_statusBar) {
         m_statusBar->showMessage(tr("Error fetching repositories: %1").arg(error), 5000);
     }

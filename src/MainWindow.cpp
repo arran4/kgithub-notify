@@ -95,6 +95,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::setClient(GitHubClient* c) {
     client = c;
+    connect(client, &GitHubClient::notificationsChanged, this, &MainWindow::onRefreshClicked);
     connect(client, &GitHubClient::loadingStarted, this, &MainWindow::onLoadingStarted);
     connect(client, &GitHubClient::notificationsReceived, this, &MainWindow::updateNotifications);
     connect(client, &GitHubClient::errorOccurred, this, &MainWindow::showError);
@@ -102,22 +103,56 @@ void MainWindow::setClient(GitHubClient* c) {
 
     notificationListWidget->setClient(client);
 
-    connect(client, &GitHubClient::detailsError, notificationListWidget, &NotificationListWidget::updateError);
-    connect(client, &GitHubClient::detailsReceived, notificationListWidget, &NotificationListWidget::updateDetails);
-    connect(client, &GitHubClient::imageReceived, notificationListWidget, &NotificationListWidget::updateImage);
+    connect(client, &GitHubClient::detailsError, notificationListWidget,
+            [this](const QUuid& reqId, const QString& id, const QString& err) {
+                if (reqId.isNull()) return;
+                const bool detailsMatch = m_detailRequests.value(id) == reqId;
+                const bool imageMatch = m_imageRequests.value(id) == reqId;
+                if (!detailsMatch && !imageMatch) return;
+                if (detailsMatch) m_detailRequests.remove(id);
+                if (imageMatch) m_imageRequests.remove(id);
+                this->notificationListWidget->updateError(id, err);
+            });
+    connect(client, &GitHubClient::detailsReceived, notificationListWidget,
+            [this](const QUuid& reqId, const QString& id, const QString& author, const QString& avatar,
+                   const QString& htmlUrl) {
+                if (reqId.isNull() || m_detailRequests.value(id) != reqId) return;
+                m_detailRequests.remove(id);
+                this->notificationListWidget->updateDetails(id, author, avatar, htmlUrl);
+            });
+    connect(client, &GitHubClient::imageReceived, notificationListWidget,
+            [this](const QUuid& reqId, const QString& id, const QPixmap& img) {
+                if (reqId.isNull() || m_imageRequests.value(id) != reqId) return;
+                m_imageRequests.remove(id);
+                this->notificationListWidget->updateImage(id, img);
+            });
 
     // Wire up ListWidget requests
-    connect(notificationListWidget, &NotificationListWidget::requestDetails, client,
-            &GitHubClient::fetchNotificationDetails);
-    connect(notificationListWidget, &NotificationListWidget::requestImage, client, &GitHubClient::fetchImage);
-    connect(notificationListWidget, &NotificationListWidget::markAsRead, client, &GitHubClient::markAsRead);
+    connect(notificationListWidget, &NotificationListWidget::requestDetails, this,
+            [this](const QString& url, const QString& id) {
+                const QUuid requestId = QUuid::createUuid();
+                m_detailRequests.insert(id, requestId);
+                client->fetchNotificationDetails(url, id, requestId);
+            });
+    connect(notificationListWidget, &NotificationListWidget::requestImage, this,
+            [this](const QString& url, const QString& id) {
+                const QUuid requestId = QUuid::createUuid();
+                m_imageRequests.insert(id, requestId);
+                client->fetchImage(url, id, requestId);
+            });
+    connect(notificationListWidget, &NotificationListWidget::markAsRead, this,
+            [this](const QString& id) { this->client->markAsRead(id); });
     connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this,
             [this](const QString& url) { showDebugWindow(url); });
-    connect(notificationListWidget, &NotificationListWidget::markAsDone, client, &GitHubClient::markAsDone);
-    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, client, &GitHubClient::loadMore);
+    connect(notificationListWidget, &NotificationListWidget::markAsDone, this,
+            [this](const QString& id) { this->client->markAsDone(id); });
+    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this, [this]() {
+        if (m_notificationLoading) return;
+        client->loadMore(m_currentRefreshId);
+    });
 
     if (refreshTimer) {
-        connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
+        connect(refreshTimer, &QTimer::timeout, this, [this]() { startNotificationRefresh(); });
         int interval = SettingsDialog::getInterval();
         refreshTimer->setInterval(calculateSafeInterval(interval));
         refreshTimer->start();
@@ -125,7 +160,7 @@ void MainWindow::setClient(GitHubClient* c) {
 
     if (!m_loadedToken.isEmpty()) {
         client->setToken(m_loadedToken);
-        client->checkNotifications();
+        startNotificationRefresh();
     }
 }
 
@@ -151,7 +186,10 @@ void MainWindow::showDesktopFileWarning(const QString& desktopFileName, const QS
 // Slots
 // -----------------------------------------------------------------------------
 
-void MainWindow::updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore) {
+void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append,
+                                     bool hasMore) {
+    if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
+    m_notificationLoading = false;
     m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
@@ -160,7 +198,7 @@ void MainWindow::updateNotifications(const QList<Notification>& notifications, b
 
     updateSelectionComboBox();
 
-    if (statusLabel) {
+    if (statusLabel && !m_notificationLoading) {
         statusLabel->setText(tr("Updated"));
     }
 }
@@ -205,7 +243,10 @@ void MainWindow::onListStatusMessage(const QString& message) {
     }
 }
 
-void MainWindow::showError(const QString& error) {
+void MainWindow::showError(const QUuid& reqId, const QString& error) {
+    if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
+    m_notificationLoading = false;
+    if (notificationListWidget) notificationListWidget->resetLoadMoreState();
     if (error == lastError) return;
     lastError = error;
 
@@ -238,7 +279,9 @@ void MainWindow::showError(const QString& error) {
     updateTrayToolTip();
 }
 
-void MainWindow::onAuthError(const QString& message) {
+void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
+    if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
+    m_notificationLoading = false;
     pendingAuthError = true;
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
@@ -297,7 +340,7 @@ void MainWindow::showSettings() {
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
-            client->checkNotifications();
+            startNotificationRefresh();
         }
         if (refreshTimer) {
             refreshTimer->setInterval(calculateSafeInterval(interval));
@@ -307,7 +350,9 @@ void MainWindow::showSettings() {
     }
 }
 
-void MainWindow::onLoadingStarted() {
+void MainWindow::onLoadingStarted(const QUuid& reqId) {
+    if (reqId.isNull() || reqId != m_currentRefreshId) return;
+    m_notificationLoading = true;
     if (!notificationListWidget) return;
 
     if (statusLabel) {
@@ -343,7 +388,7 @@ void MainWindow::onTokenLoaded() {
         stackWidget->setCurrentWidget(notificationListWidget);
         if (client) {
             client->setToken(m_loadedToken);
-            client->checkNotifications();
+            startNotificationRefresh();
         }
     }
 }
@@ -351,7 +396,7 @@ void MainWindow::onTokenLoaded() {
 void MainWindow::onRefreshClicked() {
     if (!client) return;
 
-    client->checkNotifications();
+    startNotificationRefresh();
 
     if (refreshTimer) {
         refreshTimer->start();
@@ -1204,4 +1249,12 @@ void MainWindow::showNewIssueDialog() {
     NewIssueDialog* dialog = new NewIssueDialog(client, this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();
+}
+
+void MainWindow::startNotificationRefresh() {
+    if (!client) return;
+    m_currentRefreshId = QUuid::createUuid();
+    m_detailRequests.clear();
+    m_imageRequests.clear();
+    client->checkNotifications(m_currentRefreshId);
 }

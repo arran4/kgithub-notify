@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QPushButton>
 #include <QTableWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -14,9 +15,11 @@
 
 class ActionWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
 
    public:
-    explicit ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr);
+    explicit ActionWindow(const Notification& n, GitHubClient* client, QWidget* parent = nullptr,
+                          QNetworkAccessManager* networkManager = nullptr);
 
    private slots:
     void fetchRunDetails();
@@ -29,6 +32,9 @@ class ActionWindow : public KXmlGuiWindow {
     Notification m_notification;
     GitHubClient* m_client;
     QNetworkAccessManager* m_manager;
+    QUuid m_detailsGeneration;
+    QLabel* m_requestStatus;
+    QPushButton* m_retryButton;
 
     QLabel* m_statusLabel;
     QTableWidget* m_jobsTable;

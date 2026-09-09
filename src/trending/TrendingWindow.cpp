@@ -170,6 +170,7 @@ TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
 
     if (m_client) {
         connect(m_client, &GitHubClient::rawDataReceived, this, &TrendingWindow::onRawDataReceived);
+        connect(m_client, &GitHubClient::errorOccurred, this, &TrendingWindow::onErrorOccurred);
     }
 
     QSettings settings("arran4", "kgithub-notify-trending");
@@ -231,24 +232,32 @@ void TrendingWindow::onRefreshClicked() {
     }
 
     lastRequestedUrl = endpoint;
-    m_client->requestRaw(endpoint);
+    refreshButton->setEnabled(false);
+    m_currentReqId = QUuid::createUuid();
+    m_client->requestRaw(endpoint, "GET", QByteArray(), m_currentReqId);
 }
 
-void TrendingWindow::onRawDataReceived(const QByteArray& data) {
-    // Only process if it looks like a search response. We use lastRequestedUrl to match loosely if possible.
-    // In our client, requestRaw doesn't pass back the endpoint it requested.
-    // So we'll try to parse and check if it's the right format.
+void TrendingWindow::onRawDataReceived(const QUuid& reqId, const QByteArray& data) {
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
+    refreshButton->setEnabled(true);
 
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(data, &error);
 
     if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-        return;  // Ignore invalid JSON (might be for something else)
+        tableWidget->setRowCount(1);
+        tableWidget->setColumnCount(1);
+        tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Invalid search response.")));
+        return;
     }
 
     QJsonObject root = doc.object();
     if (!root.contains("items")) {
-        return;  // Not a search result
+        tableWidget->setRowCount(1);
+        tableWidget->setColumnCount(1);
+        tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Invalid search response.")));
+        return;
     }
 
     // Clear the loading text
@@ -446,4 +455,14 @@ void TrendingWindow::onItemSelectionChanged() {
         QSettings settings("arran4", "kgithub-notify-trending");
         settings.setValue("seen_urls", QStringList(m_selectedUrls.begin(), m_selectedUrls.end()));
     }
+}
+
+void TrendingWindow::onErrorOccurred(const QUuid& reqId, const QString& error) {
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
+    refreshButton->setEnabled(true);
+    tableWidget->clear();
+    tableWidget->setColumnCount(1);
+    tableWidget->setRowCount(1);
+    tableWidget->setItem(0, 0, new QTableWidgetItem(tr("Error: %1").arg(error)));
 }

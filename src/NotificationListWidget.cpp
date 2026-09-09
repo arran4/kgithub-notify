@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollBar>

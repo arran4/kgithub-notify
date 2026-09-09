@@ -307,6 +307,8 @@ void SettingsDialog::setNotifyRead(bool notify) {
 }
 
 void SettingsDialog::onTestClicked() {
+    m_verificationRequestId = QUuid();
+    testButton->setEnabled(true);
     if (tokenEdit->text().isEmpty()) {
         statusLabel->setText("Please enter a token first.");
         statusLabel->setStyleSheet("color: red;");
@@ -316,7 +318,10 @@ void SettingsDialog::onTestClicked() {
 
     if (!testClient) {
         testClient = new GitHubClient(this);
-        connect(testClient, &GitHubClient::tokenVerified, this, &SettingsDialog::onVerificationResult);
+        connect(testClient, &GitHubClient::tokenVerified, this,
+                [this](const QUuid& reqId, bool valid, const QString& message) {
+                    this->onVerificationResult(reqId, valid, message);
+                });
     }
 
     testClient->setToken(tokenEdit->text());
@@ -324,10 +329,13 @@ void SettingsDialog::onTestClicked() {
     statusLabel->setStyleSheet("color: black;");
     statusLabel->show();
     testButton->setEnabled(false);
-    testClient->verifyToken();
+    m_verificationRequestId = QUuid::createUuid();
+    testClient->verifyToken(m_verificationRequestId);
 }
 
-void SettingsDialog::onVerificationResult(bool valid, const QString& message) {
+void SettingsDialog::onVerificationResult(const QUuid& reqId, bool valid, const QString& message) {
+    if (reqId.isNull() || reqId != m_verificationRequestId) return;
+    m_verificationRequestId = QUuid();
     testButton->setEnabled(true);
     statusLabel->setText(message);
     if (valid) {

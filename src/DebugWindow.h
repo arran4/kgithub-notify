@@ -22,18 +22,22 @@ struct ApiPreset {
 
 class DebugWindow : public QDialog {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
     explicit DebugWindow(GitHubClient* client, QWidget* parent = nullptr);
     void setEndpoint(const QString& url);
 
    private slots:
     void sendRequest();
-    void displayResponse(const QByteArray& data);
+    void displayResponse(const QUuid& reqId, const QByteArray& data);
+    void onErrorOccurred(const QUuid& reqId, const QString& error);
     void onApiSelected(int index);
     void onParamChanged();
 
    private:
     GitHubClient* m_client;
+    QUuid m_currentReqId;
 
     QComboBox* m_apiSelector;
     QComboBox* m_methodSelector;

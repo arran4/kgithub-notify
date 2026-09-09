@@ -18,6 +18,8 @@ class NotificationItemWidget;
 
 class NotificationListWidget : public QWidget {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
     explicit NotificationListWidget(QWidget* parent = nullptr);
 

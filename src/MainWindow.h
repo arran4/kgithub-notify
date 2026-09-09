@@ -35,6 +35,8 @@ class NewIssueDialog;
 
 class MainWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
+
    public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
@@ -43,15 +45,15 @@ class MainWindow : public KXmlGuiWindow {
     void showDesktopFileWarning(const QString& desktopFileName, const QStringList& appPaths);
 
    public slots:
-    void updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore);
-    void showError(const QString& error);
-    void onAuthError(const QString& message);
+    void updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore);
+    void showError(const QUuid& reqId, const QString& error);
+    void onAuthError(const QUuid& reqId, const QString& message);
 
    private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onTrayMessageClicked();
     void showSettings();
-    void onLoadingStarted();
+    void onLoadingStarted(const QUuid& reqId);
     void onAuthNotificationSettingsClicked();
     void dismissAllNotifications();
     void onTokenLoaded();
@@ -81,6 +83,7 @@ class MainWindow : public KXmlGuiWindow {
     void closeEvent(QCloseEvent* event) override;
 
    private:
+    void startNotificationRefresh();
     // Helpers
     void createTrayIcon();
     void updateTrayMenu();
@@ -109,6 +112,10 @@ class MainWindow : public KXmlGuiWindow {
     QPointer<DebugWindow> debugWindow;
     QPointer<RepoListWindow> repoListWindow;
     QPointer<TrendingWindow> trendingWindow;
+    QUuid m_currentRefreshId;
+    bool m_notificationLoading = false;
+    QHash<QString, QUuid> m_detailRequests;
+    QHash<QString, QUuid> m_imageRequests;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
     NotificationListWidget* notificationListWidget;

@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QSet>
 #include <QTableWidget>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -17,6 +18,7 @@ class GitHubClient;
 
 class TrendingWindow : public KXmlGuiWindow {
     Q_OBJECT
+    friend class TestRequestConsumers;
 
    public:
     explicit TrendingWindow(GitHubClient* client, QWidget* parent = nullptr);
@@ -25,7 +27,8 @@ class TrendingWindow : public KXmlGuiWindow {
     void onRefreshClicked();
     void onItemActivated(QTableWidgetItem* item);
     void onModeChanged(int index);
-    void onRawDataReceived(const QByteArray& data);
+    void onRawDataReceived(const QUuid& reqId, const QByteArray& data);
+    void onErrorOccurred(const QUuid& reqId, const QString& error);
     void onRepoStarredCheckFinished(QNetworkReply* reply);
     void onItemSelectionChanged();
 
@@ -37,6 +40,7 @@ class TrendingWindow : public KXmlGuiWindow {
     QPushButton* refreshButton;
     QTableWidget* tableWidget;
     GitHubClient* m_client;
+    QUuid m_currentReqId;
 
     // Store the last requested URL to ignore responses from other raw requests
     QString lastRequestedUrl;

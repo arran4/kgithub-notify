@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QStatusBar>
 #include <QTextEdit>
 #include <QUrl>
 
@@ -94,16 +95,23 @@ CommentWidget::CommentWidget(const QString& author, const QString& body, const Q
 
 #include "PullRequestWindow.moc"
 
-PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent)
+PullRequestWindow::PullRequestWindow(const Notification& n, GitHubClient* client, QWidget* parent,
+                                     QNetworkAccessManager* networkManager)
     : KXmlGuiWindow(parent, Qt::Window),
       m_notification(n),
       m_client(client),
-      m_manager(new QNetworkAccessManager(this)) {
+      m_manager(networkManager ? networkManager : new QNetworkAccessManager(this)) {
     setWindowTitle(tr("Pull Request - %1").arg(n.title));
     resize(800, 600);
 
     setupUi();
 
+    m_requestStatus = new QLabel(this);
+    m_requestStatus->setTextFormat(Qt::PlainText);
+    statusBar()->addWidget(m_requestStatus, 1);
+    m_retryButton = new QPushButton(tr("Retry"), this);
+    statusBar()->addPermanentWidget(m_retryButton);
+    connect(m_retryButton, &QPushButton::clicked, this, &PullRequestWindow::fetchPrDetails);
     fetchPrDetails();
 }
 
@@ -228,14 +236,24 @@ void PullRequestWindow::setupUi() {
 }
 
 void PullRequestWindow::fetchPrDetails() {
+    m_detailsGeneration = QUuid::createUuid();
+    m_requestStatus->setText(tr("Loading PR details..."));
+    m_retryButton->setEnabled(false);
     QUrl url(m_notification.url);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPrDetailsReply(reply); });
 }
 
 void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
+    m_retryButton->setEnabled(true);
     if (reply->error() == QNetworkReply::NoError) {
+        m_requestStatus->setText(tr("PR details loaded."));
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         m_rawJsonStr = QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
@@ -252,6 +270,13 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         QString issueUrl = obj["issue_url"].toString();
         m_issueCommentsUrl = issueUrl + "/comments";
         m_timelineUrl = issueUrl + "/timeline";
+
+        while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
+            delete item->widget();
+            delete item;
+        }
+
+        m_commentsContainerLayout->addStretch();
 
         // Add the PR body as the first comment
         QString author = obj["user"].toObject()["login"].toString();
@@ -305,7 +330,7 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         fetchCommits();
         fetchFiles();
     } else {
-        QMessageBox::warning(this, tr("Error"), tr("Failed to fetch PR details: %1").arg(reply->errorString()));
+        m_requestStatus->setText(tr("Failed to fetch PR details: %1. Retry to try again.").arg(reply->errorString()));
     }
     reply->deleteLater();
 }
@@ -315,10 +340,15 @@ void PullRequestWindow::fetchTimeline() {
     QUrl url(m_timelineUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onTimelineReply(reply); });
 }
 
 void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -434,10 +464,15 @@ void PullRequestWindow::fetchReviewComments() {
     QUrl url(m_reviewCommentsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onReviewCommentsReply(reply); });
 }
 
 void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -463,10 +498,15 @@ void PullRequestWindow::fetchCommits() {
     QUrl url(m_commitsUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onCommitsReply(reply); });
 }
 
 void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -495,10 +535,15 @@ void PullRequestWindow::fetchFiles() {
     QUrl url(m_notification.url + "/files");
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onFilesReply(reply); });
 }
 
 void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+        reply->deleteLater();
+        return;
+    }
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -573,7 +618,9 @@ void PullRequestWindow::onCommentButtonClicked() {
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
+    m_commentRequestId = QUuid::createUuid();
     QNetworkReply* reply = m_manager->post(request, data);
+    reply->setProperty("reqId", m_commentRequestId);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onPostCommentReply(reply); });
 }
 
@@ -616,6 +663,11 @@ void PullRequestWindow::onViewRawJson() {
 }
 
 void PullRequestWindow::onPostCommentReply(QNetworkReply* reply) {
+    if (reply->property("reqId").toUuid() != m_commentRequestId) {
+        reply->deleteLater();
+        return;
+    }
+    m_commentRequestId = QUuid();
     m_commentButton->setEnabled(true);
     if (reply->error() == QNetworkReply::NoError) {
         m_replyEdit->clear();

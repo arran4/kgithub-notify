@@ -21,6 +21,7 @@ NewIssueDialog::NewIssueDialog(GitHubClient* client, QWidget* parent)
     connect(m_client, &GitHubClient::repoVerified, this, &NewIssueDialog::onRepoVerified);
     connect(m_client, &GitHubClient::userReposReceived, this, &NewIssueDialog::onReposReceived);
     connect(m_client, &GitHubClient::errorOccurred, this, &NewIssueDialog::onErrorOccurred);
+    connect(m_client, &GitHubClient::authError, this, &NewIssueDialog::onErrorOccurred);
     connect(m_client, &GitHubClient::issueCreated, this, &NewIssueDialog::onIssueCreated);
 
     loadCache();
@@ -153,6 +154,10 @@ void NewIssueDialog::saveCache() {
 }
 
 void NewIssueDialog::onRepoTextChanged(const QString& text) {
+    m_verifyTimer->stop();
+    m_verifyRequestId = QUuid();
+    m_currentVerifyRepo.clear();
+    m_repositoryVerified = false;
     m_createButton->setEnabled(false);
 
     // Basic format check
@@ -178,22 +183,27 @@ void NewIssueDialog::verifyRepo() {
         if (fullName.compare(m_currentVerifyRepo, Qt::CaseInsensitive) == 0) {
             m_statusLabel->setText(tr("Repository found in cache."));
             m_statusLabel->setStyleSheet("color: green;");
-            m_createButton->setEnabled(true);
+            m_repositoryVerified = true;
+            m_createButton->setEnabled(m_createIssueRequestId.isNull());
             return;
         }
     }
 
     // Not in cache, verify via API
-    m_client->verifyRepo(m_currentVerifyRepo);
+    m_verifyRequestId = QUuid::createUuid();
+    m_client->verifyRepo(m_currentVerifyRepo, m_verifyRequestId);
 }
 
-void NewIssueDialog::onRepoVerified(const QString& repoFullName, bool exists) {
+void NewIssueDialog::onRepoVerified(const QUuid& reqId, const QString& repoFullName, bool exists) {
+    if (reqId.isNull() || reqId != m_verifyRequestId) return;
+    m_verifyRequestId = QUuid();
     if (repoFullName.compare(m_currentVerifyRepo, Qt::CaseInsensitive) != 0) return;
 
+    m_repositoryVerified = exists;
     if (exists) {
         m_statusLabel->setText(tr("Repository verified successfully."));
         m_statusLabel->setStyleSheet("color: green;");
-        m_createButton->setEnabled(true);
+        m_createButton->setEnabled(m_createIssueRequestId.isNull());
     } else {
         m_statusLabel->setText(tr("Repository not found or not accessible."));
         m_statusLabel->setStyleSheet("color: red;");
@@ -217,10 +227,14 @@ void NewIssueDialog::onCreateClicked() {
     m_statusLabel->setText(tr("Creating issue..."));
     m_statusLabel->setStyleSheet("color: gray;");
 
-    m_client->createIssue(repoName, title, body, assignee);
+    m_createIssueRequestId = QUuid::createUuid();
+    m_client->createIssue(repoName, title, body, assignee, m_createIssueRequestId);
 }
 
-void NewIssueDialog::onIssueCreated(const QByteArray& data) {
+void NewIssueDialog::onIssueCreated(const QUuid& reqId, const QByteArray& data) {
+    if (reqId.isNull() || reqId != m_createIssueRequestId) return;
+    m_createIssueRequestId = QUuid();
+    m_createButton->setEnabled(m_repositoryVerified);
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isObject() && doc.object().contains("html_url")) {
         QString url = doc.object()["html_url"].toString();
@@ -241,7 +255,7 @@ void NewIssueDialog::onIssueCreated(const QByteArray& data) {
         }
         m_statusLabel->setText(errMsg);
         m_statusLabel->setStyleSheet("color: red;");
-        m_createButton->setEnabled(true);
+        m_createButton->setEnabled(m_repositoryVerified);
     }
 }
 
@@ -251,18 +265,21 @@ void NewIssueDialog::onRefreshClicked() {
     m_statusLabel->setText(tr("Refreshing cache..."));
     m_statusLabel->setStyleSheet("color: gray;");
     m_allRepos = QJsonArray();
-    m_client->fetchUserRepos();
+    m_repoLoadRequestId = QUuid::createUuid();
+    m_client->fetchUserRepos(QString(), m_repoLoadRequestId);
 }
 
-void NewIssueDialog::onReposReceived(const QJsonArray& repos, const QString& nextPageUrl) {
+void NewIssueDialog::onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl) {
+    if (reqId != m_repoLoadRequestId) return;
     if (!m_isFetchingRepos) return;
     for (int i = 0; i < repos.size(); ++i) {
         m_allRepos.append(repos[i]);
     }
 
     if (!nextPageUrl.isEmpty()) {
-        m_client->fetchUserRepos(nextPageUrl);
+        m_client->fetchUserRepos(nextPageUrl, reqId);
     } else {
+        m_repoLoadRequestId = QUuid();
         saveCache();
         loadCache();
 
@@ -278,9 +295,22 @@ void NewIssueDialog::onReposReceived(const QJsonArray& repos, const QString& nex
     }
 }
 
-void NewIssueDialog::onErrorOccurred(const QString& error) {
-    m_refreshButton->setEnabled(true);
-    m_createButton->setEnabled(true);
+void NewIssueDialog::onErrorOccurred(const QUuid& reqId, const QString& error) {
+    if (reqId.isNull()) return;
+    if (reqId == m_repoLoadRequestId) {
+        m_repoLoadRequestId = QUuid();
+        m_refreshButton->setEnabled(true);
+        m_isFetchingRepos = false;
+    } else if (reqId == m_verifyRequestId) {
+        m_verifyRequestId = QUuid();
+        m_createButton->setEnabled(false);
+    } else if (reqId == m_createIssueRequestId) {
+        m_createIssueRequestId = QUuid();
+        m_createButton->setEnabled(m_repositoryVerified);
+    } else {
+        return;  // ignore unknown
+    }
+
     QString errMsg = tr("Error: %1").arg(error);
     if (error.contains("404") || error.contains("Not Found")) {
         errMsg +=

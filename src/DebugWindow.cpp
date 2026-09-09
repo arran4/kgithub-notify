@@ -68,6 +68,7 @@ DebugWindow::DebugWindow(GitHubClient* client, QWidget* parent) : QDialog(parent
     mainLayout->addWidget(m_responseOutput);
 
     connect(m_client, &GitHubClient::rawDataReceived, this, &DebugWindow::displayResponse);
+    connect(m_client, &GitHubClient::errorOccurred, this, &DebugWindow::onErrorOccurred);
 
     // Trigger initial selection
     onApiSelected(0);
@@ -139,10 +140,15 @@ void DebugWindow::sendRequest() {
     QByteArray body = m_bodyInput->toPlainText().toUtf8();
 
     m_responseOutput->setText(tr("Loading..."));
-    m_client->requestRaw(endpoint, method, body);
+    m_sendButton->setEnabled(false);
+    m_currentReqId = QUuid::createUuid();
+    m_client->requestRaw(endpoint, method, body, m_currentReqId);
 }
 
-void DebugWindow::displayResponse(const QByteArray& data) {
+void DebugWindow::displayResponse(const QUuid& reqId, const QByteArray& data) {
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
+    m_sendButton->setEnabled(true);
     // Only update if we are visible
     // Check if JSON and format it?
     QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -154,3 +160,10 @@ void DebugWindow::displayResponse(const QByteArray& data) {
 }
 
 void DebugWindow::setEndpoint(const QString& url) { m_endpointInput->setText(url); }
+
+void DebugWindow::onErrorOccurred(const QUuid& reqId, const QString& error) {
+    if (reqId.isNull() || reqId != m_currentReqId) return;
+    m_currentReqId = QUuid();
+    m_responseOutput->setText(tr("Error: %1").arg(error));
+    m_sendButton->setEnabled(true);
+}
