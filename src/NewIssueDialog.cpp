@@ -288,7 +288,7 @@ void NewIssueDialog::onErrorOccurred(const QUuid& reqId, const QString& error) {
     } else if (reqId == m_verifyRequestId || reqId == m_createIssueRequestId) {
         m_createButton->setEnabled(true);
     } else {
-        return; // ignore unknown
+        return;  // ignore unknown
     }
 
     QString errMsg = tr("Error: %1").arg(error);

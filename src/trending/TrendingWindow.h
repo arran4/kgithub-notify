@@ -9,8 +9,8 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QSet>
-#include <QUuid>
 #include <QTableWidget>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <QWidget>
 

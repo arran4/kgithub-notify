@@ -19,8 +19,7 @@ GitHubClient::GitHubClient(QObject* parent) : QObject(parent) {
     m_pendingPatchRequests = 0;
     m_showAll = false;
     m_nextPageUrl = "";
-
-    }
+}
 
 QString GitHubClient::apiToHtmlUrl(const QString& apiUrl, const QString& notificationId) {
     QString htmlUrl = apiUrl;
@@ -604,7 +603,7 @@ void GitHubClient::handleRepoVerifyReply(QNetworkReply* reply) {
 }
 
 QUuid GitHubClient::createIssue(const QString& repoFullName, const QString& title, const QString& body,
-                               const QString& assignee, QUuid reqId) {
+                                const QString& assignee, QUuid reqId) {
     if (reqId.isNull()) reqId = QUuid::createUuid();
     if (m_token.isEmpty()) return reqId;
 
