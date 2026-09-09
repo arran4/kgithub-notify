@@ -38,10 +38,10 @@ class RepoListWindow : public KXmlGuiWindow {
    private slots:
     void onRefreshClicked();
     void onExportClicked();
-    void onReposReceived(const QJsonArray& repos, const QString& nextPageUrl);
+    void onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl);
     void updateTimerLabel();
     void onCustomContextMenuRequested(const QPoint& pos);
-    void onError(const QString& error);
+    void onError(const QUuid& reqId, const QString& error);
     void onFilterChanged();
 
    private:
@@ -51,6 +51,8 @@ class RepoListWindow : public KXmlGuiWindow {
     void addReposToTable(const QJsonArray& repos);
 
     GitHubClient* m_client;
+    QUuid m_refreshRequestId;
+    QAction* m_refreshAction;
     QTableWidget* m_table;
     QToolBar* m_toolbar;
     QComboBox* m_filterCombo;

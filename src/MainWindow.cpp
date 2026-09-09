@@ -102,22 +102,21 @@ void MainWindow::setClient(GitHubClient* c) {
 
     notificationListWidget->setClient(client);
 
-    connect(client, &GitHubClient::detailsError, notificationListWidget, &NotificationListWidget::updateError);
-    connect(client, &GitHubClient::detailsReceived, notificationListWidget, &NotificationListWidget::updateDetails);
-    connect(client, &GitHubClient::imageReceived, notificationListWidget, &NotificationListWidget::updateImage);
+    connect(client, &GitHubClient::detailsError, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QString& err) { this->notificationListWidget->updateError(id, err); });
+    connect(client, &GitHubClient::detailsReceived, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QString& author, const QString& avatar, const QString& htmlUrl) { this->notificationListWidget->updateDetails(id, author, avatar, htmlUrl); });
+    connect(client, &GitHubClient::imageReceived, notificationListWidget, [this](const QUuid& reqId, const QString& id, const QPixmap& img) { this->notificationListWidget->updateImage(id, img); });
 
     // Wire up ListWidget requests
-    connect(notificationListWidget, &NotificationListWidget::requestDetails, client,
-            &GitHubClient::fetchNotificationDetails);
-    connect(notificationListWidget, &NotificationListWidget::requestImage, client, &GitHubClient::fetchImage);
-    connect(notificationListWidget, &NotificationListWidget::markAsRead, client, &GitHubClient::markAsRead);
+    connect(notificationListWidget, &NotificationListWidget::requestDetails, this, [this](const QString& url, const QString& id) { this->client->fetchNotificationDetails(url, id); });
+    connect(notificationListWidget, &NotificationListWidget::requestImage, this, [this](const QString& url, const QString& id) { this->client->fetchImage(url, id); });
+    connect(notificationListWidget, &NotificationListWidget::markAsRead, this, [this](const QString& id) { this->client->markAsRead(id); });
     connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this,
             [this](const QString& url) { showDebugWindow(url); });
-    connect(notificationListWidget, &NotificationListWidget::markAsDone, client, &GitHubClient::markAsDone);
-    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, client, &GitHubClient::loadMore);
+    connect(notificationListWidget, &NotificationListWidget::markAsDone, this, [this](const QString& id) { this->client->markAsDone(id); });
+    connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this, [this]() { this->client->loadMore(); });
 
     if (refreshTimer) {
-        connect(refreshTimer, &QTimer::timeout, client, &GitHubClient::checkNotifications);
+        connect(refreshTimer, &QTimer::timeout, this, [this]() { this->client->checkNotifications(); });
         int interval = SettingsDialog::getInterval();
         refreshTimer->setInterval(calculateSafeInterval(interval));
         refreshTimer->start();
@@ -151,7 +150,9 @@ void MainWindow::showDesktopFileWarning(const QString& desktopFileName, const QS
 // Slots
 // -----------------------------------------------------------------------------
 
-void MainWindow::updateNotifications(const QList<Notification>& notifications, bool append, bool hasMore) {
+void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore) {
+    if (!m_notificationRequests.contains(reqId)) return;
+    if (!hasMore) m_notificationRequests.remove(reqId);
     m_lastCheckTime = QDateTime::currentDateTime();
     pendingAuthError = false;
     lastError.clear();
@@ -205,7 +206,9 @@ void MainWindow::onListStatusMessage(const QString& message) {
     }
 }
 
-void MainWindow::showError(const QString& error) {
+void MainWindow::showError(const QUuid& reqId, const QString& error) {
+    if (!m_notificationRequests.contains(reqId)) return;
+    m_notificationRequests.remove(reqId);
     if (error == lastError) return;
     lastError = error;
 
@@ -238,7 +241,9 @@ void MainWindow::showError(const QString& error) {
     updateTrayToolTip();
 }
 
-void MainWindow::onAuthError(const QString& message) {
+void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
+    if (!m_notificationRequests.contains(reqId)) return;
+    m_notificationRequests.remove(reqId);
     pendingAuthError = true;
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
@@ -307,7 +312,8 @@ void MainWindow::showSettings() {
     }
 }
 
-void MainWindow::onLoadingStarted() {
+void MainWindow::onLoadingStarted(const QUuid& reqId) {
+    m_notificationRequests.insert(reqId);
     if (!notificationListWidget) return;
 
     if (statusLabel) {

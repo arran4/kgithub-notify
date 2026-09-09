@@ -184,10 +184,11 @@ void NewIssueDialog::verifyRepo() {
     }
 
     // Not in cache, verify via API
-    m_client->verifyRepo(m_currentVerifyRepo);
+    m_verifyRequestId = m_client->verifyRepo(m_currentVerifyRepo);
 }
 
-void NewIssueDialog::onRepoVerified(const QString& repoFullName, bool exists) {
+void NewIssueDialog::onRepoVerified(const QUuid& reqId, const QString& repoFullName, bool exists) {
+    if (reqId != m_verifyRequestId) return;
     if (repoFullName.compare(m_currentVerifyRepo, Qt::CaseInsensitive) != 0) return;
 
     if (exists) {
@@ -217,10 +218,11 @@ void NewIssueDialog::onCreateClicked() {
     m_statusLabel->setText(tr("Creating issue..."));
     m_statusLabel->setStyleSheet("color: gray;");
 
-    m_client->createIssue(repoName, title, body, assignee);
+    m_createIssueRequestId = m_client->createIssue(repoName, title, body, assignee);
 }
 
-void NewIssueDialog::onIssueCreated(const QByteArray& data) {
+void NewIssueDialog::onIssueCreated(const QUuid& reqId, const QByteArray& data) {
+    if (reqId != m_createIssueRequestId) return;
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isObject() && doc.object().contains("html_url")) {
         QString url = doc.object()["html_url"].toString();
@@ -251,17 +253,18 @@ void NewIssueDialog::onRefreshClicked() {
     m_statusLabel->setText(tr("Refreshing cache..."));
     m_statusLabel->setStyleSheet("color: gray;");
     m_allRepos = QJsonArray();
-    m_client->fetchUserRepos();
+    m_repoLoadRequestId = m_client->fetchUserRepos();
 }
 
-void NewIssueDialog::onReposReceived(const QJsonArray& repos, const QString& nextPageUrl) {
+void NewIssueDialog::onReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl) {
+    if (reqId != m_repoLoadRequestId) return;
     if (!m_isFetchingRepos) return;
     for (int i = 0; i < repos.size(); ++i) {
         m_allRepos.append(repos[i]);
     }
 
     if (!nextPageUrl.isEmpty()) {
-        m_client->fetchUserRepos(nextPageUrl);
+        m_client->fetchUserRepos(nextPageUrl, reqId);
     } else {
         saveCache();
         loadCache();
@@ -278,9 +281,16 @@ void NewIssueDialog::onReposReceived(const QJsonArray& repos, const QString& nex
     }
 }
 
-void NewIssueDialog::onErrorOccurred(const QString& error) {
-    m_refreshButton->setEnabled(true);
-    m_createButton->setEnabled(true);
+void NewIssueDialog::onErrorOccurred(const QUuid& reqId, const QString& error) {
+    if (reqId == m_repoLoadRequestId) {
+        m_refreshButton->setEnabled(true);
+        m_isFetchingRepos = false;
+    } else if (reqId == m_verifyRequestId || reqId == m_createIssueRequestId) {
+        m_createButton->setEnabled(true);
+    } else {
+        return; // ignore unknown
+    }
+
     QString errMsg = tr("Error: %1").arg(error);
     if (error.contains("404") || error.contains("Not Found")) {
         errMsg +=

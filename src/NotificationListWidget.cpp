@@ -1,4 +1,5 @@
 #include "NotificationListWidget.h"
+#include <QPointer>
 
 #include <QApplication>
 #include <QClipboard>

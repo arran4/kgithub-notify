@@ -316,7 +316,7 @@ void SettingsDialog::onTestClicked() {
 
     if (!testClient) {
         testClient = new GitHubClient(this);
-        connect(testClient, &GitHubClient::tokenVerified, this, &SettingsDialog::onVerificationResult);
+        connect(testClient, &GitHubClient::tokenVerified, this, [this](const QUuid& reqId, bool valid, const QString& message) { this->onVerificationResult(reqId, valid, message); });
     }
 
     testClient->setToken(tokenEdit->text());
@@ -327,7 +327,7 @@ void SettingsDialog::onTestClicked() {
     testClient->verifyToken();
 }
 
-void SettingsDialog::onVerificationResult(bool valid, const QString& message) {
+void SettingsDialog::onVerificationResult(const QUuid& reqId, bool valid, const QString& message) {
     testButton->setEnabled(true);
     statusLabel->setText(message);
     if (valid) {

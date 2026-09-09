@@ -33,7 +33,7 @@ class SettingsDialog : public QDialog {
    private slots:
     void saveSettings();
     void onTestClicked();
-    void onVerificationResult(bool valid, const QString& message);
+    void onVerificationResult(const QUuid& reqId, bool valid, const QString& message);
     void installNotifyRc();
 
    private:
