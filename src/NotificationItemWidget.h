@@ -37,6 +37,7 @@ class NotificationItemWidget : public QWidget {
     void setError(const QString& error);
     void setRead(bool read);
     void setLoading(bool loading);
+    void setChildLoadingState(const QString& childId, bool loading);
     bool isLoading() const { return m_isLoading; }
     void updateNotification(const Notification& n);
 
@@ -51,6 +52,7 @@ class NotificationItemWidget : public QWidget {
 
    private:
     bool m_isLoading;
+    QMap<QString, QWidget*> m_childWidgets;
 };
 
 #endif  // NOTIFICATIONITEMWIDGET_H

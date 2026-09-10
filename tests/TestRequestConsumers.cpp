@@ -9,6 +9,7 @@
 #include "../src/DebugWindow.h"
 #include "../src/MainWindow.h"
 #include "../src/NewIssueDialog.h"
+#include "../src/NotificationItemWidget.h"
 #include "../src/PullRequestWindow.h"
 #include "../src/RepoListWindow.h"
 #include "../src/SettingsDialog.h"
@@ -434,6 +435,135 @@ class TestRequestConsumers : public QObject {
         QVERIFY(window.notificationListWidget->m_allNotifications.isEmpty());
         QVERIFY(client.m_nextPageUrl.isEmpty());
         QCOMPARE(window.statusLabel->text(), QString("Updated"));
+    }
+
+    void testMarkAsReadSuccess() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->getUnreadNotifications().size(), 1);
+
+        list->requestMarkAsRead("1");
+        QCOMPARE(network->requests.size(), 2);
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->complete("{}");
+
+        QCOMPARE(list->count(), 0);  // because default filter hides read items
+        QCOMPARE(list->getUnreadNotifications().size(), 0);
+    }
+
+    void testMarkAsDoneFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsDone("1");
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Server Error");
+
+        QCOMPARE(list->count(), 1);
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("Server Error"));
+    }
+
+    void testBatchDismissalPartialFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test1\"},\"repository\":{\"full_name\":\"repo\"}},"
+            "{\"id\":\"2\",\"unread\":true,\"subject\":{\"title\":\"Test2\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        window.dismissAllNotifications();
+        QCOMPARE(network->requests.size(), 3);  // refresh, done1, done2
+
+        network->requests[1].reply->complete("{}");
+        network->requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Failed");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);  // Only the failed one remains
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QCOMPARE(widget->getTitle(), QString("Test2"));
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("Failed"));
+    }
+
+    void testPendingDuplicateAction() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsRead("1");
+        list->requestMarkAsRead("1");
+
+        QCOMPARE(network->requests.size(), 2);  // refresh, read (not two reads)
+    }
+
+    void testRefreshDuringMutation() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsRead("1");
+
+        // While in flight, simulate a refresh
+        window.onRefreshClicked();
+
+        // Original item is replaced/updated, but we still have a pending mutation.
+        network->requests[2].reply->complete(  // complete refresh
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        // The item should probably still be marked as loading (if properly re-associated) or at least the mutation
+        // completes safely.
+        network->requests[1].reply->complete("{}");  // complete read
+
+        // We don't guarantee the re-fetched item goes back to loading, but we DO guarantee it handles it without
+        // crashing and ideally the mutation succeeded hook removes it.
+        QCOMPARE(list->count(), 0);
     }
 };
 

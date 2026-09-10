@@ -211,31 +211,26 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             childLayout->addWidget(copyBtn);
 
             QToolButton* readBtn = new QToolButton(this);
+            readBtn->setObjectName(child.id + "_readBtn");
             readBtn->setIcon(QIcon::fromTheme("mail-mark-read"));
             readBtn->setToolTip(tr("Mark as Read"));
             readBtn->setIconSize(QSize(16, 16));
             readBtn->setAutoRaise(true);
             readBtn->setVisible(child.unread);
-            connect(readBtn, &QToolButton::clicked, this, [this, child, childUnread, readBtn]() {
-                emit childMarkAsReadClicked(child.id);
-                childUnread->setVisible(false);
-                readBtn->setVisible(false);
-            });
+            connect(readBtn, &QToolButton::clicked, this, [this, child]() { emit childMarkAsReadClicked(child.id); });
             childLayout->addWidget(readBtn);
 
             QToolButton* doneBtn = new QToolButton(this);
+            doneBtn->setObjectName(child.id + "_doneBtn");
             doneBtn->setIcon(QIcon::fromTheme("task-complete"));
             doneBtn->setToolTip(tr("Mark as Done"));
             doneBtn->setIconSize(QSize(16, 16));
             doneBtn->setAutoRaise(true);
-            connect(doneBtn, &QToolButton::clicked, this, [this, child, childWidget]() {
-                emit childMarkAsDoneClicked(child.id);
-                childWidget->setVisible(false);
-                emit heightChanged();
-            });
+            connect(doneBtn, &QToolButton::clicked, this, [this, child]() { emit childMarkAsDoneClicked(child.id); });
             childLayout->addWidget(doneBtn);
 
             childrenLayout->addWidget(childWidget);
+            m_childWidgets.insert(child.id, childWidget);
         }
     }
 
@@ -287,6 +282,18 @@ void NotificationItemWidget::setLoading(bool loading) {
     } else {
         loadingLabel->hide();
     }
+}
+
+void NotificationItemWidget::setChildLoadingState(const QString& childId, bool loading) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (!childWidget) return;
+
+    QToolButton* readBtn = childWidget->findChild<QToolButton*>(childId + "_readBtn");
+    if (readBtn) readBtn->setEnabled(!loading);
+
+    QToolButton* doneBtn = childWidget->findChild<QToolButton*>(childId + "_doneBtn");
+    if (doneBtn) doneBtn->setEnabled(!loading);
 }
 
 void NotificationItemWidget::updateNotification(const Notification& n) {
