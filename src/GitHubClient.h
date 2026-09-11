@@ -44,6 +44,7 @@ class GitHubClient : public QObject {
    signals:
     // Request-scoped results
     void mutationSucceeded(const QUuid& reqId);
+    void partialMutationSucceeded(const QUuid& reqId, const QString& successfulAction);
     void notificationsChanged();
     void loadingStarted(const QUuid& reqId);
     void notificationsReceived(const QUuid& reqId, const QList<Notification>& notifications, bool append, bool hasMore);
@@ -70,6 +71,11 @@ class GitHubClient : public QObject {
     bool m_showAll;
     int m_pendingPatchRequests;
     QString m_nextPageUrl;
+
+    struct PendingReadAndDone {
+        QString id;
+    };
+    QMap<QUuid, PendingReadAndDone> m_pendingReadAndDone;
     QUuid m_notificationSessionId;
 
     // Request construction and reply handling

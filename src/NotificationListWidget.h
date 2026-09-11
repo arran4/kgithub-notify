@@ -79,6 +79,7 @@ class NotificationListWidget : public QWidget {
     void updateError(const QString& id, const QString& error);
     void resetLoadMoreState();
     void onMutationSucceeded(const QUuid& reqId);
+    void onPartialMutationSucceeded(const QUuid& reqId, const QString& action);
     void onMutationError(const QUuid& reqId, const QString& error);
 
    signals:

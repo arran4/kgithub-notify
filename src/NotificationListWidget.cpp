@@ -180,6 +180,8 @@ void NotificationListWidget::setClient(GitHubClient* client) {
     m_client = client;
     if (m_client) {
         connect(m_client, &GitHubClient::mutationSucceeded, this, &NotificationListWidget::onMutationSucceeded);
+        connect(m_client, &GitHubClient::partialMutationSucceeded, this,
+                &NotificationListWidget::onPartialMutationSucceeded);
         connect(m_client, &GitHubClient::errorOccurred, this, &NotificationListWidget::onMutationError);
     }
 }
@@ -1097,6 +1099,21 @@ void NotificationListWidget::onMutationSucceeded(const QUuid& reqId) {
                 delete listWidget->takeItem(listWidget->row(item));
             }
         }
+    }
+}
+
+void NotificationListWidget::onPartialMutationSucceeded(const QUuid& reqId, const QString& action) {
+    if (!m_pendingMutations.contains(reqId)) return;
+    PendingMutation mutation = m_pendingMutations.value(reqId);  // Don't take it, error handler needs it
+
+    // We only support partial "read" successes when "done" fails currently
+    if (action == "read") {
+        PendingMutation readMutation = mutation;
+        readMutation.action = "read";
+        // Create a temporary UUID to route through the standard success handler
+        QUuid tempId = QUuid::createUuid();
+        m_pendingMutations.insert(tempId, readMutation);
+        onMutationSucceeded(tempId);
     }
 }
 
