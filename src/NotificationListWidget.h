@@ -149,7 +149,7 @@ class NotificationListWidget : public QWidget {
     bool m_countsDirty;
 
     QMap<QUuid, PendingMutation> m_pendingMutations;
-    QMap<QString, QString> m_notificationErrors;
+    QMap<QString, QString> m_mutationErrors;
 
     // Context Menu
     GitHubClient* m_client;

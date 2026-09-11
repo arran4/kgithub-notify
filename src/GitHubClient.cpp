@@ -577,7 +577,8 @@ void GitHubClient::handlePatchReply(QNetworkReply* reply) {
             if (m_pendingPatchRequests < 0) m_pendingPatchRequests = 0;
 
             m_pendingReadAndDone.remove(reqId);
-            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+                reply->error() == QNetworkReply::AuthenticationRequiredError) {
                 emit authError(reqId, "Invalid Token");
             } else {
                 emit errorOccurred(reqId, reply->errorString());
@@ -602,7 +603,12 @@ void GitHubClient::handlePatchReply(QNetworkReply* reply) {
 
         if (reply->error() != QNetworkReply::NoError) {
             emit partialMutationSucceeded(reqId, "read");
-            emit errorOccurred(reqId, reply->errorString());
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+                reply->error() == QNetworkReply::AuthenticationRequiredError) {
+                emit authError(reqId, "Invalid Token");
+            } else {
+                emit errorOccurred(reqId, reply->errorString());
+            }
             return;
         }
 
@@ -619,7 +625,8 @@ void GitHubClient::handlePatchReply(QNetworkReply* reply) {
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+            reply->error() == QNetworkReply::AuthenticationRequiredError) {
             emit authError(reqId, "Invalid Token");
         } else {
             emit errorOccurred(reqId, reply->errorString());

@@ -262,8 +262,22 @@ void NotificationItemWidget::setHtmlUrl(const QString& url) {
 }
 
 void NotificationItemWidget::setError(const QString& error) {
-    errorLabel->setText(tr("Error: %1").arg(error));
+    if (error.isEmpty()) {
+        if (!errorLabel->text().isEmpty() || errorLabel->isVisible()) {
+            errorLabel->clear();
+            errorLabel->hide();
+            emit heightChanged();
+        }
+        return;
+    }
+    if (error.startsWith("Error:") || error.startsWith(tr("Error:")) || error.startsWith("Failed to") ||
+        error.startsWith(tr("Failed to"))) {
+        errorLabel->setText(error);
+    } else {
+        errorLabel->setText(tr("Error: %1").arg(error));
+    }
     errorLabel->show();
+    emit heightChanged();
 }
 
 void NotificationItemWidget::setRead(bool read) {
@@ -295,6 +309,14 @@ void NotificationItemWidget::setChildLoadingState(const QString& childId, bool l
 
     QToolButton* doneBtn = childWidget->findChild<QToolButton*>(childId + "_doneBtn");
     if (doneBtn) doneBtn->setEnabled(!loading);
+}
+
+void NotificationItemWidget::setChildError(const QString& childId, const QString& error) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (childWidget) {
+        childWidget->setToolTip(error);
+    }
 }
 
 void NotificationItemWidget::markChildRead(const QString& childId) {

@@ -183,6 +183,7 @@ void NotificationListWidget::setClient(GitHubClient* client) {
         connect(m_client, &GitHubClient::partialMutationSucceeded, this,
                 &NotificationListWidget::onPartialMutationSucceeded);
         connect(m_client, &GitHubClient::errorOccurred, this, &NotificationListWidget::onMutationError);
+        connect(m_client, &GitHubClient::authError, this, &NotificationListWidget::onMutationError);
     }
 }
 
@@ -400,8 +401,7 @@ void NotificationListWidget::updateImage(const QString& id, const QPixmap& pixma
 }
 
 void NotificationListWidget::updateError(const QString& id, const QString& error) {
-    if (m_notificationErrors.contains(id)) return;
-    m_notificationErrors[id] = error;
+    if (m_mutationErrors.contains(id)) return;
     NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setError(error);
@@ -476,8 +476,8 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
         }
     }
 
-    if (m_notificationErrors.contains(n.id)) {
-        widget->setError(m_notificationErrors[n.id]);
+    if (m_mutationErrors.contains(n.id)) {
+        widget->setError(m_mutationErrors[n.id]);
     }
 
     QPointer<NotificationItemWidget> safeWidget(widget);
@@ -643,6 +643,11 @@ void NotificationListWidget::updateList() {
             NotificationItemWidget* widget = qobject_cast<NotificationItemWidget*>(listWidget->itemWidget(currentItem));
             if (widget) {
                 widget->updateNotification(n);
+                if (m_mutationErrors.contains(n.id)) {
+                    widget->setError(m_mutationErrors[n.id]);
+                } else if (!widget->isLoading()) {
+                    widget->setError(QString());
+                }
             }
             // Update Item Data
             currentItem->setData(Qt::UserRole + 4, n.toJson());
@@ -940,6 +945,7 @@ void NotificationListWidget::requestMarkAsRead(const QString& id) {
     }
 
     QUuid reqId = QUuid::createUuid();
+    m_mutationErrors.remove(id);
     m_pendingMutations.insert(reqId, {id, "read", false, ""});
 
     NotificationItemWidget* widget = findNotificationWidget(id);
@@ -958,6 +964,7 @@ void NotificationListWidget::requestMarkAsDone(const QString& id) {
     }
 
     QUuid reqId = QUuid::createUuid();
+    m_mutationErrors.remove(id);
     m_pendingMutations.insert(reqId, {id, "done", false, ""});
 
     NotificationItemWidget* widget = findNotificationWidget(id);
@@ -976,6 +983,7 @@ void NotificationListWidget::requestMarkAsReadAndDone(const QString& id) {
     }
 
     QUuid reqId = QUuid::createUuid();
+    m_mutationErrors.remove(id);
     m_pendingMutations.insert(reqId, {id, "read_and_done", false, ""});
 
     NotificationItemWidget* widget = findNotificationWidget(id);
@@ -995,6 +1003,7 @@ void NotificationListWidget::requestChildMarkAsRead(const QString& parentId, con
     }
 
     QUuid reqId = QUuid::createUuid();
+    m_mutationErrors.remove(parentId);
     m_pendingMutations.insert(reqId, {parentId, "read", true, childId});
 
     NotificationItemWidget* widget = findNotificationWidget(parentId);
@@ -1014,6 +1023,7 @@ void NotificationListWidget::requestChildMarkAsDone(const QString& parentId, con
     }
 
     QUuid reqId = QUuid::createUuid();
+    m_mutationErrors.remove(parentId);
     m_pendingMutations.insert(reqId, {parentId, "done", true, childId});
 
     NotificationItemWidget* widget = findNotificationWidget(parentId);
@@ -1147,7 +1157,7 @@ void NotificationListWidget::updateItemDoneUi(const QString& id, bool isChild, c
 void NotificationListWidget::onMutationSucceeded(const QUuid& reqId) {
     if (!m_pendingMutations.contains(reqId)) return;
     PendingMutation mutation = m_pendingMutations.take(reqId);
-    m_notificationErrors.remove(mutation.id);
+    m_mutationErrors.remove(mutation.id);
 
     if (mutation.action == "read") {
         applyReadToModel(mutation.id, mutation.isChild, mutation.childId);
@@ -1171,18 +1181,25 @@ void NotificationListWidget::onPartialMutationSucceeded(const QUuid& reqId, cons
 void NotificationListWidget::onMutationError(const QUuid& reqId, const QString& error) {
     if (!m_pendingMutations.contains(reqId)) return;
     PendingMutation mutation = m_pendingMutations.take(reqId);
-    m_notificationErrors[mutation.id] = error;
 
-    emit statusMessage(tr("Error: %1").arg(error));
+    QString actionStr = (mutation.action == "read_and_done") ? QStringLiteral("read+done") : mutation.action;
+    QString targetId = mutation.isChild ? mutation.childId : mutation.id;
+    QString contextualError = tr("Failed to %1 notification %2: %3").arg(actionStr, targetId, error);
+
+    m_mutationErrors[mutation.id] = contextualError;
+
+    emit statusMessage(contextualError);
 
     NotificationItemWidget* widget = findNotificationWidget(mutation.id);
     if (!widget) return;
 
     if (mutation.isChild) {
         widget->setChildLoadingState(mutation.childId, false);
+        widget->setChildError(mutation.childId, contextualError);
+        widget->setError(contextualError);
     } else {
         widget->setLoading(false);
-        widget->setError(error);
+        widget->setError(contextualError);
     }
 }
 

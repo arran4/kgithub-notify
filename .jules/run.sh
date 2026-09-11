@@ -36,13 +36,9 @@ sudo mkdir -p "${ROOTFS_DIR}/dev/pts"
 sudo rm -f "${ROOTFS_DIR}/etc/resolv.conf"
 sudo touch "${ROOTFS_DIR}/etc/resolv.conf"
 
-# Test if mounting is permitted in this environment; if not, fall back to proot
-if ! sudo mount -t proc /proc "${ROOTFS_DIR}/proc" 2>/dev/null; then
-    echo "Direct mount not permitted in this environment, using proot wrapper..."
-    exec proot -r "${ROOTFS_DIR}" -b /proc -b /dev -b /sys -b "${HOME}" -b "${WORKSPACE_DIR}:/workspace" /bin/bash -c 'cd /workspace; export QT_QPA_PLATFORM=offscreen; "$@"' -- "$@"
-fi
-
+# Mount necessary pseudo-filesystems
 echo "Mounting file systems..."
+sudo mount -t proc /proc "${ROOTFS_DIR}/proc"
 sudo mount -t sysfs /sys "${ROOTFS_DIR}/sys"
 sudo mount --rbind /dev "${ROOTFS_DIR}/dev"
 sudo mount --make-rslave "${ROOTFS_DIR}/dev"
