@@ -140,12 +140,10 @@ void MainWindow::setClient(GitHubClient* c) {
                 m_imageRequests.insert(id, requestId);
                 client->fetchImage(url, id, requestId);
             });
-    connect(notificationListWidget, &NotificationListWidget::markAsRead, this,
-            [this](const QString& id) { this->client->markAsRead(id); });
+
     connect(notificationListWidget, &NotificationListWidget::requestDebugApi, this,
             [this](const QString& url) { showDebugWindow(url); });
-    connect(notificationListWidget, &NotificationListWidget::markAsDone, this,
-            [this](const QString& id) { this->client->markAsDone(id); });
+
     connect(notificationListWidget, &NotificationListWidget::loadMoreRequested, this, [this]() {
         if (m_notificationLoading) return;
         client->loadMore(m_currentRefreshId);
@@ -373,8 +371,10 @@ void MainWindow::onLoadingStarted(const QUuid& reqId) {
 void MainWindow::onAuthNotificationSettingsClicked() { showSettings(); }
 
 void MainWindow::dismissAllNotifications() {
-    notificationListWidget->selectAll();
-    notificationListWidget->dismissSelected();
+    QList<Notification> unread = notificationListWidget->getUnreadNotifications(-1);
+    for (const Notification& n : unread) {
+        notificationListWidget->requestMarkAsDone(n.id);
+    }
 }
 
 void MainWindow::onTokenLoaded() {
@@ -592,7 +592,7 @@ void MainWindow::updateTrayMenu() {
             QString url = n.url;
 
             connect(itemAction, &QAction::triggered, [this, url, id]() {
-                if (client) client->markAsRead(id);
+                if (notificationListWidget) notificationListWidget->requestMarkAsRead(id);
                 QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
                 QDesktopServices::openUrl(QUrl(htmlUrl));
 
@@ -605,9 +605,22 @@ void MainWindow::updateTrayMenu() {
 
         QAction* dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
         connect(dismissAllAction, &QAction::triggered, this, [this]() {
-            QMessageBox::StandardButton reply = QMessageBox::question(
-                this, tr("Dismiss All"), tr("Are you sure you want to dismiss all unread notifications?"),
-                QMessageBox::Yes | QMessageBox::No);
+            int unreadCount = 0;
+            if (notificationListWidget) {
+                unreadCount = notificationListWidget->getUnreadNotifications(-1).size();
+            }
+            if (unreadCount == 0) return;
+
+            QString msg;
+            if (notificationListWidget && notificationListWidget->hasMore()) {
+                msg = tr("Are you sure you want to dismiss %1 loaded unread notification(s)? More unread notifications "
+                         "may exist on GitHub that have not been loaded yet.")
+                          .arg(unreadCount);
+            } else {
+                msg = tr("Are you sure you want to dismiss all %1 unread notification(s)?").arg(unreadCount);
+            }
+            QMessageBox::StandardButton reply =
+                QMessageBox::question(this, tr("Dismiss All"), msg, QMessageBox::Yes | QMessageBox::No);
             if (reply == QMessageBox::Yes) {
                 this->dismissAllNotifications();
             }

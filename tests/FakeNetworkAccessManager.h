@@ -40,9 +40,14 @@ class ControlledFakeReply : public QNetworkReply {
         emit finished();
     }
 
-    void completeWithError(NetworkError code, const QString& errorString) {
+    void completeWithError(NetworkError code, const QString& errorString, int httpStatus = 0) {
         if (isFinished()) return;
         setFinished(true);
+        if (httpStatus != 0) {
+            setAttribute(QNetworkRequest::HttpStatusCodeAttribute, httpStatus);
+        } else if (code == AuthenticationRequiredError) {
+            setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 401);
+        }
         setError(code, errorString);
         emit errorOccurred(code);
         emit finished();

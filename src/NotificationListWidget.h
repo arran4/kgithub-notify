@@ -8,6 +8,7 @@
 #include <QPixmap>
 #include <QSet>
 #include <QUrl>
+#include <QUuid>
 #include <QWidget>
 #include <QtGui/QAction>
 
@@ -20,10 +21,17 @@ class NotificationListWidget : public QWidget {
     Q_OBJECT
     friend class TestRequestConsumers;
 
+    struct PendingMutation {
+        QString id;
+        QString action;
+        bool isChild = false;
+        QString childId;
+    };
+
    public:
     explicit NotificationListWidget(QWidget* parent = nullptr);
 
-    void setClient(GitHubClient* client) { m_client = client; }
+    void setClient(GitHubClient* client);
     void setNotifications(const QList<Notification>& notifications, bool append, bool hasMore);
     void setFilterMode(int mode);  // 0: Inbox, 1: Unread, 2: Read
     void setSortMode(int mode);
@@ -56,6 +64,14 @@ class NotificationListWidget : public QWidget {
     int count() const;
     QList<Notification> getUnreadNotifications(int limit = 5) const;
 
+    void requestMarkAsRead(const QString& id);
+    void requestMarkAsDone(const QString& id);
+    void requestMarkAsReadAndDone(const QString& id);
+    void requestChildMarkAsRead(const QString& parentId, const QString& childId);
+    void requestChildMarkAsDone(const QString& parentId, const QString& childId);
+    bool willLoadMore() const;
+    bool hasMore() const { return m_hasMore; }
+
    protected:
     void resizeEvent(QResizeEvent* event) override;
 
@@ -64,14 +80,15 @@ class NotificationListWidget : public QWidget {
     void updateImage(const QString& id, const QPixmap& pixmap);
     void updateError(const QString& id, const QString& error);
     void resetLoadMoreState();
+    void onMutationSucceeded(const QUuid& reqId);
+    void onPartialMutationSucceeded(const QUuid& reqId, const QString& action);
+    void onMutationError(const QUuid& reqId, const QString& error);
 
    signals:
     void countsChanged(int total, int unread, int newCount, const QList<Notification>& newItems);
     void statusMessage(const QString& message);
     void linkActivated(const QUrl& url);
     void refreshRequested();
-    void markAsRead(const QString& id);
-    void markAsDone(const QString& id);
     void loadMoreRequested();
     void notificationActivated(const QString& id);
     void requestDetails(const QString& url, const QString& id);
@@ -83,7 +100,6 @@ class NotificationListWidget : public QWidget {
     void onItemActivated(QListWidgetItem* item);
     void onLoadMoreClicked();
     void handleLoadMoreStrategy();
-    bool willLoadMore() const;
 
    private:
     void triggerLoadMore();
@@ -108,6 +124,10 @@ class NotificationListWidget : public QWidget {
     void openWindowForItem(QListWidgetItem* item);
     void copyLinkCurrentItem();
     void markAsReadAndRemoveItem(QListWidgetItem* item);
+    void applyReadToModel(const QString& id, bool isChild = false, const QString& childId = QString());
+    void applyDoneToModel(const QString& id, bool isChild = false, const QString& childId = QString());
+    void updateItemReadUi(const QString& id, bool isChild = false, const QString& childId = QString());
+    void updateItemDoneUi(const QString& id, bool isChild = false, const QString& childId = QString());
 
     QListWidget* listWidget;
     QList<Notification> m_allNotifications;
@@ -127,6 +147,9 @@ class NotificationListWidget : public QWidget {
     int m_pendingNewNotifications;
     QList<Notification> m_pendingNewlyAddedNotifications;
     bool m_countsDirty;
+
+    QMap<QUuid, PendingMutation> m_pendingMutations;
+    QMap<QString, QString> m_mutationErrors;
 
     // Context Menu
     GitHubClient* m_client;

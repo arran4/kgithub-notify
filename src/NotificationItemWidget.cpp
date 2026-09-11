@@ -177,6 +177,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             childLayout->setContentsMargins(0, 0, 0, 0);
 
             QLabel* childUnread = new QLabel(this);
+            childUnread->setObjectName(child.id + "_unreadDot");
             childUnread->setFixedSize(6, 6);
             if (child.unread) {
                 QPixmap dot(6, 6);
@@ -211,31 +212,26 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             childLayout->addWidget(copyBtn);
 
             QToolButton* readBtn = new QToolButton(this);
+            readBtn->setObjectName(child.id + "_readBtn");
             readBtn->setIcon(QIcon::fromTheme("mail-mark-read"));
             readBtn->setToolTip(tr("Mark as Read"));
             readBtn->setIconSize(QSize(16, 16));
             readBtn->setAutoRaise(true);
             readBtn->setVisible(child.unread);
-            connect(readBtn, &QToolButton::clicked, this, [this, child, childUnread, readBtn]() {
-                emit childMarkAsReadClicked(child.id);
-                childUnread->setVisible(false);
-                readBtn->setVisible(false);
-            });
+            connect(readBtn, &QToolButton::clicked, this, [this, child]() { emit childMarkAsReadClicked(child.id); });
             childLayout->addWidget(readBtn);
 
             QToolButton* doneBtn = new QToolButton(this);
+            doneBtn->setObjectName(child.id + "_doneBtn");
             doneBtn->setIcon(QIcon::fromTheme("task-complete"));
             doneBtn->setToolTip(tr("Mark as Done"));
             doneBtn->setIconSize(QSize(16, 16));
             doneBtn->setAutoRaise(true);
-            connect(doneBtn, &QToolButton::clicked, this, [this, child, childWidget]() {
-                emit childMarkAsDoneClicked(child.id);
-                childWidget->setVisible(false);
-                emit heightChanged();
-            });
+            connect(doneBtn, &QToolButton::clicked, this, [this, child]() { emit childMarkAsDoneClicked(child.id); });
             childLayout->addWidget(doneBtn);
 
             childrenLayout->addWidget(childWidget);
+            m_childWidgets.insert(child.id, childWidget);
         }
     }
 
@@ -266,8 +262,22 @@ void NotificationItemWidget::setHtmlUrl(const QString& url) {
 }
 
 void NotificationItemWidget::setError(const QString& error) {
-    errorLabel->setText(tr("Error: %1").arg(error));
+    if (error.isEmpty()) {
+        if (!errorLabel->text().isEmpty() || errorLabel->isVisible()) {
+            errorLabel->clear();
+            errorLabel->hide();
+            emit heightChanged();
+        }
+        return;
+    }
+    if (error.startsWith("Error:") || error.startsWith(tr("Error:")) || error.startsWith("Failed to") ||
+        error.startsWith(tr("Failed to"))) {
+        errorLabel->setText(error);
+    } else {
+        errorLabel->setText(tr("Error: %1").arg(error));
+    }
     errorLabel->show();
+    emit heightChanged();
 }
 
 void NotificationItemWidget::setRead(bool read) {
@@ -287,6 +297,54 @@ void NotificationItemWidget::setLoading(bool loading) {
     } else {
         loadingLabel->hide();
     }
+}
+
+void NotificationItemWidget::setChildLoadingState(const QString& childId, bool loading) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (!childWidget) return;
+
+    QToolButton* readBtn = childWidget->findChild<QToolButton*>(childId + "_readBtn");
+    if (readBtn) readBtn->setEnabled(!loading);
+
+    QToolButton* doneBtn = childWidget->findChild<QToolButton*>(childId + "_doneBtn");
+    if (doneBtn) doneBtn->setEnabled(!loading);
+}
+
+void NotificationItemWidget::setChildError(const QString& childId, const QString& error) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (childWidget) {
+        childWidget->setToolTip(error);
+    }
+}
+
+void NotificationItemWidget::markChildRead(const QString& childId) {
+    setChildLoadingState(childId, false);
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (!childWidget) return;
+
+    QToolButton* readBtn = childWidget->findChild<QToolButton*>(childId + "_readBtn");
+    if (readBtn) readBtn->setVisible(false);
+
+    QLabel* unreadDot = childWidget->findChild<QLabel*>(childId + "_unreadDot");
+    if (unreadDot) unreadDot->setVisible(false);
+}
+
+void NotificationItemWidget::removeChild(const QString& childId) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.take(childId);
+    if (childWidget) {
+        childWidget->hide();
+        childWidget->setParent(nullptr);
+        childWidget->deleteLater();
+    }
+    if (m_childWidgets.isEmpty()) {
+        if (expandButton) expandButton->setVisible(false);
+        if (childrenContainer) childrenContainer->setVisible(false);
+    }
+    emit heightChanged();
 }
 
 void NotificationItemWidget::updateNotification(const Notification& n) {

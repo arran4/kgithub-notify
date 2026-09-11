@@ -167,8 +167,10 @@ QUuid GitHubClient::markAsReadAndDone(const QString& id, QUuid reqId) {
 
     QNetworkReply* reply = manager->sendCustomRequest(request, "PATCH");
     reply->setProperty("reqId", reqId);
-    reply->setProperty("type", "read_and_done");
+    reply->setProperty("type", "read_and_done_stage1");
     reply->setProperty("notificationId", id);
+
+    m_pendingReadAndDone.insert(reqId, {id});
     return reqId;
 }
 
@@ -369,7 +371,8 @@ void GitHubClient::onReplyFinished(QNetworkReply* reply) {
         } else {
             emit errorOccurred(reqId, reply->errorString());
         }
-    } else if (type == "patch" || type == "delete") {
+    } else if (type == "patch" || type == "delete" || type == "read_and_done_stage1" ||
+               type == "read_and_done_stage2") {
         handlePatchReply(reply);
     } else if (type == "read_and_done") {
         QString id = reply->property("notificationId").toString();
@@ -566,13 +569,64 @@ void GitHubClient::handleUserReposReply(QNetworkReply* reply) {
 
 void GitHubClient::handlePatchReply(QNetworkReply* reply) {
     QUuid reqId = reply->property("reqId").toUuid();
+    QString type = reply->property("type").toString();
+
+    if (type == "read_and_done_stage1") {
+        if (reply->error() != QNetworkReply::NoError) {
+            m_pendingPatchRequests--;
+            if (m_pendingPatchRequests < 0) m_pendingPatchRequests = 0;
+
+            m_pendingReadAndDone.remove(reqId);
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+                reply->error() == QNetworkReply::AuthenticationRequiredError) {
+                emit authError(reqId, "Invalid Token");
+            } else {
+                emit errorOccurred(reqId, reply->errorString());
+            }
+            return;
+        }
+
+        PendingReadAndDone pending = m_pendingReadAndDone.take(reqId);
+
+        QUrl url(m_apiUrl + "/notifications/threads/" + pending.id);
+        QNetworkRequest request = createAuthenticatedRequest(url);
+        QNetworkReply* deleteReply = manager->sendCustomRequest(request, "DELETE");
+        deleteReply->setProperty("reqId", reqId);
+        deleteReply->setProperty("type", "read_and_done_stage2");
+        deleteReply->setProperty("notificationId", pending.id);
+        return;
+    }
+
+    if (type == "read_and_done_stage2") {
+        m_pendingPatchRequests--;
+        if (m_pendingPatchRequests < 0) m_pendingPatchRequests = 0;
+
+        if (reply->error() != QNetworkReply::NoError) {
+            emit partialMutationSucceeded(reqId, "read");
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+                reply->error() == QNetworkReply::AuthenticationRequiredError) {
+                emit authError(reqId, "Invalid Token");
+            } else {
+                emit errorOccurred(reqId, reply->errorString());
+            }
+            return;
+        }
+
+        emit mutationSucceeded(reqId);
+        if (m_pendingPatchRequests == 0) {
+            emit notificationsChanged();
+        }
+        return;
+    }
+
     m_pendingPatchRequests--;
     if (m_pendingPatchRequests < 0) {
         m_pendingPatchRequests = 0;
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+            reply->error() == QNetworkReply::AuthenticationRequiredError) {
             emit authError(reqId, "Invalid Token");
         } else {
             emit errorOccurred(reqId, reply->errorString());
@@ -630,6 +684,13 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
         n.reason = obj["reason"].toString();
         n.unread = obj["unread"].toBool();
         n.rawJson = obj;
+
+        if (obj.contains("groupedNotifications")) {
+            QJsonArray grouped = obj["groupedNotifications"].toArray();
+            for (const QJsonValue& v : grouped) {
+                n.groupedNotifications.append(Notification::fromJson(v.toObject()));
+            }
+        }
 
         notifications.append(n);
     }

@@ -9,6 +9,7 @@
 #include "../src/DebugWindow.h"
 #include "../src/MainWindow.h"
 #include "../src/NewIssueDialog.h"
+#include "../src/NotificationItemWidget.h"
 #include "../src/PullRequestWindow.h"
 #include "../src/RepoListWindow.h"
 #include "../src/SettingsDialog.h"
@@ -434,6 +435,823 @@ class TestRequestConsumers : public QObject {
         QVERIFY(window.notificationListWidget->m_allNotifications.isEmpty());
         QVERIFY(client.m_nextPageUrl.isEmpty());
         QCOMPARE(window.statusLabel->text(), QString("Updated"));
+    }
+
+    void testMarkAsReadSuccess() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->getUnreadNotifications().size(), 1);
+
+        list->requestMarkAsRead("1");
+        QCOMPARE(network->requests.size(), 2);
+        QCOMPARE(list->m_pendingMutations.size(), 1);
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->complete("{}");
+
+        // Authoritative model updated
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, false);
+        QCOMPARE(list->getUnreadNotifications().size(), 0);
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        // Under default filter mode (unread only), row is removed
+        QCOMPARE(list->count(), 0);
+
+        // Switch to "All" filter mode (4) to verify widget state
+        list->setFilterMode(4);
+        QCOMPARE(list->count(), 1);
+        auto* allWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(allWidget != nullptr);
+        QVERIFY(!allWidget->isLoading());
+        QVERIFY(!allWidget->unreadIndicator->isVisible());
+        QVERIFY(allWidget->doneButton->isEnabled());
+    }
+
+    void testMarkAsReadFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsRead("1");
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Read failed");
+
+        // Authoritative model remains unchanged
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        QCOMPARE(list->getUnreadNotifications().size(), 1);
+        QCOMPARE(list->count(), 1);
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        // Widget busy state cleared, error shown, actionable
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("Read failed"));
+        QVERIFY(widget->doneButton->isEnabled());
+    }
+
+    void testDoneSuccess() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        QVERIFY(list->knownNotificationIds.contains("1"));
+
+        list->requestMarkAsDone("1");
+        QCOMPARE(network->requests.size(), 2);
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->complete("{}");
+
+        // Authoritative model and known IDs cleaned up
+        QVERIFY(list->m_allNotifications.isEmpty());
+        QVERIFY(list->getUnreadNotifications().isEmpty());
+        QCOMPARE(list->count(), 0);
+        QVERIFY(!list->knownNotificationIds.contains("1"));
+        QVERIFY(list->m_pendingMutations.isEmpty());
+    }
+
+    void testMarkAsDoneFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsDone("1");
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Server Error");
+
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        QVERIFY(list->knownNotificationIds.contains("1"));
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("1"));
+        QVERIFY(widget->errorLabel->text().contains("done"));
+        QVERIFY(widget->errorLabel->text().contains("Server Error"));
+        QVERIFY(widget->doneButton->isEnabled());
+    }
+
+    void testComposedReadDonePartialFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->getUnreadNotifications().size(), 1);
+
+        // 1. Start composed read+done through NotificationListWidget
+        list->requestMarkAsReadAndDone("1");
+        QCOMPARE(network->requests.size(), 2);
+        QCOMPARE(network->requests[1].reply->property("type").toString(), QString("read_and_done_stage1"));
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        // 2. PATCH succeeds
+        network->requests[1].reply->complete("{}");
+
+        // 3. GitHubClient starts DELETE under the same logical request identity
+        QCOMPARE(network->requests.size(), 3);
+        QCOMPARE(network->requests[2].reply->property("type").toString(), QString("read_and_done_stage2"));
+        QUuid reqId1 = network->requests[1].reply->property("reqId").toUuid();
+        QUuid reqId2 = network->requests[2].reply->property("reqId").toUuid();
+        QCOMPARE(reqId1, reqId2);
+
+        // 4. DELETE fails
+        network->requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Delete failed");
+
+        // Required final state:
+        // - notification remains in m_allNotifications
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].id, QString("1"));
+        // - unread == false (successful read committed and not rolled back)
+        QCOMPARE(list->m_allNotifications[0].unread, false);
+        // - it is NOT removed as Done
+        QVERIFY(list->knownNotificationIds.contains("1"));
+        // - unread/tray counts reflect the successful read
+        QCOMPARE(list->getUnreadNotifications().size(), 0);
+        // - unread-only presentation does not show it
+        QCOMPARE(list->count(), 0);
+        // - pending/busy state is cleared
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        // Switch to "All" mode to verify visible state and actionability
+        list->setFilterMode(4);
+        QCOMPARE(list->count(), 1);
+        auto* allWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(allWidget != nullptr);
+        QVERIFY(!allWidget->isLoading());
+        QVERIFY(!allWidget->unreadIndicator->isVisible());
+        // - Done failure is understandable
+        QVERIFY(allWidget->errorLabel->isVisible() || !allWidget->errorLabel->text().isEmpty());
+        QVERIFY(allWidget->errorLabel->text().contains("1"));
+        QVERIFY(allWidget->errorLabel->text().contains("read+done"));
+        QVERIFY(allWidget->errorLabel->text().contains("Delete failed"));
+        // - notification remains actionable
+        QVERIFY(allWidget->doneButton->isEnabled());
+    }
+
+    void testBatchDismissalPartialFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test1\"},\"repository\":{\"full_name\":\"repo\"}},"
+            "{\"id\":\"2\",\"unread\":true,\"subject\":{\"title\":\"Test2\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 2);
+        QCOMPARE(list->getUnreadNotifications().size(), 2);
+
+        window.dismissAllNotifications();
+        QCOMPARE(network->requests.size(), 3);  // refresh, done1, done2
+
+        network->requests[1].reply->complete("{}");
+        network->requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Failed");
+
+        // Authoritative model: successful ID 1 removed, failed ID 2 remains
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].id, QString("2"));
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        QVERIFY(!list->knownNotificationIds.contains("1"));
+        QVERIFY(list->knownNotificationIds.contains("2"));
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        // Visible list
+        QCOMPARE(list->count(), 1);
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QCOMPARE(widget->getTitle(), QString("Test2"));
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("2"));
+        QVERIFY(widget->errorLabel->text().contains("done"));
+        QVERIFY(widget->errorLabel->text().contains("Failed"));
+        QVERIFY(widget->doneButton->isEnabled());
+    }
+
+    void testUnreadOnlyFilterDuringMutation() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        // Default filter is mode 0 (All Unread)
+        QCOMPARE(list->m_filterMode, 0);
+        QCOMPARE(list->count(), 1);
+
+        list->requestMarkAsRead("1");
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->complete("{}");
+
+        // Because it was marked read, it is filtered out of unread-only presentation
+        QCOMPARE(list->count(), 0);
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, false);
+        QCOMPARE(list->getUnreadNotifications().size(), 0);
+
+        // Switching to "All" (mode 4) shows it with updated read status
+        list->setFilterMode(4);
+        QCOMPARE(list->count(), 1);
+        auto* widgetAll =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widgetAll != nullptr);
+        QVERIFY(!widgetAll->isLoading());
+        QVERIFY(!widgetAll->unreadIndicator->isVisible());
+    }
+
+    void testRepoFilterTrayDismissAll() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test1\"},\"repository\":{\"full_name\":\"repoA\"}}"
+            ","
+            "{\"id\":\"2\",\"unread\":true,\"subject\":{\"title\":\"Test2\"},\"repository\":{\"full_name\":\"repoB\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 2);
+
+        // Filter main window list to repoA
+        list->setRepoFilter("repoA");
+        QVERIFY(!list->listWidget->item(0)->isHidden());
+        QVERIFY(list->listWidget->item(1)->isHidden());
+
+        // Tray Dismiss All must operate on all loaded unread items (both repoA and repoB)
+        window.dismissAllNotifications();
+        QCOMPARE(network->requests.size(), 3);  // refresh, done1, done2
+
+        network->requests[1].reply->complete("{}");
+        network->requests[2].reply->complete("{}");
+
+        // Both items authoritatively cleaned up even though repoB was hidden by filter
+        QVERIFY(list->m_allNotifications.isEmpty());
+        QVERIFY(list->getUnreadNotifications().isEmpty());
+        QCOMPARE(list->count(), 0);
+        QVERIFY(!list->knownNotificationIds.contains("1"));
+        QVERIFY(!list->knownNotificationIds.contains("2"));
+    }
+
+    void testSearchFilterTrayDismissAll() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Apple\"},\"repository\":{\"full_name\":\"repo\"}},"
+            "{\"id\":\"2\",\"unread\":true,\"subject\":{\"title\":\"Banana\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 2);
+
+        // Search filter hiding "Banana"
+        list->setSearchFilter("Apple");
+        QVERIFY(!list->listWidget->item(0)->isHidden());
+        QVERIFY(list->listWidget->item(1)->isHidden());
+
+        // Tray Dismiss All must target all unread regardless of search filter
+        window.dismissAllNotifications();
+        QCOMPARE(network->requests.size(), 3);  // refresh, done1, done2
+
+        network->requests[1].reply->complete("{}");
+        network->requests[2].reply->complete("{}");
+
+        // Both items authoritatively removed
+        QVERIFY(list->m_allNotifications.isEmpty());
+        QVERIFY(list->getUnreadNotifications().isEmpty());
+        QCOMPARE(list->count(), 0);
+        QVERIFY(!list->knownNotificationIds.contains("1"));
+        QVERIFY(!list->knownNotificationIds.contains("2"));
+    }
+
+    void testTrayDismissAllPreservesSelection() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test1\"},\"repository\":{\"full_name\":\"repo\"}},"
+            "{\"id\":\"2\",\"unread\":true,\"subject\":{\"title\":\"Test2\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        list->setFilterMode(4);  // All mode so rows stay in view
+        list->listWidget->item(1)->setSelected(true);
+        QVERIFY(list->listWidget->item(1)->isSelected());
+        QVERIFY(!list->listWidget->item(0)->isSelected());
+
+        // Tray Dismiss All must NOT change selection (must not call selectAll)
+        window.dismissAllNotifications();
+        QVERIFY(list->listWidget->item(1)->isSelected());
+        QVERIFY(!list->listWidget->item(0)->isSelected());
+    }
+
+    void testPendingDuplicateAction() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsRead("1");
+        QCOMPARE(network->requests.size(), 2);  // refresh, read
+
+        // Prevent any second mutation for the same notification while one mutation is pending:
+        // Same action
+        list->requestMarkAsRead("1");
+        QCOMPARE(network->requests.size(), 2);
+
+        // Different action (done)
+        list->requestMarkAsDone("1");
+        QCOMPARE(network->requests.size(), 2);
+
+        // Different action (read_and_done)
+        list->requestMarkAsReadAndDone("1");
+        QCOMPARE(network->requests.size(), 2);
+
+        // Complete the pending request
+        network->requests[1].reply->complete("{}");
+        QVERIFY(list->m_pendingMutations.isEmpty());
+    }
+
+    void testSynchronousErrorRace() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"},"
+            "\"groupedNotifications\":[{\"id\":\"c1\",\"unread\":true,\"title\":\"Child\",\"type\":\"Issue\"}]}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+
+        // Client will synchronously emit errorOccurred when m_token is empty
+        client.setToken("");
+
+        list->requestMarkAsRead("1");
+
+        // Assert:
+        // - no stranded entry remains in m_pendingMutations
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        // - notification remains in authoritative model
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        // - read/done state is unchanged
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        // - busy state is cleared
+        QVERIFY(!widget->isLoading());
+        // - mutation controls become actionable again
+        QVERIFY(widget->doneButton->isEnabled());
+        // - understandable error is shown
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("No token provided"));
+
+        // Now test synchronous failure on child action
+        list->requestChildMarkAsRead("1", "c1");
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications[0].unread, true);
+    }
+
+    void testRefreshDuringMutation() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        list->requestMarkAsRead("1");
+        QCOMPARE(network->requests.size(), 2);
+        QCOMPARE(list->m_pendingMutations.size(), 1);
+
+        // While mutation is in flight, trigger a refresh
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 3);
+
+        // Server responds to refresh with item "1" still unread
+        network->requests[2].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        // The refreshed/recreated item MUST remain pending/busy until the mutation resolves
+        auto* refreshedWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(refreshedWidget != nullptr);
+        QVERIFY(refreshedWidget->isLoading());
+        QVERIFY(!refreshedWidget->doneButton->isEnabled());
+
+        // Duplicate mutation must be rejected while still pending
+        list->requestMarkAsDone("1");
+        QCOMPARE(network->requests.size(), 3);
+
+        // Resolve in-flight read mutation
+        network->requests[1].reply->complete("{}");
+
+        // Authoritative model updated, row removed from unread list
+        QCOMPARE(list->count(), 0);
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, false);
+        QVERIFY(list->m_pendingMutations.isEmpty());
+    }
+
+    void testPartiallyLoadedPaginatedTrayScope() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        auto* reply = network->requests[0].reply;
+        reply->setRawHeader("Link", "<https://api.github.com/notifications?page=2>; rel=\"next\"");
+        reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        QVERIFY(list->hasMore());
+        QCOMPARE(list->getUnreadNotifications(-1).size(), 1);
+
+        // Verify Dismiss All operates strictly on loaded unread notifications
+        window.dismissAllNotifications();
+        QCOMPARE(network->requests.size(), 2);  // refresh, done for loaded item 1
+        QCOMPARE(network->requests[1].reply->property("type").toString(), QString("delete"));
+
+        network->requests[1].reply->complete("{}");
+        QVERIFY(list->m_allNotifications.isEmpty());
+        QVERIFY(list->getUnreadNotifications().isEmpty());
+    }
+
+    void testChildActionsSuccess() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"p1\",\"unread\":true,\"subject\":{\"title\":\"Parent\"},\"repository\":{\"full_name\":\"repo\"}"
+            ","
+            "\"groupedNotifications\":["
+            "{\"id\":\"c1\",\"unread\":true,\"title\":\"Child1\",\"type\":\"Issue\"},"
+            "{\"id\":\"c2\",\"unread\":true,\"title\":\"Child2\",\"type\":\"Issue\"}"
+            "]}]");
+
+        auto* list = window.notificationListWidget;
+        list->setFilterMode(4);  // All mode so parent stays visible
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+
+        // 1. Mark child 1 as read
+        list->requestChildMarkAsRead("p1", "c1");
+        QCOMPARE(network->requests.size(), 2);
+        network->requests[1].reply->complete("{}");
+
+        // Authoritative model updated
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications[0].unread, false);
+        // Child 1 read button is hidden
+        auto* c1Btn = widget->findChild<QToolButton*>("c1_readBtn");
+        QVERIFY(!c1Btn || !c1Btn->isVisible());
+
+        // 2. Mark child 2 as done
+        list->requestChildMarkAsDone("p1", "c2");
+        QCOMPARE(network->requests.last().reply->property("type").toString(), QString("delete"));
+        network->requests.last().reply->complete("{}");
+
+        // Authoritative model updated (c2 removed)
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications[0].id, QString("c1"));
+        // Child 2 widget removed from UI
+        QVERIFY(widget->findChild<QToolButton*>("c2_doneBtn") == nullptr);
+    }
+
+    void testMutationAuthError() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        QSignalSpy authSpy(&client, &GitHubClient::authError);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+
+        // 1. Mark as Read 401 failure
+        list->requestMarkAsRead("1");
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        network->requests[1].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Unauthorized", 401);
+
+        QCOMPARE(authSpy.count(), 1);
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("1"));
+        QVERIFY(widget->errorLabel->text().contains("read"));
+        QVERIFY(widget->errorLabel->text().contains("Invalid Token"));
+        QVERIFY(widget->doneButton->isEnabled());
+
+        // 2. Mark as Done 401 failure
+        list->requestMarkAsDone("1");
+        QVERIFY(widget->isLoading());
+
+        network->requests[2].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Unauthorized", 401);
+
+        QCOMPARE(authSpy.count(), 2);
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].unread, true);
+        QVERIFY(list->knownNotificationIds.contains("1"));
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        QVERIFY(!widget->isLoading());
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("1"));
+        QVERIFY(widget->errorLabel->text().contains("done"));
+        QVERIFY(widget->errorLabel->text().contains("Invalid Token"));
+        QVERIFY(widget->doneButton->isEnabled());
+    }
+
+    void testComposedReadDoneStage2AuthError() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        QSignalSpy authSpy(&client, &GitHubClient::authError);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"test/"
+            "repo\"}}]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->getUnreadNotifications().size(), 1);
+
+        // 1. Start composed read+done
+        list->requestMarkAsReadAndDone("1");
+        QCOMPARE(network->requests.size(), 2);
+        QCOMPARE(network->requests[1].reply->property("type").toString(), QString("read_and_done_stage1"));
+
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+        QVERIFY(widget->isLoading());
+
+        // 2. PATCH succeeds
+        network->requests[1].reply->complete("{}");
+
+        // 3. Stage 2 DELETE is initiated
+        QCOMPARE(network->requests.size(), 3);
+        QCOMPARE(network->requests[2].reply->property("type").toString(), QString("read_and_done_stage2"));
+
+        // 4. DELETE returns HTTP 401
+        network->requests[2].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Unauthorized", 401);
+
+        // - routes through authError
+        QCOMPARE(authSpy.count(), 1);
+
+        // - read stage committed (unread == false)
+        QCOMPARE(list->m_allNotifications.size(), 1);
+        QCOMPARE(list->m_allNotifications[0].id, QString("1"));
+        QCOMPARE(list->m_allNotifications[0].unread, false);
+        QCOMPARE(list->getUnreadNotifications().size(), 0);
+
+        // - NOT removed as Done
+        QVERIFY(list->knownNotificationIds.contains("1"));
+
+        // - pending state cleared
+        QVERIFY(list->m_pendingMutations.isEmpty());
+
+        // - unread-only view does not show it
+        QCOMPARE(list->count(), 0);
+
+        // Switch to "All" mode to verify visible state, actionable restoration, and contextual failure
+        list->setFilterMode(4);
+        QCOMPARE(list->count(), 1);
+        auto* allWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(allWidget != nullptr);
+        QVERIFY(!allWidget->isLoading());
+        QVERIFY(allWidget->doneButton->isEnabled());
+        QVERIFY(allWidget->errorLabel->isVisible() || !allWidget->errorLabel->text().isEmpty());
+        QVERIFY(allWidget->errorLabel->text().contains("1"));
+        QVERIFY(allWidget->errorLabel->text().contains("read+done"));
+        QVERIFY(allWidget->errorLabel->text().contains("Invalid Token"));
+    }
+
+    void testChildActionFailure() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        QSignalSpy authSpy(&client, &GitHubClient::authError);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"p1\",\"unread\":true,\"subject\":{\"title\":\"Parent\"},\"repository\":{\"full_name\":\"repo\"}"
+            ","
+            "\"groupedNotifications\":["
+            "{\"id\":\"c1\",\"unread\":true,\"title\":\"Child1\",\"type\":\"Issue\"}"
+            "]}]");
+
+        auto* list = window.notificationListWidget;
+        list->setFilterMode(4);  // All mode so parent stays visible
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+
+        auto* c1ReadBtn = widget->findChild<QToolButton*>("c1_readBtn");
+        auto* c1DoneBtn = widget->findChild<QToolButton*>("c1_doneBtn");
+        QVERIFY(c1ReadBtn != nullptr);
+        QVERIFY(c1DoneBtn != nullptr);
+
+        // 1. Mark child 1 as read, fails with HTTP 401
+        list->requestChildMarkAsRead("p1", "c1");
+        QCOMPARE(network->requests.size(), 2);
+        QVERIFY(!c1ReadBtn->isEnabled());
+        QVERIFY(!c1DoneBtn->isEnabled());
+
+        network->requests[1].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Unauthorized", 401);
+
+        QCOMPARE(authSpy.count(), 1);
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        // Model unread preserved
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications[0].unread, true);
+        // Actionable restoration
+        QVERIFY(c1ReadBtn->isEnabled());
+        QVERIFY(c1DoneBtn->isEnabled());
+        // Visible contextual failure
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("c1"));
+        QVERIFY(widget->errorLabel->text().contains("read"));
+        QVERIFY(widget->errorLabel->text().contains("Invalid Token"));
+
+        // 2. Mark child 1 as done, fails with 500 InternalServerError
+        list->requestChildMarkAsDone("p1", "c1");
+        QCOMPARE(network->requests.size(), 3);
+        QVERIFY(!c1ReadBtn->isEnabled());
+        QVERIFY(!c1DoneBtn->isEnabled());
+
+        network->requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Server Error");
+
+        QVERIFY(list->m_pendingMutations.isEmpty());
+        // Child not removed from model
+        QCOMPARE(list->m_allNotifications[0].groupedNotifications.size(), 1);
+        // Actionable restoration
+        QVERIFY(c1ReadBtn->isEnabled());
+        QVERIFY(c1DoneBtn->isEnabled());
+        // Visible contextual failure
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("c1"));
+        QVERIFY(widget->errorLabel->text().contains("done"));
+        QVERIFY(widget->errorLabel->text().contains("Server Error"));
+    }
+
+    void testDetailsErrorDoesNotPersistAsMutationError() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Test\"},\"repository\":{\"full_name\":\"repo\"}}"
+            "]");
+
+        auto* list = window.notificationListWidget;
+        QCOMPARE(list->count(), 1);
+        auto* widget = qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(widget != nullptr);
+
+        // Details error arrives
+        list->updateError("1", "404 Not Found");
+        QVERIFY(widget->errorLabel->isVisible() || !widget->errorLabel->text().isEmpty());
+        QVERIFY(widget->errorLabel->text().contains("404 Not Found"));
+
+        // Crucial: Details error must NOT enter m_mutationErrors
+        QVERIFY(list->m_mutationErrors.isEmpty());
+
+        // Rebuilding / filtering the list must not restore the transient details error
+        list->setFilterMode(4);
+        QCOMPARE(list->count(), 1);
+        auto* rebuiltWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(rebuiltWidget != nullptr);
+        QVERIFY(!rebuiltWidget->errorLabel->isVisible());
+        QVERIFY(rebuiltWidget->errorLabel->text().isEmpty());
+
+        // Conversely, a real mutation error DOES persist across rebuilds:
+        list->requestMarkAsRead("1");
+        network->requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Mutation failed");
+        QCOMPARE(list->m_mutationErrors.size(), 1);
+        list->setFilterMode(0);
+        list->setFilterMode(4);
+        auto* mutationErrWidget =
+            qobject_cast<NotificationItemWidget*>(list->listWidget->itemWidget(list->listWidget->item(0)));
+        QVERIFY(mutationErrWidget != nullptr);
+        QVERIFY(mutationErrWidget->errorLabel->isVisible() || !mutationErrWidget->errorLabel->text().isEmpty());
+        QVERIFY(mutationErrWidget->errorLabel->text().contains("Mutation failed"));
     }
 };
 
