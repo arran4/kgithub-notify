@@ -605,11 +605,19 @@ void MainWindow::updateTrayMenu() {
 
         QAction* dismissAllAction = new QAction(tr("Dismiss All"), unreadMenu);
         connect(dismissAllAction, &QAction::triggered, this, [this]() {
-            QString msg = tr("Are you sure you want to dismiss all unread notifications?");
-            if (notificationListWidget && notificationListWidget->willLoadMore()) {
-                msg =
-                    tr("Are you sure you want to dismiss all unread notifications? Only the loaded notifications will "
-                       "be dismissed.");
+            int unreadCount = 0;
+            if (notificationListWidget) {
+                unreadCount = notificationListWidget->getUnreadNotifications(-1).size();
+            }
+            if (unreadCount == 0) return;
+
+            QString msg;
+            if (notificationListWidget && notificationListWidget->hasMore()) {
+                msg = tr("Are you sure you want to dismiss %1 loaded unread notification(s)? More unread notifications "
+                         "may exist on GitHub that have not been loaded yet.")
+                          .arg(unreadCount);
+            } else {
+                msg = tr("Are you sure you want to dismiss all %1 unread notification(s)?").arg(unreadCount);
             }
             QMessageBox::StandardButton reply =
                 QMessageBox::question(this, tr("Dismiss All"), msg, QMessageBox::Yes | QMessageBox::No);

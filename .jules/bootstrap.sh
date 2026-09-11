@@ -28,7 +28,8 @@ sha256sum -c "$SHA_FILE"
 
 echo "Extracting rootfs..."
 # Use sudo to preserve numeric ownership for a proper chroot filesystem setup
-sudo tar -I zstd --numeric-owner -xf "$TAR_FILE"
+# Exclude ./dev/* because unprivileged containers cannot mknod device files and run.sh mounts /dev anyway
+sudo tar -I zstd --numeric-owner --exclude='./dev/*' -xf "$TAR_FILE"
 
 # Make sure we clean up the downloaded archives
 sudo rm "$TAR_FILE" "$SHA_FILE"

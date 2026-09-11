@@ -678,6 +678,13 @@ void GitHubClient::handleNotificationsReply(QNetworkReply* reply) {
         n.unread = obj["unread"].toBool();
         n.rawJson = obj;
 
+        if (obj.contains("groupedNotifications")) {
+            QJsonArray grouped = obj["groupedNotifications"].toArray();
+            for (const QJsonValue& v : grouped) {
+                n.groupedNotifications.append(Notification::fromJson(v.toObject()));
+            }
+        }
+
         notifications.append(n);
     }
 

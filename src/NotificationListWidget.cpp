@@ -400,6 +400,8 @@ void NotificationListWidget::updateImage(const QString& id, const QPixmap& pixma
 }
 
 void NotificationListWidget::updateError(const QString& id, const QString& error) {
+    if (m_notificationErrors.contains(id)) return;
+    m_notificationErrors[id] = error;
     NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setError(error);
@@ -448,7 +450,7 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
             widget->setAuthor(details.author, details.avatar);
             widget->setHtmlUrl(details.htmlUrl);
         }
-    } else {
+    } else if (!n.url.isEmpty()) {
         emit requestDetails(n.url, n.id);
     }
 
@@ -463,6 +465,20 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
     item->setSizeHint(hint);
 
     widget->setRead(!n.unread);
+
+    for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
+        if (it.value().id == n.id) {
+            if (it.value().isChild) {
+                widget->setChildLoadingState(it.value().childId, true);
+            } else {
+                widget->setLoading(true);
+            }
+        }
+    }
+
+    if (m_notificationErrors.contains(n.id)) {
+        widget->setError(m_notificationErrors[n.id]);
+    }
 
     QPointer<NotificationItemWidget> safeWidget(widget);
 
@@ -920,101 +936,106 @@ void NotificationListWidget::requestMarkAsRead(const QString& id) {
     if (!m_client) return;
 
     for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
-        if (it.value().id == id && it.value().action == "read" && !it.value().isChild) return;
+        if (!it.value().isChild && it.value().id == id) return;
     }
 
-    QUuid reqId = m_client->markAsRead(id);
+    QUuid reqId = QUuid::createUuid();
     m_pendingMutations.insert(reqId, {id, "read", false, ""});
 
     NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setLoading(true);
     }
+
+    m_client->markAsRead(id, reqId);
 }
 
 void NotificationListWidget::requestMarkAsDone(const QString& id) {
     if (!m_client) return;
 
     for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
-        if (it.value().id == id && it.value().action == "done" && !it.value().isChild) return;
+        if (!it.value().isChild && it.value().id == id) return;
     }
 
-    QUuid reqId = m_client->markAsDone(id);
+    QUuid reqId = QUuid::createUuid();
     m_pendingMutations.insert(reqId, {id, "done", false, ""});
 
     NotificationItemWidget* widget = findNotificationWidget(id);
     if (widget) {
         widget->setLoading(true);
     }
+
+    m_client->markAsDone(id, reqId);
+}
+
+void NotificationListWidget::requestMarkAsReadAndDone(const QString& id) {
+    if (!m_client) return;
+
+    for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
+        if (!it.value().isChild && it.value().id == id) return;
+    }
+
+    QUuid reqId = QUuid::createUuid();
+    m_pendingMutations.insert(reqId, {id, "read_and_done", false, ""});
+
+    NotificationItemWidget* widget = findNotificationWidget(id);
+    if (widget) {
+        widget->setLoading(true);
+    }
+
+    m_client->markAsReadAndDone(id, reqId);
 }
 
 void NotificationListWidget::requestChildMarkAsRead(const QString& parentId, const QString& childId) {
     if (!m_client) return;
 
     for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
-        if (it.value().id == parentId && it.value().action == "read" && it.value().isChild &&
-            it.value().childId == childId)
-            return;
+        if (it.value().isChild && it.value().childId == childId) return;
+        if (!it.value().isChild && it.value().id == parentId) return;
     }
 
-    QUuid reqId = m_client->markAsRead(childId);
+    QUuid reqId = QUuid::createUuid();
     m_pendingMutations.insert(reqId, {parentId, "read", true, childId});
 
     NotificationItemWidget* widget = findNotificationWidget(parentId);
     if (widget) {
         widget->setChildLoadingState(childId, true);
     }
+
+    m_client->markAsRead(childId, reqId);
 }
 
 void NotificationListWidget::requestChildMarkAsDone(const QString& parentId, const QString& childId) {
     if (!m_client) return;
 
     for (auto it = m_pendingMutations.begin(); it != m_pendingMutations.end(); ++it) {
-        if (it.value().id == parentId && it.value().action == "done" && it.value().isChild &&
-            it.value().childId == childId)
-            return;
+        if (it.value().isChild && it.value().childId == childId) return;
+        if (!it.value().isChild && it.value().id == parentId) return;
     }
 
-    QUuid reqId = m_client->markAsDone(childId);
+    QUuid reqId = QUuid::createUuid();
     m_pendingMutations.insert(reqId, {parentId, "done", true, childId});
 
     NotificationItemWidget* widget = findNotificationWidget(parentId);
     if (widget) {
         widget->setChildLoadingState(childId, true);
     }
+
+    m_client->markAsDone(childId, reqId);
 }
 
-void NotificationListWidget::onMutationSucceeded(const QUuid& reqId) {
-    if (!m_pendingMutations.contains(reqId)) return;
-    PendingMutation mutation = m_pendingMutations.take(reqId);
-
-    NotificationItemWidget* widget = findNotificationWidget(mutation.id);
-
-    // First, modify the underlying data model (m_allNotifications)
+void NotificationListWidget::applyReadToModel(const QString& id, bool isChild, const QString& childId) {
     for (int i = 0; i < m_allNotifications.size(); ++i) {
-        if (m_allNotifications[i].id == mutation.id) {
-            if (mutation.isChild) {
-                if (mutation.action == "read") {
-                    for (int j = 0; j < m_allNotifications[i].groupedNotifications.size(); ++j) {
-                        if (m_allNotifications[i].groupedNotifications[j].id == mutation.childId) {
-                            m_allNotifications[i].groupedNotifications[j].unread = false;
-                            break;
-                        }
-                    }
-                } else if (mutation.action == "done") {
-                    for (int j = 0; j < m_allNotifications[i].groupedNotifications.size(); ++j) {
-                        if (m_allNotifications[i].groupedNotifications[j].id == mutation.childId) {
-                            m_allNotifications[i].groupedNotifications.removeAt(j);
-                            break;
-                        }
+        if (m_allNotifications[i].id == id) {
+            if (isChild) {
+                for (int j = 0; j < m_allNotifications[i].groupedNotifications.size(); ++j) {
+                    if (m_allNotifications[i].groupedNotifications[j].id == childId) {
+                        m_allNotifications[i].groupedNotifications[j].unread = false;
+                        break;
                     }
                 }
             } else {
-                if (mutation.action == "read") {
-                    m_allNotifications[i].unread = false;
-                } else if (mutation.action == "done") {
-                    m_allNotifications.removeAt(i);
-                }
+                m_allNotifications[i].unread = false;
             }
             break;
         }
@@ -1022,104 +1043,137 @@ void NotificationListWidget::onMutationSucceeded(const QUuid& reqId) {
     m_countsDirty = true;
     emit countsChanged(count(), getUnreadNotifications().size(), m_pendingNewNotifications,
                        m_pendingNewlyAddedNotifications);
+}
 
-    // Then, if visible, update the widget and list item
-    if (!widget) return;
+void NotificationListWidget::applyDoneToModel(const QString& id, bool isChild, const QString& childId) {
+    for (int i = 0; i < m_allNotifications.size(); ++i) {
+        if (m_allNotifications[i].id == id) {
+            if (isChild) {
+                for (int j = 0; j < m_allNotifications[i].groupedNotifications.size(); ++j) {
+                    if (m_allNotifications[i].groupedNotifications[j].id == childId) {
+                        m_allNotifications[i].groupedNotifications.removeAt(j);
+                        break;
+                    }
+                }
+            } else {
+                m_allNotifications.removeAt(i);
+                knownNotificationIds.remove(id);
+                removeKnownNotification(id);
+            }
+            break;
+        }
+    }
+    m_countsDirty = true;
+    emit countsChanged(count(), getUnreadNotifications().size(), m_pendingNewNotifications,
+                       m_pendingNewlyAddedNotifications);
+}
 
-    if (mutation.isChild) {
-        QListWidgetItem* item = nullptr;
-        for (int i = 0; i < listWidget->count(); ++i) {
-            if (listWidget->item(i)->data(Qt::UserRole + 1).toString() == mutation.id) {
-                item = listWidget->item(i);
+void NotificationListWidget::updateItemReadUi(const QString& id, bool isChild, const QString& childId) {
+    NotificationItemWidget* widget = findNotificationWidget(id);
+    if (widget) {
+        if (isChild) {
+            widget->markChildRead(childId);
+        } else {
+            widget->setLoading(false);
+            widget->setRead(true);
+        }
+    }
+
+    QListWidgetItem* item = nullptr;
+    for (int i = 0; i < listWidget->count(); ++i) {
+        if (listWidget->item(i)->data(Qt::UserRole + 1).toString() == id) {
+            item = listWidget->item(i);
+            break;
+        }
+    }
+    if (!item) return;
+
+    QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
+    Notification n = Notification::fromJson(json);
+
+    if (isChild) {
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == childId) {
+                n.groupedNotifications[i].unread = false;
                 break;
             }
         }
-        if (!item) return;
+        item->setData(Qt::UserRole + 4, n.toJson());
+    } else {
+        n.unread = false;
+        item->setData(Qt::UserRole + 4, n.toJson());
 
+        QFont font = item->font();
+        font.setBold(false);
+        item->setFont(font);
+
+        if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5 || m_filterMode == 7 || m_filterMode == 9 ||
+            m_filterMode == 11) {
+            delete listWidget->takeItem(listWidget->row(item));
+        }
+    }
+}
+
+void NotificationListWidget::updateItemDoneUi(const QString& id, bool isChild, const QString& childId) {
+    NotificationItemWidget* widget = findNotificationWidget(id);
+    if (widget && isChild) {
+        widget->removeChild(childId);
+    }
+
+    QListWidgetItem* item = nullptr;
+    for (int i = 0; i < listWidget->count(); ++i) {
+        if (listWidget->item(i)->data(Qt::UserRole + 1).toString() == id) {
+            item = listWidget->item(i);
+            break;
+        }
+    }
+    if (!item) return;
+
+    if (isChild) {
         QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
         Notification n = Notification::fromJson(json);
-
-        if (mutation.action == "read") {
-            for (int i = 0; i < n.groupedNotifications.size(); ++i) {
-                if (n.groupedNotifications[i].id == mutation.childId) {
-                    n.groupedNotifications[i].unread = false;
-                    break;
-                }
-            }
-            QToolButton* childUnreadBtn = widget->findChild<QToolButton*>(mutation.childId + "_readBtn");
-            if (childUnreadBtn) childUnreadBtn->setVisible(false);
-
-        } else if (mutation.action == "done") {
-            for (int i = 0; i < n.groupedNotifications.size(); ++i) {
-                if (n.groupedNotifications[i].id == mutation.childId) {
-                    n.groupedNotifications.removeAt(i);
-                    break;
-                }
+        for (int i = 0; i < n.groupedNotifications.size(); ++i) {
+            if (n.groupedNotifications[i].id == childId) {
+                n.groupedNotifications.removeAt(i);
+                break;
             }
         }
         item->setData(Qt::UserRole + 4, n.toJson());
-
     } else {
-        if (mutation.action == "read") {
-            widget->setRead(true);
+        delete listWidget->takeItem(listWidget->row(item));
+    }
+}
 
-            QListWidgetItem* item = nullptr;
-            for (int i = 0; i < listWidget->count(); ++i) {
-                if (listWidget->item(i)->data(Qt::UserRole + 1).toString() == mutation.id) {
-                    item = listWidget->item(i);
-                    break;
-                }
-            }
-            if (item) {
-                QJsonObject json = item->data(Qt::UserRole + 4).toJsonObject();
-                Notification n = Notification::fromJson(json);
-                n.unread = false;
-                item->setData(Qt::UserRole + 4, n.toJson());
+void NotificationListWidget::onMutationSucceeded(const QUuid& reqId) {
+    if (!m_pendingMutations.contains(reqId)) return;
+    PendingMutation mutation = m_pendingMutations.take(reqId);
+    m_notificationErrors.remove(mutation.id);
 
-                QFont font = item->font();
-                font.setBold(false);
-                item->setFont(font);
-
-                if (m_filterMode == 0 || m_filterMode == 2 || m_filterMode == 5 || m_filterMode == 7 ||
-                    m_filterMode == 9 || m_filterMode == 11) {
-                    delete listWidget->takeItem(listWidget->row(item));
-                }
-            }
-        } else if (mutation.action == "done") {
-            QListWidgetItem* item = nullptr;
-            for (int i = 0; i < listWidget->count(); ++i) {
-                if (listWidget->item(i)->data(Qt::UserRole + 1).toString() == mutation.id) {
-                    item = listWidget->item(i);
-                    break;
-                }
-            }
-            if (item) {
-                knownNotificationIds.remove(mutation.id);
-                removeKnownNotification(mutation.id);
-                delete listWidget->takeItem(listWidget->row(item));
-            }
-        }
+    if (mutation.action == "read") {
+        applyReadToModel(mutation.id, mutation.isChild, mutation.childId);
+        updateItemReadUi(mutation.id, mutation.isChild, mutation.childId);
+    } else if (mutation.action == "done" || mutation.action == "read_and_done") {
+        applyDoneToModel(mutation.id, mutation.isChild, mutation.childId);
+        updateItemDoneUi(mutation.id, mutation.isChild, mutation.childId);
     }
 }
 
 void NotificationListWidget::onPartialMutationSucceeded(const QUuid& reqId, const QString& action) {
     if (!m_pendingMutations.contains(reqId)) return;
-    PendingMutation mutation = m_pendingMutations.value(reqId);  // Don't take it, error handler needs it
+    const PendingMutation& mutation = m_pendingMutations.value(reqId);
 
-    // We only support partial "read" successes when "done" fails currently
     if (action == "read") {
-        PendingMutation readMutation = mutation;
-        readMutation.action = "read";
-        // Create a temporary UUID to route through the standard success handler
-        QUuid tempId = QUuid::createUuid();
-        m_pendingMutations.insert(tempId, readMutation);
-        onMutationSucceeded(tempId);
+        applyReadToModel(mutation.id, mutation.isChild, mutation.childId);
+        updateItemReadUi(mutation.id, mutation.isChild, mutation.childId);
     }
 }
 
 void NotificationListWidget::onMutationError(const QUuid& reqId, const QString& error) {
     if (!m_pendingMutations.contains(reqId)) return;
     PendingMutation mutation = m_pendingMutations.take(reqId);
+    m_notificationErrors[mutation.id] = error;
+
+    emit statusMessage(tr("Error: %1").arg(error));
 
     NotificationItemWidget* widget = findNotificationWidget(mutation.id);
     if (!widget) return;

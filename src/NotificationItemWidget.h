@@ -38,6 +38,8 @@ class NotificationItemWidget : public QWidget {
     void setRead(bool read);
     void setLoading(bool loading);
     void setChildLoadingState(const QString& childId, bool loading);
+    void markChildRead(const QString& childId);
+    void removeChild(const QString& childId);
     bool isLoading() const { return m_isLoading; }
     void updateNotification(const Notification& n);
 

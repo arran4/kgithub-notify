@@ -66,9 +66,11 @@ class NotificationListWidget : public QWidget {
 
     void requestMarkAsRead(const QString& id);
     void requestMarkAsDone(const QString& id);
+    void requestMarkAsReadAndDone(const QString& id);
     void requestChildMarkAsRead(const QString& parentId, const QString& childId);
     void requestChildMarkAsDone(const QString& parentId, const QString& childId);
     bool willLoadMore() const;
+    bool hasMore() const { return m_hasMore; }
 
    protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -122,6 +124,10 @@ class NotificationListWidget : public QWidget {
     void openWindowForItem(QListWidgetItem* item);
     void copyLinkCurrentItem();
     void markAsReadAndRemoveItem(QListWidgetItem* item);
+    void applyReadToModel(const QString& id, bool isChild = false, const QString& childId = QString());
+    void applyDoneToModel(const QString& id, bool isChild = false, const QString& childId = QString());
+    void updateItemReadUi(const QString& id, bool isChild = false, const QString& childId = QString());
+    void updateItemDoneUi(const QString& id, bool isChild = false, const QString& childId = QString());
 
     QListWidget* listWidget;
     QList<Notification> m_allNotifications;
@@ -143,6 +149,7 @@ class NotificationListWidget : public QWidget {
     bool m_countsDirty;
 
     QMap<QUuid, PendingMutation> m_pendingMutations;
+    QMap<QString, QString> m_notificationErrors;
 
     // Context Menu
     GitHubClient* m_client;

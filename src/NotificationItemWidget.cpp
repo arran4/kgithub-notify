@@ -177,6 +177,7 @@ NotificationItemWidget::NotificationItemWidget(const Notification& n, QWidget* p
             childLayout->setContentsMargins(0, 0, 0, 0);
 
             QLabel* childUnread = new QLabel(this);
+            childUnread->setObjectName(child.id + "_unreadDot");
             childUnread->setFixedSize(6, 6);
             if (child.unread) {
                 QPixmap dot(6, 6);
@@ -294,6 +295,34 @@ void NotificationItemWidget::setChildLoadingState(const QString& childId, bool l
 
     QToolButton* doneBtn = childWidget->findChild<QToolButton*>(childId + "_doneBtn");
     if (doneBtn) doneBtn->setEnabled(!loading);
+}
+
+void NotificationItemWidget::markChildRead(const QString& childId) {
+    setChildLoadingState(childId, false);
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.value(childId);
+    if (!childWidget) return;
+
+    QToolButton* readBtn = childWidget->findChild<QToolButton*>(childId + "_readBtn");
+    if (readBtn) readBtn->setVisible(false);
+
+    QLabel* unreadDot = childWidget->findChild<QLabel*>(childId + "_unreadDot");
+    if (unreadDot) unreadDot->setVisible(false);
+}
+
+void NotificationItemWidget::removeChild(const QString& childId) {
+    if (!m_childWidgets.contains(childId)) return;
+    QWidget* childWidget = m_childWidgets.take(childId);
+    if (childWidget) {
+        childWidget->hide();
+        childWidget->setParent(nullptr);
+        childWidget->deleteLater();
+    }
+    if (m_childWidgets.isEmpty()) {
+        if (expandButton) expandButton->setVisible(false);
+        if (childrenContainer) childrenContainer->setVisible(false);
+    }
+    emit heightChanged();
 }
 
 void NotificationItemWidget::updateNotification(const Notification& n) {
