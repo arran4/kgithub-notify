@@ -1,4 +1,5 @@
 #include "GitHubClient.h"
+#include "WalletManager.h"
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
@@ -23,7 +24,7 @@ class SettingsDialog : public QDialog {
     Q_ENUM(GetDataOption)
 
     static QString getToken();
-    static QFuture<QString> getTokenAsync();
+    static QFuture<WalletResult> getTokenAsync();
     static int getInterval();
     static GetDataOption getGetDataOption();
     static int getSummaryThreshold();

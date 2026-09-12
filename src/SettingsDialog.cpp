@@ -44,9 +44,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
     tokenEdit->setEnabled(false);
     tokenEdit->setPlaceholderText("Loading...");
 
-    QFutureWatcher<QString>* watcher = new QFutureWatcher<QString>(this);
+    QFutureWatcher<WalletResult>* watcher = new QFutureWatcher<WalletResult>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
-        tokenEdit->setText(watcher->result());
+        tokenEdit->setText(watcher->result().token);
         tokenEdit->setEnabled(true);
         tokenEdit->setPlaceholderText("");
         watcher->deleteLater();
@@ -204,7 +204,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 }
 
 void SettingsDialog::saveSettings() {
-    WalletManager::saveToken(tokenEdit->text());
+    // Handled asynchronously
 
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
@@ -260,7 +260,7 @@ bool SettingsDialog::isAutostartEnabled() {
 
 QString SettingsDialog::getToken() { return WalletManager::loadToken(); }
 
-QFuture<QString> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
+QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
 int SettingsDialog::getInterval() {
     QSettings settings;

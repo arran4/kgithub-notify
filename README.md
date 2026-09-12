@@ -85,20 +85,9 @@ On the first run, or by selecting "Settings" from the File menu (or tray icon co
 
 ### Token Scopes
 
-To ensure the application can fetch your notifications and their details (especially for private repositories), your token must have the correct permissions.
-
-**For a Classic Token:**
-* Select the `notifications` scope to access your inbox.
-* To receive notifications and fetch details (like pull request status or issue authors) for **private repositories**, you **must** also select the full `repo` scope.
-
-**For a Fine-grained Token:**
-* **Repository Access:** Select the specific repositories you want to monitor, or "All repositories".
-* **Permissions:** Under "Repository permissions", grant **Read-only** access to:
-    * `Pull requests` (Required to fetch pull request details)
-    * `Issues` (Required to fetch issue details)
-    * `Metadata` (Usually required automatically)
-* **User Permissions:** Under "User permissions", grant **Read-only** access to:
-    * `Notifications` (Required to access your inbox)
+- A Personal Access Token (PAT). Requirements:
+  - **Classic Token**: Requires `repo` and `notifications` scopes.
+  - **Fine-grained Token**: Requires Read-only access to Metadata and Notifications, Read/Write for Issues and Pull Requests.
 
 3. Copy the token and paste it into the application's settings dialog.
 
@@ -107,7 +96,3 @@ To ensure the application can fetch your notifications and their details (especi
 This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 
-## GitHub Token Permissions
-When setting up your Personal Access Token, ensure it has the appropriate permissions:
-* **Classic PAT**: `repo`, `read:org`, `notifications` scopes.
-* **Fine-grained Token**: Read/Write access for `Issues` & `Pull requests`, and Read access for `Metadata`.
