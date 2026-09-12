@@ -15,14 +15,15 @@
 #include "SecureString.h"
 
 struct TokenCapabilities {
+    QString login;
     std::optional<bool> hasNotifications;
     std::optional<bool> hasRepoMetadata;
     std::optional<bool> hasPrivateRepos;
-    std::optional<bool> hasIssues;
+    std::optional<bool> hasCreateIssues;
+    std::optional<bool> hasPrComments;
 };
 
 struct VerificationSession {
-    QString token;
     QUuid uuid;
     TokenCapabilities capabilities;
 };

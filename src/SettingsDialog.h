@@ -37,6 +37,8 @@ class SettingsDialog : public QDialog {
 
    private slots:
     void saveSettings();
+    void onAccepted();
+    void onSaveFinished();
     void onTestClicked();
     void onVerificationResult(const QUuid& reqId, bool isValid, const TokenCapabilities& capabilities,
                               const QString& error);
@@ -60,6 +62,7 @@ class SettingsDialog : public QDialog {
     QLabel* statusLabel;
     GitHubClient* testClient;
     QUuid m_verificationRequestId;
+    QFutureWatcher<WalletResult>* saveWatcher = nullptr;
 };
 
 #endif  // SETTINGSDIALOG_H

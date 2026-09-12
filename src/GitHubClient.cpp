@@ -108,7 +108,7 @@ QUuid GitHubClient::verifyToken(QUuid reqId) {
         return reqId;
     }
 
-    VerificationSession* session = new VerificationSession{m_token.toQString(), reqId, TokenCapabilities{}};
+    VerificationSession* session = new VerificationSession{reqId, TokenCapabilities{}};
 
     QUrl url(m_apiUrl + "/user");
     QNetworkRequest request = createAuthenticatedRequest(url);
@@ -128,17 +128,22 @@ void GitHubClient::onVerifyUserFinished(QNetworkReply* reply, VerificationSessio
     if (reply->error() == QNetworkReply::NoError) {
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (statusCode == 200) {
+            QJsonDocument json = QJsonDocument::fromJson(reply->readAll());
+            if (json.isObject()) {
+                session->capabilities.login = json.object().value("login").toString();
+            }
             if (reply->hasRawHeader("X-OAuth-Scopes")) {
                 QString scopes = QString::fromUtf8(reply->rawHeader("X-OAuth-Scopes"));
-                if (scopes.contains("notifications")) {
+                if (scopes.split(", ").contains("notifications")) {
                     session->capabilities.hasNotifications = true;
                 } else {
                     session->capabilities.hasNotifications = false;
                 }
-                if (scopes.contains("repo")) {
+                if (scopes.split(", ").contains("repo")) {
                     session->capabilities.hasRepoMetadata = true;
                     session->capabilities.hasPrivateRepos = true;
-                    session->capabilities.hasIssues = true;
+                    session->capabilities.hasCreateIssues = true;
+                    session->capabilities.hasPrComments = true;
                 }
             }
 
@@ -176,8 +181,13 @@ void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSessi
             }
         }
     } else {
-        if (!session->capabilities.hasRepoMetadata.has_value()) {
-            session->capabilities.hasRepoMetadata = false;
+        // Leave as Unknown (std::nullopt) on network/rate limit errors to avoid false negative.
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 403 ||
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 404) {
+            if (!session->capabilities.hasRepoMetadata.has_value()) {
+                session->capabilities.hasRepoMetadata = false;
+            }
         }
     }
 

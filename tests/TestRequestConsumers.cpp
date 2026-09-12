@@ -1,5 +1,6 @@
 #include <QAction>
 #include <QDesktopServices>
+#include <QFutureInterface>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -13,8 +14,36 @@
 #include "../src/PullRequestWindow.h"
 #include "../src/RepoListWindow.h"
 #include "../src/SettingsDialog.h"
+#include "../src/WalletManager.h"
 #include "../src/trending/TrendingWindow.h"
 #include "FakeNetworkAccessManager.h"
+class MockWalletBackend : public WalletBackend {
+   public:
+    QFuture<WalletResult> loadTokenAsync() override {
+        QFutureInterface<WalletResult> iface;
+        iface.reportResult(loadResult);
+        iface.reportFinished();
+        return iface.future();
+    }
+    QFuture<WalletResult> saveTokenAsync(const QString& token) override {
+        savedToken = token;
+        QFutureInterface<WalletResult> iface;
+        iface.reportResult(saveResult);
+        iface.reportFinished();
+        return iface.future();
+    }
+    QFuture<WalletResult> clearTokenAsync() override {
+        savedToken.clear();
+        QFutureInterface<WalletResult> iface;
+        iface.reportResult({true, "", ""});
+        iface.reportFinished();
+        return iface.future();
+    }
+
+    WalletResult loadResult{true, "test_token", ""};
+    WalletResult saveResult{true, "", ""};
+    QString savedToken;
+};
 
 class TestRequestConsumers : public QObject {
     Q_OBJECT
@@ -231,6 +260,57 @@ class TestRequestConsumers : public QObject {
         QVERIFY(trending.refreshButton->isEnabled());
         QVERIFY(network->requests.isEmpty());
     }
+    void testSettingsClearToken() {
+        MockWalletBackend* mockBackend = new MockWalletBackend();
+        mockBackend->savedToken = "old_token";
+        mockBackend->saveResult = {true, "", ""};  // clearTokenAsync uses saveResult
+        WalletManager::setBackend(mockBackend);
+
+        SettingsDialog dialog;
+        QLineEdit* tokenInput = dialog.findChild<QLineEdit*>();
+        tokenInput->setText("");
+        dialog.onAccepted();
+        QCoreApplication::processEvents();
+        QCOMPARE(mockBackend->savedToken, QString(""));
+
+        delete mockBackend;
+        WalletManager::setBackend(nullptr);
+    }
+    void testSettingsSaveFailureKeepsDialog() {
+        MockWalletBackend* mockBackend = new MockWalletBackend();
+        mockBackend->saveResult = {false, "", "Simulated failure"};
+        WalletManager::setBackend(mockBackend);
+
+        SettingsDialog dialog;
+        QLineEdit* tokenInput = dialog.findChild<QLineEdit*>();
+        tokenInput->setText("new_token");
+
+        dialog.onAccepted();
+        QCoreApplication::processEvents();
+
+        QCOMPARE(mockBackend->savedToken, QString("new_token"));
+
+        delete mockBackend;
+        WalletManager::setBackend(nullptr);
+    }
+    void testSettingsSaveSuccessClosesDialog() {
+        MockWalletBackend* mockBackend = new MockWalletBackend();
+        mockBackend->saveResult = {true, "", ""};
+        WalletManager::setBackend(mockBackend);
+
+        SettingsDialog dialog;
+        QLineEdit* tokenInput = dialog.findChild<QLineEdit*>();
+        tokenInput->setText("new_token");
+
+        dialog.onAccepted();
+        QCoreApplication::processEvents();
+
+        QCOMPARE(mockBackend->savedToken, QString("new_token"));
+
+        delete mockBackend;
+        WalletManager::setBackend(nullptr);
+    }
+
     void testSettingsVerificationIsolation() {
         SettingsDialog settings;
         settings.tokenEdit->setText("first-token");

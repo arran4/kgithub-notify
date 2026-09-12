@@ -57,6 +57,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 
     testButton = new QPushButton("Test Key", this);
     connect(testButton, &QPushButton::clicked, this, &SettingsDialog::onTestClicked);
+    saveWatcher = new QFutureWatcher<WalletResult>(this);
+    connect(saveWatcher, &QFutureWatcher<WalletResult>::finished, this, &SettingsDialog::onSaveFinished);
+
     tokenLayout->addWidget(testButton);
 
     layout->addLayout(tokenLayout);
@@ -204,8 +207,6 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 }
 
 void SettingsDialog::saveSettings() {
-    // Handled asynchronously
-
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
     settings.setValue("dataOption", dataOptionCombo->currentData().toInt());
@@ -217,7 +218,7 @@ void SettingsDialog::saveSettings() {
 
     updateAutostartEntry();
 
-    accept();
+    QDialog::accept();
 }
 
 void SettingsDialog::updateAutostartEntry() {
@@ -376,7 +377,8 @@ void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, cons
 
     if (isValid) {
         QString capabilityText =
-            "<font color='green'>Authentication Successful</font><br/><br/><b>Capabilities:</b><ul>";
+            QString("<font color='green'>Authentication Successful%1</font><br/><br/><b>Capabilities:</b><ul>")
+                .arg(capabilities.login.isEmpty() ? "" : " for " + capabilities.login.toHtmlEscaped());
         capabilityText += QString("<li>Notifications: %1</li>")
                               .arg(capabilities.hasNotifications == true ? "<font color='green'>Yes</font>"
                                                                          : (capabilities.hasNotifications == false
@@ -392,11 +394,16 @@ void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, cons
                                        ? "<font color='green'>Yes</font>"
                                        : (capabilities.hasRepoMetadata == false ? "<font color='red'>No</font>"
                                                                                 : "<font color='gray'>Unknown</font>"));
-        capabilityText += QString("<li>Issues/PRs: %1</li>")
-                              .arg(capabilities.hasIssues == true
+        capabilityText += QString("<li>Create Issues: %1</li>")
+                              .arg(capabilities.hasCreateIssues == true
                                        ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasIssues == false ? "<font color='red'>No</font>"
-                                                                          : "<font color='gray'>Unknown</font>"));
+                                       : (capabilities.hasCreateIssues == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>PR Comments: %1</li>")
+                              .arg(capabilities.hasPrComments == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasPrComments == false ? "<font color='red'>No</font>"
+                                                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += "</ul>";
 
         if (capabilities.hasNotifications == false || capabilities.hasRepoMetadata == false) {
@@ -408,5 +415,34 @@ void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, cons
     } else {
         statusLabel->setText(QString("<font color='red'>Verification failed: %1</font>").arg(error.toHtmlEscaped()));
         statusLabel->setStyleSheet("");
+    }
+}
+
+void SettingsDialog::onAccepted() {
+    QString token = tokenEdit->text().trimmed();
+
+    testButton->setEnabled(false);
+    tokenEdit->setEnabled(false);
+    if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(false);
+
+    if (token.isEmpty()) {
+        saveWatcher->setFuture(WalletManager::clearTokenAsync());
+    } else {
+        saveWatcher->setFuture(WalletManager::saveTokenAsync(token));
+    }
+}
+
+void SettingsDialog::onSaveFinished() {
+    WalletResult result = saveWatcher->result();
+    if (result.success) {
+        saveSettings();
+    } else {
+        testButton->setEnabled(true);
+        tokenEdit->setEnabled(true);
+        if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(true);
+        statusLabel->setText(QString("<font color='red'>Failed to save token to KWallet: %1</font><br/>"
+                                     "Please try again or check your KWallet configuration.")
+                                 .arg(result.errorMessage.toHtmlEscaped()));
+        statusLabel->show();
     }
 }
