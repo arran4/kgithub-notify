@@ -24,7 +24,6 @@ class WalletManager {
    public:
     static void setBackend(WalletBackend* backend);
 
-    static QString loadToken();
     static QFuture<WalletResult> loadTokenAsync();
     static QFuture<WalletResult> saveTokenAsync(const QString& token);
     static QFuture<WalletResult> clearTokenAsync();

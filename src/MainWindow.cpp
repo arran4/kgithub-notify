@@ -334,7 +334,7 @@ void MainWindow::onTrayMessageClicked() {
 void MainWindow::showSettings() {
     SettingsDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
-        QString newToken = dialog.getToken();
+        QString newToken = dialog.getTokenValue();
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);

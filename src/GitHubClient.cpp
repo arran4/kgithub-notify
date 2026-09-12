@@ -134,16 +134,23 @@ void GitHubClient::onVerifyUserFinished(QNetworkReply* reply, VerificationSessio
             }
             if (reply->hasRawHeader("X-OAuth-Scopes")) {
                 QString scopes = QString::fromUtf8(reply->rawHeader("X-OAuth-Scopes"));
-                if (scopes.split(", ").contains("notifications")) {
-                    session->capabilities.hasNotifications = true;
+                auto scopeList = scopes.split(", ");
+                if (scopeList.contains("notifications")) {
+                    session->capabilities.hasNotifications = CapabilityStatus::Available;
                 } else {
-                    session->capabilities.hasNotifications = false;
+                    session->capabilities.hasNotifications = CapabilityStatus::Unavailable;
                 }
-                if (scopes.split(", ").contains("repo")) {
-                    session->capabilities.hasRepoMetadata = true;
-                    session->capabilities.hasPrivateRepos = true;
-                    session->capabilities.hasCreateIssues = true;
-                    session->capabilities.hasPrComments = true;
+
+                if (scopeList.contains("repo")) {
+                    session->capabilities.hasRepoMetadata = CapabilityStatus::Available;
+                    session->capabilities.hasPrivateRepos = CapabilityStatus::Available;
+                    session->capabilities.hasCreateIssues = CapabilityStatus::Available;
+                    session->capabilities.hasPrComments = CapabilityStatus::Available;
+                } else if (scopeList.contains("public_repo")) {
+                    session->capabilities.hasRepoMetadata = CapabilityStatus::Limited;
+                    session->capabilities.hasPrivateRepos = CapabilityStatus::Unavailable;
+                    session->capabilities.hasCreateIssues = CapabilityStatus::Limited;
+                    session->capabilities.hasPrComments = CapabilityStatus::Limited;
                 }
             }
 
@@ -176,8 +183,8 @@ void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSessi
     if (reply->error() == QNetworkReply::NoError) {
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (statusCode == 200) {
-            if (!session->capabilities.hasRepoMetadata.has_value()) {
-                session->capabilities.hasRepoMetadata = true;
+            if (session->capabilities.hasRepoMetadata == CapabilityStatus::Unknown) {
+                session->capabilities.hasRepoMetadata = CapabilityStatus::Available;
             }
         }
     } else {
@@ -185,8 +192,8 @@ void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSessi
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 403 ||
             reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
             reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 404) {
-            if (!session->capabilities.hasRepoMetadata.has_value()) {
-                session->capabilities.hasRepoMetadata = false;
+            if (session->capabilities.hasRepoMetadata == CapabilityStatus::Unknown) {
+                session->capabilities.hasRepoMetadata = CapabilityStatus::Unavailable;
             }
         }
     }
@@ -203,7 +210,7 @@ void GitHubClient::onVerifyNotificationsFinished(QNetworkReply* reply, Verificat
     reply->deleteLater();
     if (reply->error() == QNetworkReply::NoError &&
         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200) {
-        session->capabilities.hasNotifications = true;
+        session->capabilities.hasNotifications = CapabilityStatus::Available;
     }
     finalizeVerification(session, true);
 }

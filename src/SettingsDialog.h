@@ -23,7 +23,7 @@ class SettingsDialog : public QDialog {
     enum GetDataOption { Manual, FillScreen, GetAll, Infinite };
     Q_ENUM(GetDataOption)
 
-    static QString getToken();
+    QString getTokenValue() const { return tokenEdit->text().trimmed(); }
     static QFuture<WalletResult> getTokenAsync();
     static int getInterval();
     static GetDataOption getGetDataOption();

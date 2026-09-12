@@ -177,19 +177,6 @@ QFuture<WalletResult> KWalletBackend::clearTokenAsync() {
     return saver->start();
 }
 
-QString WalletManager::loadToken() {
-    KWallet::Wallet* wallet =
-        KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous);
-    if (wallet) {
-        wallet->setFolder(FOLDER_NAME);
-        QString token;
-        wallet->readPassword(KEY_NAME, token);
-        delete wallet;
-        return token;
-    }
-    return QString();
-}
-
 QFuture<WalletResult> WalletManager::loadTokenAsync() { return getBackend()->loadTokenAsync(); }
 
 QFuture<WalletResult> WalletManager::saveTokenAsync(const QString& token) {

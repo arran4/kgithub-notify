@@ -257,8 +257,6 @@ bool SettingsDialog::isAutostartEnabled() {
     return QFile::exists(path);
 }
 
-QString SettingsDialog::getToken() { return WalletManager::loadToken(); }
-
 QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
 int SettingsDialog::getInterval() {
@@ -378,33 +376,39 @@ void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, cons
             QString("<font color='green'>Authentication Successful%1</font><br/><br/><b>Capabilities:</b><ul>")
                 .arg(capabilities.login.isEmpty() ? "" : " for " + capabilities.login.toHtmlEscaped());
         capabilityText += QString("<li>Notifications: %1</li>")
-                              .arg(capabilities.hasNotifications == true ? "<font color='green'>Yes</font>"
-                                                                         : (capabilities.hasNotifications == false
-                                                                                ? "<font color='red'>No</font>"
-                                                                                : "<font color='gray'>Unknown</font>"));
+                              .arg(capabilities.hasNotifications == CapabilityStatus::Available
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasNotifications == CapabilityStatus::Unavailable
+                                              ? "<font color='red'>No</font>"
+                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += QString("<li>Private Repos: %1</li>")
-                              .arg(capabilities.hasPrivateRepos == true
+                              .arg(capabilities.hasPrivateRepos == CapabilityStatus::Available
                                        ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasPrivateRepos == false ? "<font color='red'>No</font>"
-                                                                                : "<font color='gray'>Unknown</font>"));
+                                       : (capabilities.hasPrivateRepos == CapabilityStatus::Unavailable
+                                              ? "<font color='red'>No</font>"
+                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += QString("<li>Repo Metadata: %1</li>")
-                              .arg(capabilities.hasRepoMetadata == true
+                              .arg(capabilities.hasRepoMetadata == CapabilityStatus::Available
                                        ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasRepoMetadata == false ? "<font color='red'>No</font>"
-                                                                                : "<font color='gray'>Unknown</font>"));
+                                       : (capabilities.hasRepoMetadata == CapabilityStatus::Unavailable
+                                              ? "<font color='red'>No</font>"
+                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += QString("<li>Create Issues: %1</li>")
-                              .arg(capabilities.hasCreateIssues == true
+                              .arg(capabilities.hasCreateIssues == CapabilityStatus::Available
                                        ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasCreateIssues == false ? "<font color='red'>No</font>"
-                                                                                : "<font color='gray'>Unknown</font>"));
+                                       : (capabilities.hasCreateIssues == CapabilityStatus::Unavailable
+                                              ? "<font color='red'>No</font>"
+                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += QString("<li>PR Comments: %1</li>")
-                              .arg(capabilities.hasPrComments == true
+                              .arg(capabilities.hasPrComments == CapabilityStatus::Available
                                        ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasPrComments == false ? "<font color='red'>No</font>"
-                                                                              : "<font color='gray'>Unknown</font>"));
+                                       : (capabilities.hasPrComments == CapabilityStatus::Unavailable
+                                              ? "<font color='red'>No</font>"
+                                              : "<font color='gray'>Unknown</font>"));
         capabilityText += "</ul>";
 
-        if (capabilities.hasNotifications == false || capabilities.hasRepoMetadata == false) {
+        if (capabilities.hasNotifications == CapabilityStatus::Unavailable ||
+            capabilities.hasRepoMetadata == CapabilityStatus::Unavailable) {
             capabilityText +=
                 "<br/><i>Note: Token is valid but lacks recommended capabilities. Features may be limited.</i>";
         }

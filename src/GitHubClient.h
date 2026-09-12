@@ -14,13 +14,15 @@
 #include "Notification.h"
 #include "SecureString.h"
 
+enum class CapabilityStatus { Available, Limited, Unknown, Unavailable };
+
 struct TokenCapabilities {
     QString login;
-    std::optional<bool> hasNotifications;
-    std::optional<bool> hasRepoMetadata;
-    std::optional<bool> hasPrivateRepos;
-    std::optional<bool> hasCreateIssues;
-    std::optional<bool> hasPrComments;
+    CapabilityStatus hasNotifications = CapabilityStatus::Unknown;
+    CapabilityStatus hasRepoMetadata = CapabilityStatus::Unknown;
+    CapabilityStatus hasPrivateRepos = CapabilityStatus::Unknown;
+    CapabilityStatus hasCreateIssues = CapabilityStatus::Unknown;
+    CapabilityStatus hasPrComments = CapabilityStatus::Unknown;
 };
 
 struct VerificationSession {
