@@ -378,7 +378,7 @@ void MainWindow::dismissAllNotifications() {
 }
 
 void MainWindow::onTokenLoaded() {
-    m_loadedToken = tokenWatcher->result();
+    m_loadedToken = tokenWatcher->result().token;
 
     authNotificationSent = false;
 
@@ -1090,8 +1090,8 @@ void MainWindow::setupStatusBar() {
 }
 
 void MainWindow::loadToken() {
-    tokenWatcher = new QFutureWatcher<QString>(this);
-    connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
+    tokenWatcher = new QFutureWatcher<WalletResult>(this);
+    connect(tokenWatcher, &QFutureWatcher<WalletResult>::finished, this, &MainWindow::onTokenLoaded);
     tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
 }
 

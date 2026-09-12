@@ -3,6 +3,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFutureWatcher>
@@ -26,11 +27,8 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
     QLabel* label = new QLabel("GitHub Personal Access Token:", this);
     layout->addWidget(label);
 
-    QLabel* helpLabel = new QLabel(
-        "<small>Classic PAT scopes: <code>repo</code>, <code>read:org</code>, "
-        "<code>notifications</code>.<br>Fine-grained token: <code>Issues</code> & <code>Pull requests</code> "
-        "(Read/Write), <code>Metadata</code> (Read).</small>",
-        this);
+    QLabel* helpLabel =
+        new QLabel("<small>" + GitHubClient::getPermissionGuidance().replace("\n", "<br>") + "</small>", this);
     helpLabel->setTextFormat(Qt::RichText);
     helpLabel->setStyleSheet("color: gray;");
     layout->addWidget(helpLabel);
@@ -43,9 +41,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
     tokenEdit->setEnabled(false);
     tokenEdit->setPlaceholderText("Loading...");
 
-    QFutureWatcher<QString>* watcher = new QFutureWatcher<QString>(this);
+    QFutureWatcher<WalletResult>* watcher = new QFutureWatcher<WalletResult>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
-        tokenEdit->setText(watcher->result());
+        tokenEdit->setText(watcher->result().token);
         tokenEdit->setEnabled(true);
         tokenEdit->setPlaceholderText("");
         watcher->deleteLater();
@@ -56,6 +54,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 
     testButton = new QPushButton("Test Key", this);
     connect(testButton, &QPushButton::clicked, this, &SettingsDialog::onTestClicked);
+    saveWatcher = new QFutureWatcher<WalletResult>(this);
+    connect(saveWatcher, &QFutureWatcher<WalletResult>::finished, this, &SettingsDialog::onSaveFinished);
+
     tokenLayout->addWidget(testButton);
 
     layout->addLayout(tokenLayout);
@@ -192,19 +193,18 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     QPushButton* saveButton = new QPushButton("Save", this);
+    saveButton->setObjectName("saveButton");
     QPushButton* cancelButton = new QPushButton("Cancel", this);
 
     buttonLayout->addWidget(saveButton);
     buttonLayout->addWidget(cancelButton);
     layout->addLayout(buttonLayout);
 
-    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::saveSettings);
+    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::onAccepted);
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
 }
 
 void SettingsDialog::saveSettings() {
-    WalletManager::saveToken(tokenEdit->text());
-
     QSettings settings;
     settings.setValue("interval", intervalCombo->currentText().toInt());
     settings.setValue("dataOption", dataOptionCombo->currentData().toInt());
@@ -216,7 +216,7 @@ void SettingsDialog::saveSettings() {
 
     updateAutostartEntry();
 
-    accept();
+    QDialog::accept();
 }
 
 void SettingsDialog::updateAutostartEntry() {
@@ -259,7 +259,7 @@ bool SettingsDialog::isAutostartEnabled() {
 
 QString SettingsDialog::getToken() { return WalletManager::loadToken(); }
 
-QFuture<QString> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
+QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
 int SettingsDialog::getInterval() {
     QSettings settings;
@@ -319,8 +319,8 @@ void SettingsDialog::onTestClicked() {
     if (!testClient) {
         testClient = new GitHubClient(this);
         connect(testClient, &GitHubClient::tokenVerified, this,
-                [this](const QUuid& reqId, bool valid, const QString& message) {
-                    this->onVerificationResult(reqId, valid, message);
+                [this](const QUuid& reqId, bool valid, const TokenCapabilities& caps, const QString& message) {
+                    this->onVerificationResult(reqId, valid, caps, message);
                 });
     }
 
@@ -331,18 +331,6 @@ void SettingsDialog::onTestClicked() {
     testButton->setEnabled(false);
     m_verificationRequestId = QUuid::createUuid();
     testClient->verifyToken(m_verificationRequestId);
-}
-
-void SettingsDialog::onVerificationResult(const QUuid& reqId, bool valid, const QString& message) {
-    if (reqId.isNull() || reqId != m_verificationRequestId) return;
-    m_verificationRequestId = QUuid();
-    testButton->setEnabled(true);
-    statusLabel->setText(message);
-    if (valid) {
-        statusLabel->setStyleSheet("color: green;");
-    } else {
-        statusLabel->setStyleSheet("color: red;");
-    }
 }
 
 void SettingsDialog::installNotifyRc() {
@@ -375,4 +363,84 @@ void SettingsDialog::installNotifyRc() {
         statusLabel->setStyleSheet("color: red;");
     }
     statusLabel->show();
+}
+
+void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, const TokenCapabilities& capabilities,
+                                          const QString& error) {
+    if (reqId != m_verificationRequestId) return;
+
+    testButton->setEnabled(true);
+    tokenEdit->setEnabled(true);
+    if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(true);
+
+    if (isValid) {
+        QString capabilityText =
+            QString("<font color='green'>Authentication Successful%1</font><br/><br/><b>Capabilities:</b><ul>")
+                .arg(capabilities.login.isEmpty() ? "" : " for " + capabilities.login.toHtmlEscaped());
+        capabilityText += QString("<li>Notifications: %1</li>")
+                              .arg(capabilities.hasNotifications == true ? "<font color='green'>Yes</font>"
+                                                                         : (capabilities.hasNotifications == false
+                                                                                ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Private Repos: %1</li>")
+                              .arg(capabilities.hasPrivateRepos == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasPrivateRepos == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Repo Metadata: %1</li>")
+                              .arg(capabilities.hasRepoMetadata == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasRepoMetadata == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Create Issues: %1</li>")
+                              .arg(capabilities.hasCreateIssues == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasCreateIssues == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>PR Comments: %1</li>")
+                              .arg(capabilities.hasPrComments == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasPrComments == false ? "<font color='red'>No</font>"
+                                                                              : "<font color='gray'>Unknown</font>"));
+        capabilityText += "</ul>";
+
+        if (capabilities.hasNotifications == false || capabilities.hasRepoMetadata == false) {
+            capabilityText +=
+                "<br/><i>Note: Token is valid but lacks recommended capabilities. Features may be limited.</i>";
+        }
+        statusLabel->setText(capabilityText);
+        statusLabel->setStyleSheet("");
+    } else {
+        statusLabel->setText(QString("<font color='red'>Verification failed: %1</font>").arg(error.toHtmlEscaped()));
+        statusLabel->setStyleSheet("");
+    }
+}
+
+void SettingsDialog::onAccepted() {
+    QString token = tokenEdit->text().trimmed();
+
+    testButton->setEnabled(false);
+    tokenEdit->setEnabled(false);
+    if (auto* sb = findChild<QPushButton*>("saveButton")) sb->setEnabled(false);
+
+    if (token.isEmpty()) {
+        saveWatcher->setFuture(WalletManager::clearTokenAsync());
+    } else {
+        saveWatcher->setFuture(WalletManager::saveTokenAsync(token));
+    }
+}
+
+void SettingsDialog::onSaveFinished() {
+    WalletResult result = saveWatcher->result();
+    if (result.success) {
+        saveSettings();
+    } else {
+        testButton->setEnabled(true);
+        tokenEdit->setEnabled(true);
+        if (auto* sb = findChild<QPushButton*>("saveButton")) sb->setEnabled(true);
+        statusLabel->setText(QString("<font color='red'>Failed to save token to KWallet: %1</font><br/>"
+                                     "Please try again or check your KWallet configuration.")
+                                 .arg(result.errorMessage.toHtmlEscaped()));
+        statusLabel->show();
+    }
 }
