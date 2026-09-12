@@ -316,25 +316,32 @@ class TestGitHubClient : public QObject {
         QCOMPARE(args.at(1).toString(), QString("123"));
         QCOMPARE(args.at(2).toString(), QString("Not Found"));
     }
-
     void testVerificationDispatch() {
         GitHubClient client;
+        qRegisterMetaType<TokenCapabilities>();
         QSignalSpy spy(&client, &GitHubClient::tokenVerified);
 
-        QByteArray json = "{\"login\":\"user\"}";
-        MockNetworkReply* reply = new MockNetworkReply(json, &client);
-        reply->setProperty("type", "verification");
-        reply->setProperty(
-            "reqId", client.m_notificationSessionId.isNull() ? QUuid::createUuid() : client.m_notificationSessionId);
-        reply->setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        auto* manager = new FakeNetworkAccessManager(&client);
+        manager->autoEmitFinished = false;
+        client.manager = manager;
 
-        QMetaObject::invokeMethod(&client, "onReplyFinished", Qt::DirectConnection, Q_ARG(QNetworkReply*, reply));
+        client.setToken("dummy_token");
+        client.verifyToken();
 
-        QCOMPARE(spy.count(), 1);
+        QCoreApplication::processEvents();
+
+        manager->requests[0].reply->setRawHeader("X-OAuth-Scopes", "repo, notifications");
+        manager->requests[0].reply->complete("{\"login\":\"user\"}");
+
+        QTRY_COMPARE(manager->requests.size(), 2);
+        manager->requests[1].reply->complete("[]");
+
+        QTRY_COMPARE(manager->requests.size(), 3);
+        manager->requests[2].reply->complete("[]");
+
+        QTRY_COMPARE(spy.count(), 1);
         QList<QVariant> args = spy.takeFirst();
-        QUuid reqId = args.at(0).toUuid();
         QCOMPARE(args.at(1).toBool(), true);
-        QVERIFY(args.at(2).toString().contains("user"));
     }
 
     void testUnreadLogic() {
@@ -515,10 +522,11 @@ class TestGitHubClient : public QObject {
                 [&](const QUuid& id, const QString&) { completions.append(id); });
         connect(&client, &GitHubClient::detailsError, this,
                 [&](const QUuid& id, const QString&, const QString&) { completions.append(id); });
-        connect(&client, &GitHubClient::tokenVerified, this, [&](const QUuid& id, bool valid, const QString&) {
-            QVERIFY(!valid);
-            completions.append(id);
-        });
+        connect(&client, &GitHubClient::tokenVerified, this,
+                [&](const QUuid& id, bool valid, const TokenCapabilities& caps, const QString&) {
+                    QVERIFY(!valid);
+                    completions.append(id);
+                });
         QList<QUuid> ids{client.checkNotifications(),
                          client.verifyToken(),
                          client.markAsRead("1"),

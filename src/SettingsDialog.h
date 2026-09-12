@@ -1,3 +1,4 @@
+#include "GitHubClient.h"
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
@@ -36,7 +37,8 @@ class SettingsDialog : public QDialog {
    private slots:
     void saveSettings();
     void onTestClicked();
-    void onVerificationResult(const QUuid& reqId, bool valid, const QString& message);
+    void onVerificationResult(const QUuid& reqId, bool isValid, const TokenCapabilities& capabilities,
+                              const QString& error);
     void installNotifyRc();
 
    private:

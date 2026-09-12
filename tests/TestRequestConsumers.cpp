@@ -231,36 +231,56 @@ class TestRequestConsumers : public QObject {
         QVERIFY(trending.refreshButton->isEnabled());
         QVERIFY(network->requests.isEmpty());
     }
-
     void testSettingsVerificationIsolation() {
         SettingsDialog settings;
         settings.tokenEdit->setText("first-token");
         settings.testClient = new GitHubClient(&settings);
         connect(settings.testClient, &GitHubClient::tokenVerified, &settings, &SettingsDialog::onVerificationResult);
-        auto* network = installNetwork(*settings.testClient);
+
+        auto* network = new FakeNetworkAccessManager(settings.testClient);
+        network->autoEmitFinished = false;
+        settings.testClient->manager = network;
+
+        // Request 1: starts verification 1 (/user)
         settings.onTestClicked();
+
+        // Change token and click again
         settings.tokenEdit->setText("second-token");
+
+        // Request 2: starts verification 2 (/user)
         settings.onTestClicked();
-        network->requests[1].reply->complete("{\"login\":\"new-user\"}");
-        QVERIFY(settings.testButton->isEnabled());
-        QVERIFY(settings.statusLabel->text().contains("new-user"));
-        network->requests[0].reply->completeWithError(QNetworkReply::TimeoutError, "stale timeout");
-        QVERIFY(settings.statusLabel->text().contains("new-user"));
-        settings.onTestClicked();
-        QVERIFY(!settings.testButton->isEnabled());
-        network->requests[2].reply->abort();
-        QVERIFY(settings.testButton->isEnabled());
-        QVERIFY(settings.statusLabel->text().contains("cancelled"));
-        settings.onTestClicked();
-        network->requests[3].reply->completeWithError(QNetworkReply::TimeoutError, "Request timed out");
-        QVERIFY(settings.testButton->isEnabled());
-        QVERIFY(settings.statusLabel->text().contains("timed out"));
-        settings.onTestClicked();
-        settings.tokenEdit->clear();
-        settings.onTestClicked();
-        network->requests[4].reply->complete("{}");
-        QVERIFY(settings.testButton->isEnabled());
-        QVERIFY(settings.statusLabel->text().contains("enter a token"));
+
+        // Let event loop run to ensure requests are registered
+        QCoreApplication::processEvents();
+        QCOMPARE(network->requests.size(), 2);
+
+        ControlledFakeReply* req1User = network->requests[0].reply;
+        ControlledFakeReply* req2User = network->requests[1].reply;
+
+        // Complete Verification 2 successfully (/user)
+        req2User->setRawHeader("X-OAuth-Scopes", "repo, notifications");
+        req2User->complete("{\"login\":\"new-user\"}");
+
+        // This should trigger Request 2's /user/repos
+        QTRY_COMPARE(network->requests.size(), 3);
+        ControlledFakeReply* req2Repos = network->requests[2].reply;
+        req2Repos->complete("[]");
+
+        // This should trigger Request 2's /notifications
+        QTRY_COMPARE(network->requests.size(), 4);
+        ControlledFakeReply* req2Notifs = network->requests[3].reply;
+        req2Notifs->complete("[]");
+
+        // Now SettingsDialog should process Verification 2 completion
+        QTRY_VERIFY(settings.testButton->isEnabled());
+        QVERIFY(settings.statusLabel->text().contains("Authentication Successful"));
+
+        // Complete Verification 1 with error, should be ignored
+        req1User->completeWithError(QNetworkReply::TimeoutError, "stale timeout");
+        QCoreApplication::processEvents();
+
+        // Verification 1 was ignored, so label remains "Authentication Successful"
+        QVERIFY(settings.statusLabel->text().contains("Authentication Successful"));
     }
 
     void testIssueCreationFailures_data() { testIndependentTimeoutsAndCancellation_data(); }

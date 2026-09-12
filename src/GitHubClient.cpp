@@ -104,17 +104,110 @@ QUuid GitHubClient::loadMore(QUuid reqId) {
 QUuid GitHubClient::verifyToken(QUuid reqId) {
     if (reqId.isNull()) reqId = QUuid::createUuid();
     if (m_token.isEmpty()) {
-        emit tokenVerified(reqId, false, "No token provided");
+        emit tokenVerified(reqId, false, TokenCapabilities{}, "No token provided");
         return reqId;
     }
+
+    VerificationSession* session = new VerificationSession{m_token.toQString(), reqId, TokenCapabilities{}};
 
     QUrl url(m_apiUrl + "/user");
     QNetworkRequest request = createAuthenticatedRequest(url);
 
     QNetworkReply* reply = manager->get(request);
-    reply->setProperty("reqId", reqId);
     reply->setProperty("type", "verification");
+    reply->setProperty("reqId", reqId);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, session]() { onVerifyUserFinished(reply, session); });
+
     return reqId;
+}
+
+void GitHubClient::onVerifyUserFinished(QNetworkReply* reply, VerificationSession* session) {
+    reply->deleteLater();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 200) {
+            if (reply->hasRawHeader("X-OAuth-Scopes")) {
+                QString scopes = QString::fromUtf8(reply->rawHeader("X-OAuth-Scopes"));
+                if (scopes.contains("notifications")) {
+                    session->capabilities.hasNotifications = true;
+                } else {
+                    session->capabilities.hasNotifications = false;
+                }
+                if (scopes.contains("repo")) {
+                    session->capabilities.hasRepoMetadata = true;
+                    session->capabilities.hasPrivateRepos = true;
+                    session->capabilities.hasIssues = true;
+                }
+            }
+
+            QUrl reposUrl(m_apiUrl + "/user/repos?per_page=1");
+            QNetworkRequest reposRequest = createAuthenticatedRequest(reposUrl);
+            QNetworkReply* reposReply = manager->get(reposRequest);
+            reposReply->setProperty("type", "verification");
+            connect(reposReply, &QNetworkReply::finished, this,
+                    [this, reposReply, session]() { onVerifyReposFinished(reposReply, session); });
+        } else {
+            finalizeVerification(session, false, QString("HTTP Status: %1").arg(statusCode));
+        }
+    } else {
+        QString errorMsg = reply->errorString();
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode > 0) {
+            errorMsg = QString("HTTP %1: %2").arg(statusCode).arg(errorMsg);
+        } else if (reply->error() == QNetworkReply::ConnectionRefusedError) {
+            errorMsg = "Connection refused. Please check your network or proxy settings.";
+        } else if (reply->error() == QNetworkReply::TimeoutError) {
+            errorMsg = "Request timed out.";
+        }
+        finalizeVerification(session, false, errorMsg);
+    }
+}
+
+void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSession* session) {
+    reply->deleteLater();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 200) {
+            if (!session->capabilities.hasRepoMetadata.has_value()) {
+                session->capabilities.hasRepoMetadata = true;
+            }
+        }
+    } else {
+        if (!session->capabilities.hasRepoMetadata.has_value()) {
+            session->capabilities.hasRepoMetadata = false;
+        }
+    }
+
+    QUrl notifUrl(m_apiUrl + "/notifications?per_page=1");
+    QNetworkRequest notifRequest = createAuthenticatedRequest(notifUrl);
+    QNetworkReply* notifReply = manager->get(notifRequest);
+    notifReply->setProperty("type", "verification");
+    connect(notifReply, &QNetworkReply::finished, this,
+            [this, notifReply, session]() { onVerifyNotificationsFinished(notifReply, session); });
+}
+
+void GitHubClient::onVerifyNotificationsFinished(QNetworkReply* reply, VerificationSession* session) {
+    reply->deleteLater();
+    if (reply->error() == QNetworkReply::NoError &&
+        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200) {
+        session->capabilities.hasNotifications = true;
+    }
+    finalizeVerification(session, true);
+}
+
+void GitHubClient::finalizeVerification(VerificationSession* session, bool isValid, const QString& error) {
+    emit tokenVerified(session->uuid, isValid, session->capabilities, error);
+    delete session;
+}
+
+QString GitHubClient::getPermissionGuidance() {
+    return "Ensure your token has the correct scopes.\n"
+           "For Classic Tokens: 'repo' and 'notifications'.\n"
+           "For Fine-grained Tokens: Read-only for Metadata and Notifications, Read/Write for Issues and Pull "
+           "Requests.";
 }
 
 QUuid GitHubClient::markAsRead(const QString& id, QUuid reqId) {
@@ -509,22 +602,7 @@ void GitHubClient::handleImageReply(QNetworkReply* reply) {
 }
 
 void GitHubClient::handleVerificationReply(QNetworkReply* reply) {
-    QUuid reqId = reply->property("reqId").toUuid();
-    if (reply->error() == QNetworkReply::NoError) {
-        QByteArray data = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (doc.isObject()) {
-            QJsonObject obj = doc.object();
-            QString login = obj["login"].toString();
-            emit tokenVerified(reqId, true, "Token valid for user: " + login);
-        } else {
-            emit tokenVerified(reqId, true, "Token valid");
-        }
-    } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-        emit tokenVerified(reqId, false, "Invalid Token");
-    } else {
-        emit tokenVerified(reqId, false, reply->errorString());
-    }
+    // Deprecated
 }
 
 void GitHubClient::handleUserReposReply(QNetworkReply* reply) {

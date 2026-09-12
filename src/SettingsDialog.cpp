@@ -3,6 +3,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFutureWatcher>
@@ -319,8 +320,8 @@ void SettingsDialog::onTestClicked() {
     if (!testClient) {
         testClient = new GitHubClient(this);
         connect(testClient, &GitHubClient::tokenVerified, this,
-                [this](const QUuid& reqId, bool valid, const QString& message) {
-                    this->onVerificationResult(reqId, valid, message);
+                [this](const QUuid& reqId, bool valid, const TokenCapabilities& caps, const QString& message) {
+                    this->onVerificationResult(reqId, valid, caps, message);
                 });
     }
 
@@ -331,18 +332,6 @@ void SettingsDialog::onTestClicked() {
     testButton->setEnabled(false);
     m_verificationRequestId = QUuid::createUuid();
     testClient->verifyToken(m_verificationRequestId);
-}
-
-void SettingsDialog::onVerificationResult(const QUuid& reqId, bool valid, const QString& message) {
-    if (reqId.isNull() || reqId != m_verificationRequestId) return;
-    m_verificationRequestId = QUuid();
-    testButton->setEnabled(true);
-    statusLabel->setText(message);
-    if (valid) {
-        statusLabel->setStyleSheet("color: green;");
-    } else {
-        statusLabel->setStyleSheet("color: red;");
-    }
 }
 
 void SettingsDialog::installNotifyRc() {
@@ -375,4 +364,49 @@ void SettingsDialog::installNotifyRc() {
         statusLabel->setStyleSheet("color: red;");
     }
     statusLabel->show();
+}
+
+void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, const TokenCapabilities& capabilities,
+                                          const QString& error) {
+    if (reqId != m_verificationRequestId) return;
+
+    testButton->setEnabled(true);
+    tokenEdit->setEnabled(true);
+    if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(true);
+
+    if (isValid) {
+        QString capabilityText =
+            "<font color='green'>Authentication Successful</font><br/><br/><b>Capabilities:</b><ul>";
+        capabilityText += QString("<li>Notifications: %1</li>")
+                              .arg(capabilities.hasNotifications == true ? "<font color='green'>Yes</font>"
+                                                                         : (capabilities.hasNotifications == false
+                                                                                ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Private Repos: %1</li>")
+                              .arg(capabilities.hasPrivateRepos == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasPrivateRepos == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Repo Metadata: %1</li>")
+                              .arg(capabilities.hasRepoMetadata == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasRepoMetadata == false ? "<font color='red'>No</font>"
+                                                                                : "<font color='gray'>Unknown</font>"));
+        capabilityText += QString("<li>Issues/PRs: %1</li>")
+                              .arg(capabilities.hasIssues == true
+                                       ? "<font color='green'>Yes</font>"
+                                       : (capabilities.hasIssues == false ? "<font color='red'>No</font>"
+                                                                          : "<font color='gray'>Unknown</font>"));
+        capabilityText += "</ul>";
+
+        if (capabilities.hasNotifications == false || capabilities.hasRepoMetadata == false) {
+            capabilityText +=
+                "<br/><i>Note: Token is valid but lacks recommended capabilities. Features may be limited.</i>";
+        }
+        statusLabel->setText(capabilityText);
+        statusLabel->setStyleSheet("");
+    } else {
+        statusLabel->setText(QString("<font color='red'>Verification failed: %1</font>").arg(error.toHtmlEscaped()));
+        statusLabel->setStyleSheet("");
+    }
 }

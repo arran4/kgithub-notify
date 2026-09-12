@@ -9,9 +9,23 @@
 #include <QNetworkReply>
 #include <QObject>
 #include <QUuid>
+#include <optional>
 
 #include "Notification.h"
 #include "SecureString.h"
+
+struct TokenCapabilities {
+    std::optional<bool> hasNotifications;
+    std::optional<bool> hasRepoMetadata;
+    std::optional<bool> hasPrivateRepos;
+    std::optional<bool> hasIssues;
+};
+
+struct VerificationSession {
+    QString token;
+    QUuid uuid;
+    TokenCapabilities capabilities;
+};
 
 class GitHubClient : public QObject {
     Q_OBJECT
@@ -27,6 +41,7 @@ class GitHubClient : public QObject {
     void setShowAll(bool all);
     QUuid checkNotifications(QUuid reqId = QUuid());
     QUuid loadMore(QUuid reqId = QUuid());
+    static QString getPermissionGuidance();
     QUuid verifyToken(QUuid reqId = QUuid());
     QUuid markAsRead(const QString& id, QUuid reqId = QUuid());
     QUuid markAsDone(const QString& id, QUuid reqId = QUuid());
@@ -56,12 +71,17 @@ class GitHubClient : public QObject {
     void userReposReceived(const QUuid& reqId, const QJsonArray& repos, const QString& nextPageUrl);
     void errorOccurred(const QUuid& reqId, const QString& error);
     void authError(const QUuid& reqId, const QString& message);
-    void tokenVerified(const QUuid& reqId, bool valid, const QString& message);
+    void tokenVerified(const QUuid& reqId, bool valid, const TokenCapabilities& capabilities, const QString& message);
     void repoVerified(const QUuid& reqId, const QString& repoFullName, bool exists);
     void issueCreated(const QUuid& reqId, const QByteArray& data);
 
    private slots:
     void onReplyFinished(QNetworkReply* reply);
+
+    void onVerifyUserFinished(QNetworkReply* reply, VerificationSession* session);
+    void onVerifyReposFinished(QNetworkReply* reply, VerificationSession* session);
+    void onVerifyNotificationsFinished(QNetworkReply* reply, VerificationSession* session);
+    void finalizeVerification(VerificationSession* session, bool isValid, const QString& error = QString());
 
    private:
     // Network and notification session state
@@ -90,5 +110,7 @@ class GitHubClient : public QObject {
     void handlePatchReply(QNetworkReply* reply);
     void handleNotificationsReply(QNetworkReply* reply);
 };
+
+Q_DECLARE_METATYPE(TokenCapabilities)
 
 #endif  // GITHUBCLIENT_H
