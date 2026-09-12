@@ -27,11 +27,8 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
     QLabel* label = new QLabel("GitHub Personal Access Token:", this);
     layout->addWidget(label);
 
-    QLabel* helpLabel = new QLabel(
-        "<small>Classic PAT scopes: <code>repo</code>, <code>read:org</code>, "
-        "<code>notifications</code>.<br>Fine-grained token: <code>Issues</code> & <code>Pull requests</code> "
-        "(Read/Write), <code>Metadata</code> (Read).</small>",
-        this);
+    QLabel* helpLabel =
+        new QLabel("<small>" + GitHubClient::getPermissionGuidance().replace("\n", "<br>") + "</small>", this);
     helpLabel->setTextFormat(Qt::RichText);
     helpLabel->setStyleSheet("color: gray;");
     layout->addWidget(helpLabel);
@@ -196,13 +193,14 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
 
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     QPushButton* saveButton = new QPushButton("Save", this);
+    saveButton->setObjectName("saveButton");
     QPushButton* cancelButton = new QPushButton("Cancel", this);
 
     buttonLayout->addWidget(saveButton);
     buttonLayout->addWidget(cancelButton);
     layout->addLayout(buttonLayout);
 
-    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::saveSettings);
+    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::onAccepted);
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
 }
 
@@ -423,7 +421,7 @@ void SettingsDialog::onAccepted() {
 
     testButton->setEnabled(false);
     tokenEdit->setEnabled(false);
-    if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(false);
+    if (auto* sb = findChild<QPushButton*>("saveButton")) sb->setEnabled(false);
 
     if (token.isEmpty()) {
         saveWatcher->setFuture(WalletManager::clearTokenAsync());
@@ -439,7 +437,7 @@ void SettingsDialog::onSaveFinished() {
     } else {
         testButton->setEnabled(true);
         tokenEdit->setEnabled(true);
-        if (auto* bb = findChild<QDialogButtonBox*>()) bb->button(QDialogButtonBox::Ok)->setEnabled(true);
+        if (auto* sb = findChild<QPushButton*>("saveButton")) sb->setEnabled(true);
         statusLabel->setText(QString("<font color='red'>Failed to save token to KWallet: %1</font><br/>"
                                      "Please try again or check your KWallet configuration.")
                                  .arg(result.errorMessage.toHtmlEscaped()));
