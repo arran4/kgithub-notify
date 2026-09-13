@@ -378,7 +378,16 @@ void MainWindow::dismissAllNotifications() {
 }
 
 void MainWindow::onTokenLoaded() {
-    m_loadedToken = tokenWatcher->result().token;
+    WalletResult result = tokenWatcher->result();
+    if (!result.success) {
+        KNotification* notification = new KNotification("authError");
+        notification->setTitle("GitHub Notification Error");
+        notification->setText("Failed to load KWallet token: " + result.errorMessage);
+        notification->sendEvent();
+        m_loadedToken = QString();
+    } else {
+        m_loadedToken = result.token;
+    }
 
     authNotificationSent = false;
 

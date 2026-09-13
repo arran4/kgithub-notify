@@ -343,6 +343,63 @@ class TestGitHubClient : public QObject {
         QList<QVariant> args = spy.takeFirst();
         QCOMPARE(args.at(1).toBool(), true);
     }
+    void testVerificationRateLimit() {
+        GitHubClient client;
+        qRegisterMetaType<TokenCapabilities>();
+        QSignalSpy spy(&client, &GitHubClient::tokenVerified);
+
+        auto* manager = new FakeNetworkAccessManager(&client);
+        manager->autoEmitFinished = false;
+        client.manager = manager;
+
+        client.setToken("dummy_token");
+        client.verifyToken();
+
+        QCoreApplication::processEvents();
+
+        manager->requests[0].reply->setRawHeader("X-OAuth-Scopes", "repo, notifications");
+        manager->requests[0].reply->complete("{\"login\":\"user\"}");
+
+        QTRY_COMPARE(manager->requests.size(), 2);
+
+        // Emulate Rate Limit 403
+        manager->requests[1].reply->setRawHeader("X-RateLimit-Remaining", "0");
+        manager->requests[1].reply->completeWithError(QNetworkReply::ContentAccessDenied, "Forbidden", 403);
+
+        QTRY_COMPARE(manager->requests.size(), 3);
+        manager->requests[2].reply->setRawHeader("X-RateLimit-Remaining", "0");
+        manager->requests[2].reply->completeWithError(QNetworkReply::ContentAccessDenied, "Forbidden", 403);
+
+        QTRY_COMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QCOMPARE(args.at(1).toBool(), true);  // still valid because /user worked
+
+        TokenCapabilities caps = args.at(2).value<TokenCapabilities>();
+        QCOMPARE(caps.hasRepoMetadata, CapabilityStatus::Available);   // It inherits Available from `repo` scope now!
+        QCOMPARE(caps.hasNotifications, CapabilityStatus::Available);  // Inherits from scope!
+    }
+
+    void testVerificationInvalidToken() {
+        GitHubClient client;
+        qRegisterMetaType<TokenCapabilities>();
+        QSignalSpy spy(&client, &GitHubClient::tokenVerified);
+
+        auto* manager = new FakeNetworkAccessManager(&client);
+        manager->autoEmitFinished = false;
+        client.manager = manager;
+
+        client.setToken("dummy_token");
+        client.verifyToken();
+
+        QCoreApplication::processEvents();
+
+        // Emulate 401
+        manager->requests[0].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Unauthorized", 401);
+
+        QTRY_COMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QCOMPARE(args.at(1).toBool(), false);
+    }
 
     void testUnreadLogic() {
         GitHubClient client;

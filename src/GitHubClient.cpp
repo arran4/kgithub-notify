@@ -188,10 +188,9 @@ void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSessi
             }
         }
     } else {
-        // Leave as Unknown (std::nullopt) on network/rate limit errors to avoid false negative.
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 403 ||
-            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401 ||
-            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 404) {
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 401 || statusCode == 404 ||
+            (statusCode == 403 && !reply->hasRawHeader("X-RateLimit-Remaining"))) {
             if (session->capabilities.hasRepoMetadata == CapabilityStatus::Unknown) {
                 session->capabilities.hasRepoMetadata = CapabilityStatus::Unavailable;
             }
@@ -211,6 +210,12 @@ void GitHubClient::onVerifyNotificationsFinished(QNetworkReply* reply, Verificat
     if (reply->error() == QNetworkReply::NoError &&
         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200) {
         session->capabilities.hasNotifications = CapabilityStatus::Available;
+    } else {
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 401 || statusCode == 404 ||
+            (statusCode == 403 && !reply->hasRawHeader("X-RateLimit-Remaining"))) {
+            session->capabilities.hasNotifications = CapabilityStatus::Unavailable;
+        }
     }
     finalizeVerification(session, true);
 }

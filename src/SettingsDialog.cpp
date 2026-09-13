@@ -375,36 +375,26 @@ void SettingsDialog::onVerificationResult(const QUuid& reqId, bool isValid, cons
         QString capabilityText =
             QString("<font color='green'>Authentication Successful%1</font><br/><br/><b>Capabilities:</b><ul>")
                 .arg(capabilities.login.isEmpty() ? "" : " for " + capabilities.login.toHtmlEscaped());
-        capabilityText += QString("<li>Notifications: %1</li>")
-                              .arg(capabilities.hasNotifications == CapabilityStatus::Available
-                                       ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasNotifications == CapabilityStatus::Unavailable
-                                              ? "<font color='red'>No</font>"
-                                              : "<font color='gray'>Unknown</font>"));
-        capabilityText += QString("<li>Private Repos: %1</li>")
-                              .arg(capabilities.hasPrivateRepos == CapabilityStatus::Available
-                                       ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasPrivateRepos == CapabilityStatus::Unavailable
-                                              ? "<font color='red'>No</font>"
-                                              : "<font color='gray'>Unknown</font>"));
-        capabilityText += QString("<li>Repo Metadata: %1</li>")
-                              .arg(capabilities.hasRepoMetadata == CapabilityStatus::Available
-                                       ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasRepoMetadata == CapabilityStatus::Unavailable
-                                              ? "<font color='red'>No</font>"
-                                              : "<font color='gray'>Unknown</font>"));
-        capabilityText += QString("<li>Create Issues: %1</li>")
-                              .arg(capabilities.hasCreateIssues == CapabilityStatus::Available
-                                       ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasCreateIssues == CapabilityStatus::Unavailable
-                                              ? "<font color='red'>No</font>"
-                                              : "<font color='gray'>Unknown</font>"));
-        capabilityText += QString("<li>PR Comments: %1</li>")
-                              .arg(capabilities.hasPrComments == CapabilityStatus::Available
-                                       ? "<font color='green'>Yes</font>"
-                                       : (capabilities.hasPrComments == CapabilityStatus::Unavailable
-                                              ? "<font color='red'>No</font>"
-                                              : "<font color='gray'>Unknown</font>"));
+
+        auto statusToStr = [](CapabilityStatus status) -> QString {
+            switch (status) {
+                case CapabilityStatus::Available:
+                    return "<font color='green'>Yes</font>";
+                case CapabilityStatus::Limited:
+                    return "<font color='orange'>Limited</font>";
+                case CapabilityStatus::Unavailable:
+                    return "<font color='red'>No</font>";
+                case CapabilityStatus::Unknown:
+                default:
+                    return "<font color='gray'>Unknown</font>";
+            }
+        };
+
+        capabilityText += QString("<li>Notifications: %1</li>").arg(statusToStr(capabilities.hasNotifications));
+        capabilityText += QString("<li>Private Repos: %1</li>").arg(statusToStr(capabilities.hasPrivateRepos));
+        capabilityText += QString("<li>Repo Metadata: %1</li>").arg(statusToStr(capabilities.hasRepoMetadata));
+        capabilityText += QString("<li>Create Issues: %1</li>").arg(statusToStr(capabilities.hasCreateIssues));
+        capabilityText += QString("<li>PR Comments: %1</li>").arg(statusToStr(capabilities.hasPrComments));
         capabilityText += "</ul>";
 
         if (capabilities.hasNotifications == CapabilityStatus::Unavailable ||
