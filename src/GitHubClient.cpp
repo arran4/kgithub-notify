@@ -12,6 +12,13 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+namespace {
+bool isRateLimitedReply(QNetworkReply* reply) {
+    const QByteArray remaining = reply->rawHeader("X-RateLimit-Remaining").trimmed();
+    return remaining == "0" || reply->hasRawHeader("Retry-After");
+}
+}  // namespace
+
 GitHubClient::GitHubClient(QObject* parent) : QObject(parent) {
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &GitHubClient::onReplyFinished);
@@ -190,8 +197,7 @@ void GitHubClient::onVerifyReposFinished(QNetworkReply* reply, VerificationSessi
         }
     } else {
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (statusCode == 401 || statusCode == 404 ||
-            (statusCode == 403 && !reply->hasRawHeader("X-RateLimit-Remaining"))) {
+        if (statusCode == 401 || statusCode == 404 || (statusCode == 403 && !isRateLimitedReply(reply))) {
             if (session->capabilities.hasRepoMetadata == CapabilityStatus::Unknown) {
                 session->capabilities.hasRepoMetadata = CapabilityStatus::Unavailable;
             }
@@ -213,8 +219,7 @@ void GitHubClient::onVerifyNotificationsFinished(QNetworkReply* reply, Verificat
         session->capabilities.hasNotifications = CapabilityStatus::Available;
     } else {
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (statusCode == 401 || statusCode == 404 ||
-            (statusCode == 403 && !reply->hasRawHeader("X-RateLimit-Remaining"))) {
+        if (statusCode == 401 || statusCode == 404 || (statusCode == 403 && !isRateLimitedReply(reply))) {
             session->capabilities.hasNotifications = CapabilityStatus::Unavailable;
         }
     }
@@ -227,10 +232,13 @@ void GitHubClient::finalizeVerification(VerificationSession* session, bool isVal
 }
 
 QString GitHubClient::getPermissionGuidance() {
-    return "Ensure your token has the correct scopes.\n"
-           "For Classic Tokens: 'repo' and 'notifications'.\n"
-           "For Fine-grained Tokens: Read-only for Metadata and Notifications, Read/Write for Issues and Pull "
-           "Requests.";
+    return "Ensure your token has the correct permissions.\n"
+           "For Classic Tokens: 'repo' is recommended for full functionality and already grants notification "
+           "access; 'notifications' is sufficient for notification-only access.\n"
+           "For Fine-grained Tokens: Metadata (Read), plus Issues and Pull requests (Read/Write) as needed. "
+           "GitHub's REST notifications endpoints do not support fine-grained PATs.\n"
+           "If Test Key reports Create Issues or PR Comments as Limited or No, update the token's write "
+           "permissions before using those actions.";
 }
 
 QUuid GitHubClient::markAsRead(const QString& id, QUuid reqId) {
