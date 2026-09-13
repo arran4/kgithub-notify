@@ -1,3 +1,4 @@
+#include "WalletManager.h"
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -160,7 +161,7 @@ class MainWindow : public KXmlGuiWindow {
     QTimer* countdownTimer;
     QLabel* statusLabel;
 
-    QFutureWatcher<QString>* tokenWatcher;
+    QFutureWatcher<WalletResult>* tokenWatcher;
     QString m_loadedToken;
 
     QDateTime m_lastCheckTime;

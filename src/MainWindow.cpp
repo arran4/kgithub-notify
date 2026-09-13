@@ -334,7 +334,7 @@ void MainWindow::onTrayMessageClicked() {
 void MainWindow::showSettings() {
     SettingsDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
-        QString newToken = dialog.getToken();
+        QString newToken = dialog.getTokenValue();
         int interval = SettingsDialog::getInterval();
         if (client) {
             client->setToken(newToken);
@@ -378,7 +378,16 @@ void MainWindow::dismissAllNotifications() {
 }
 
 void MainWindow::onTokenLoaded() {
-    m_loadedToken = tokenWatcher->result();
+    WalletResult result = tokenWatcher->result();
+    if (!result.success) {
+        KNotification* notification = new KNotification("authError");
+        notification->setTitle("GitHub Notification Error");
+        notification->setText("Failed to load KWallet token: " + result.errorMessage);
+        notification->sendEvent();
+        m_loadedToken = QString();
+    } else {
+        m_loadedToken = result.token;
+    }
 
     authNotificationSent = false;
 
@@ -1090,8 +1099,8 @@ void MainWindow::setupStatusBar() {
 }
 
 void MainWindow::loadToken() {
-    tokenWatcher = new QFutureWatcher<QString>(this);
-    connect(tokenWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onTokenLoaded);
+    tokenWatcher = new QFutureWatcher<WalletResult>(this);
+    connect(tokenWatcher, &QFutureWatcher<WalletResult>::finished, this, &MainWindow::onTokenLoaded);
     tokenWatcher->setFuture(SettingsDialog::getTokenAsync());
 }
 

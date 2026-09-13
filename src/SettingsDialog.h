@@ -1,3 +1,5 @@
+#include "GitHubClient.h"
+#include "WalletManager.h"
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
@@ -21,8 +23,8 @@ class SettingsDialog : public QDialog {
     enum GetDataOption { Manual, FillScreen, GetAll, Infinite };
     Q_ENUM(GetDataOption)
 
-    static QString getToken();
-    static QFuture<QString> getTokenAsync();
+    QString getTokenValue() const { return tokenEdit->text().trimmed(); }
+    static QFuture<WalletResult> getTokenAsync();
     static int getInterval();
     static GetDataOption getGetDataOption();
     static int getSummaryThreshold();
@@ -35,8 +37,11 @@ class SettingsDialog : public QDialog {
 
    private slots:
     void saveSettings();
+    void onAccepted();
+    void onSaveFinished();
     void onTestClicked();
-    void onVerificationResult(const QUuid& reqId, bool valid, const QString& message);
+    void onVerificationResult(const QUuid& reqId, bool isValid, const TokenCapabilities& capabilities,
+                              const QString& error);
     void installNotifyRc();
 
    private:
@@ -57,6 +62,7 @@ class SettingsDialog : public QDialog {
     QLabel* statusLabel;
     GitHubClient* testClient;
     QUuid m_verificationRequestId;
+    QFutureWatcher<WalletResult>* saveWatcher = nullptr;
 };
 
 #endif  // SETTINGSDIALOG_H
