@@ -37,6 +37,27 @@ target_link_libraries(TestGitHubClient
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
 
+add_executable(TestCapabilityVerification
+    tests/TestCapabilityVerification.cpp
+    tests/MockNetworkReply.cpp
+    tests/FakeNetworkAccessManager.cpp
+    tests/MockNetworkReply.h
+    src/GitHubClient.cpp
+    src/GitHubClient.h
+    src/Notification.cpp
+    src/Notification.h
+    src/SecureString.h
+)
+
+target_link_libraries(TestCapabilityVerification
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Svg
+        Qt6::Test
+)
+
+add_test(NAME TestCapabilityVerification COMMAND TestCapabilityVerification)
+
 add_executable(TestFilterParser
     tests/TestFilterParser.cpp
     src/utils/FilterParser.cpp
@@ -149,7 +170,7 @@ install(FILES src/kgithub-notify.desktop
 
 install(FILES src/assets/icon.svg
     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-    RENAME kgithub-notify.svg
+    RENAME com.arran4.kgithub_notify.svg
 )
 
 install(FILES src/kgithub-notify.notifyrc
@@ -173,3 +194,8 @@ get_target_property(consumer_libraries kgithub-notify LINK_LIBRARIES)
 target_link_libraries(TestRequestConsumers PRIVATE ${consumer_libraries} Qt6::Test)
 add_test(NAME TestRequestConsumers COMMAND TestRequestConsumers)
 set_tests_properties(TestRequestConsumers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(TestCredentialPersistence tests/TestCredentialPersistence.cpp ${consumer_sources})
+target_link_libraries(TestCredentialPersistence PRIVATE ${consumer_libraries} Qt6::Test)
+add_test(NAME TestCredentialPersistence COMMAND TestCredentialPersistence)
+set_tests_properties(TestCredentialPersistence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
