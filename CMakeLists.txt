@@ -170,7 +170,7 @@ install(FILES src/kgithub-notify.desktop
 
 install(FILES src/assets/icon.svg
     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-    RENAME com.arran4.kgithub_notify.svg
+    RENAME kgithub-notify.svg
 )
 
 install(FILES src/kgithub-notify.notifyrc
