@@ -86,8 +86,8 @@ On the first run, or by selecting "Settings" from the File menu (or tray icon co
 ### Token Scopes
 
 - A Personal Access Token (PAT). Requirements:
-  - **Classic Token**: Requires `repo` and `notifications` scopes.
-  - **Fine-grained Token**: Requires Read-only access to Metadata, Read/Write for Issues and Pull Requests. Note: GitHub's /notifications endpoint only supports Classic PATs.
+  - **Classic Token**: `repo` is recommended for full functionality and already grants notification access; `notifications` is sufficient for notification-only access.
+  - **Fine-grained Token**: Requires Read-only access to Metadata, Read/Write for Issues and Pull Requests. GitHub's REST notifications endpoints only support Classic PATs.
 
 3. Copy the token and paste it into the application's settings dialog.
 
