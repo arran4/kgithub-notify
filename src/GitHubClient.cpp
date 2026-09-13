@@ -146,6 +146,7 @@ void GitHubClient::onVerifyUserFinished(QNetworkReply* reply, VerificationSessio
                     session->capabilities.hasPrivateRepos = CapabilityStatus::Available;
                     session->capabilities.hasCreateIssues = CapabilityStatus::Available;
                     session->capabilities.hasPrComments = CapabilityStatus::Available;
+                    session->capabilities.hasNotifications = CapabilityStatus::Available;
                 } else if (scopeList.contains("public_repo")) {
                     session->capabilities.hasRepoMetadata = CapabilityStatus::Limited;
                     session->capabilities.hasPrivateRepos = CapabilityStatus::Unavailable;

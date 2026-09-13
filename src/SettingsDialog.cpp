@@ -42,10 +42,20 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nu
     tokenEdit->setPlaceholderText("Loading...");
 
     QFutureWatcher<WalletResult>* watcher = new QFutureWatcher<WalletResult>(this);
-    connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
-        tokenEdit->setText(watcher->result().token);
+    connect(watcher, &QFutureWatcher<WalletResult>::finished, this, [this, watcher]() {
+        WalletResult result = watcher->result();
+        if (result.success) {
+            tokenEdit->setText(result.token);
+            tokenEdit->setPlaceholderText("");
+        } else if (!result.errorMessage.isEmpty()) {
+            statusLabel->setText(QString("<font color='red'>Warning: Failed to load token from KWallet: %1</font>")
+                                     .arg(result.errorMessage.toHtmlEscaped()));
+            statusLabel->show();
+            tokenEdit->setPlaceholderText("Enter token...");
+        } else {
+            tokenEdit->setPlaceholderText("Enter token...");
+        }
         tokenEdit->setEnabled(true);
-        tokenEdit->setPlaceholderText("");
         watcher->deleteLater();
     });
     watcher->setFuture(getTokenAsync());

@@ -401,6 +401,75 @@ class TestGitHubClient : public QObject {
         QCOMPARE(args.at(1).toBool(), false);
     }
 
+    void testVerificationPublicRepo() {
+        GitHubClient client;
+        qRegisterMetaType<TokenCapabilities>();
+        QSignalSpy spy(&client, &GitHubClient::tokenVerified);
+
+        auto* manager = new FakeNetworkAccessManager(&client);
+        manager->autoEmitFinished = false;
+        client.manager = manager;
+
+        client.setToken("dummy_token");
+        client.verifyToken();
+
+        QCoreApplication::processEvents();
+
+        manager->requests[0].reply->setRawHeader("X-OAuth-Scopes", "public_repo, notifications");
+        manager->requests[0].reply->complete("{\"login\":\"user\"}");
+
+        QTRY_COMPARE(manager->requests.size(), 2);
+        manager->requests[1].reply->complete("[]");
+
+        QTRY_COMPARE(manager->requests.size(), 3);
+        manager->requests[2].reply->complete("[]");
+
+        QTRY_COMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QCOMPARE(args.at(1).toBool(), true);
+
+        TokenCapabilities caps = args.at(2).value<TokenCapabilities>();
+        QCOMPARE(caps.hasRepoMetadata, CapabilityStatus::Limited);
+        QCOMPARE(caps.hasNotifications, CapabilityStatus::Available);
+        QCOMPARE(caps.hasPrivateRepos, CapabilityStatus::Unavailable);
+        QCOMPARE(caps.hasCreateIssues, CapabilityStatus::Limited);
+        QCOMPARE(caps.hasPrComments, CapabilityStatus::Limited);
+    }
+
+    void testVerificationFineGrained() {
+        GitHubClient client;
+        qRegisterMetaType<TokenCapabilities>();
+        QSignalSpy spy(&client, &GitHubClient::tokenVerified);
+
+        auto* manager = new FakeNetworkAccessManager(&client);
+        manager->autoEmitFinished = false;
+        client.manager = manager;
+
+        client.setToken("dummy_token");
+        client.verifyToken();
+
+        QCoreApplication::processEvents();
+
+        manager->requests[0].reply->complete("{\"login\":\"user\"}");  // No X-OAuth-Scopes header!
+
+        QTRY_COMPARE(manager->requests.size(), 2);
+        manager->requests[1].reply->complete("[]");  // Repo Metadata 200
+
+        QTRY_COMPARE(manager->requests.size(), 3);
+        manager->requests[2].reply->completeWithError(
+            QNetworkReply::ContentAccessDenied, "Forbidden",
+            403);  // Notification 403 Permission Denied (fine grained not supported)
+
+        QTRY_COMPARE(spy.count(), 1);
+        QList<QVariant> args = spy.takeFirst();
+        QCOMPARE(args.at(1).toBool(), true);
+
+        TokenCapabilities caps = args.at(2).value<TokenCapabilities>();
+        QCOMPARE(caps.hasRepoMetadata, CapabilityStatus::Available);     // Confirmed by endpoint!
+        QCOMPARE(caps.hasNotifications, CapabilityStatus::Unavailable);  // 403 No retry-after
+        QCOMPARE(caps.hasPrivateRepos, CapabilityStatus::Unknown);       // Unknown for fine-grained
+    }
+
     void testUnreadLogic() {
         GitHubClient client;
         QSignalSpy spy(&client, &GitHubClient::notificationsReceived);
