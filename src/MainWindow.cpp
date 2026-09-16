@@ -66,7 +66,7 @@ MainWindow::MainWindow(QWidget* parent)
       trayIconMenu(nullptr),
       notificationListWidget(nullptr),
       client(nullptr),
-      pendingAuthError(false),
+
       m_lastUnreadCount(0) {
     setupWindow();
     setupCentralWidget();
@@ -188,8 +188,9 @@ void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notificatio
                                      bool hasMore) {
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
+    m_authIncident.recordAuthenticatedSuccess();
     m_lastCheckTime = QDateTime::currentDateTime();
-    pendingAuthError = false;
+
     lastError.clear();
 
     notificationListWidget->setNotifications(notifications, append, hasMore);
@@ -242,6 +243,9 @@ void MainWindow::onListStatusMessage(const QString& message) {
 }
 
 void MainWindow::showError(const QUuid& reqId, const QString& error) {
+    if (reqId == m_currentRefreshId) {
+        m_authIncident.recordNetworkError();
+    }
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
     if (notificationListWidget) notificationListWidget->resetLoadMoreState();
@@ -280,7 +284,7 @@ void MainWindow::showError(const QUuid& reqId, const QString& error) {
 void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
-    pendingAuthError = true;
+    m_authIncident.recordAuthFailure(message);
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
     stackWidget->setCurrentWidget(errorPage);
@@ -289,7 +293,7 @@ void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
         notificationListWidget->resetLoadMoreState();
     }
 
-    if (!authNotificationSent) {
+    if (m_authIncident.shouldNotify()) {
         KNotification* notification = new KNotification("AuthError");
         notification->setComponentName(QStringLiteral("kgithub-notify"));
         notification->setTitle(tr("GitHub Authentication Error"));
@@ -300,7 +304,6 @@ void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
         connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
         notification->sendEvent();
-        authNotificationSent = true;
     }
 
     if (!trayIcon || !trayIcon->isVisible()) {
@@ -326,7 +329,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 }
 
 void MainWindow::onTrayMessageClicked() {
-    if (pendingAuthError) {
+    if (m_authIncident.inIncident()) {
         showSettings();
     }
 }
@@ -388,8 +391,6 @@ void MainWindow::onTokenLoaded() {
     } else {
         m_loadedToken = result.token;
     }
-
-    authNotificationSent = false;
 
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);

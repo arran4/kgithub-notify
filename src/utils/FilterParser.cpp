@@ -65,6 +65,8 @@ static QList<Token> tokenize(const QString& query) {
 class Parser {
     QList<Token> m_tokens;
     int m_pos;
+    bool m_error = false;
+    QString m_errorMsg;
 
    public:
     explicit Parser(const QList<Token>& tokens) : m_tokens(tokens), m_pos(0) {}
@@ -144,19 +146,31 @@ class Parser {
     QSharedPointer<ASTNode> parseUnary() {
         if (!atEnd() && current().type == Token::NOT) {
             next();
-            return QSharedPointer<ASTNode>(new NotNode(parseUnary()));
+            QSharedPointer<ASTNode> inner = parseUnary();
+            if (m_error) return QSharedPointer<ASTNode>();
+            if (!inner) {
+                m_error = true;
+                m_errorMsg = "Incomplete NOT";
+                return QSharedPointer<ASTNode>();
+            }
+            return QSharedPointer<ASTNode>(new NotNode(inner));
         }
         return parsePrimary();
     }
 
     QSharedPointer<ASTNode> parsePrimary() {
-        if (atEnd()) return QSharedPointer<ASTNode>(new KeywordNode(QString()));
+        if (atEnd()) return QSharedPointer<ASTNode>();
 
         Token tok = next();
         if (tok.type == Token::LPAREN) {
             QSharedPointer<ASTNode> node = parseOr();
+            if (m_error) return QSharedPointer<ASTNode>();
             if (!atEnd() && current().type == Token::RPAREN) {
                 next();
+            } else {
+                m_error = true;
+                m_errorMsg = "Unmatched opening parenthesis";
+                return QSharedPointer<ASTNode>();
             }
             return node;
         } else if (tok.type == Token::KV) {

@@ -199,3 +199,9 @@ add_executable(TestCredentialPersistence tests/TestCredentialPersistence.cpp ${c
 target_link_libraries(TestCredentialPersistence PRIVATE ${consumer_libraries} Qt6::Test)
 add_test(NAME TestCredentialPersistence COMMAND TestCredentialPersistence)
 set_tests_properties(TestCredentialPersistence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+if(BUILD_TESTING)
+    add_executable(TestAuthIncidentState tests/TestAuthIncidentState.cpp)
+    target_link_libraries(TestAuthIncidentState PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME AuthIncidentState COMMAND TestAuthIncidentState)
+endif()

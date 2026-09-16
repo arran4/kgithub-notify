@@ -75,7 +75,7 @@ class TestRequestConsumers : public QObject {
         disconnect(window.tokenWatcher, nullptr, &window, nullptr);
         window.m_loadedToken.clear();
         window.trayIcon->hide();
-        window.authNotificationSent = true;
+        // window.authNotificationSent = true; replaced by internal incident state handling
         window.setClient(&client);
         window.refreshTimer->stop();
         QSettings().setValue("dataOption", SettingsDialog::Manual);
