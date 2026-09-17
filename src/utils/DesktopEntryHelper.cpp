@@ -7,22 +7,19 @@
 #include <QGuiApplication>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <algorithm>
 
 QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool background) {
     if (executablePath.isEmpty()) {
         return background ? QStringLiteral("--background") : QString();
     }
 
-    bool needsQuotes = false;
-    for (const QChar& c : executablePath) {
-        if (c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') || c == QChar('>') ||
-            c == QChar('<') || c == QChar('&') || c == QChar(';') || c == QChar('|') || c == QChar('$') ||
-            c == QChar('*') || c == QChar('?') || c == QChar('!') || c == QChar('`') || c == QChar('~') ||
-            c == QChar('#') || c == QChar('(') || c == QChar(')')) {
-            needsQuotes = true;
-            break;
-        }
-    }
+    bool needsQuotes = std::any_of(executablePath.begin(), executablePath.end(), [](const QChar& c) {
+        return c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') || c == QChar('>') ||
+               c == QChar('<') || c == QChar('&') || c == QChar(';') || c == QChar('|') || c == QChar('$') ||
+               c == QChar('*') || c == QChar('?') || c == QChar('!') || c == QChar('`') || c == QChar('~') ||
+               c == QChar('#') || c == QChar('(') || c == QChar(')');
+    });
 
     QString result;
     if (needsQuotes) {

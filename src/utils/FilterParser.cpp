@@ -3,6 +3,7 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <QtGlobal>
+#include <algorithm>
 
 struct Token {
     enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD, LEX_ERROR };
@@ -156,13 +157,13 @@ class Parser {
             return res;
         }
 
-        for (const Token& tok : m_tokens) {
-            if (tok.type == Token::LEX_ERROR) {
-                res.ok = false;
-                res.error = tok.val1;
-                res.errorPos = tok.pos;
-                return res;
-            }
+        auto errIt = std::find_if(m_tokens.begin(), m_tokens.end(),
+                                  [](const Token& tok) { return tok.type == Token::LEX_ERROR; });
+        if (errIt != m_tokens.end()) {
+            res.ok = false;
+            res.error = errIt->val1;
+            res.errorPos = errIt->pos;
+            return res;
         }
 
         QSharedPointer<ASTNode> ast = parseOr();
