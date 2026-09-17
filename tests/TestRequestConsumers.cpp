@@ -1494,6 +1494,18 @@ class TestRequestConsumers : public QObject {
         QVERIFY(!repos.m_filterEdit->styleSheet().isEmpty());
         QVERIFY(repos.m_filterEdit->toolTip().contains("quote", Qt::CaseInsensitive));
 
+        // Introduce unknown structured key error: state:open -> should keep previous 2 rows untouched!
+        repos.m_filterEdit->setText("state:open");
+        QCOMPARE(repos.m_table->rowCount(), 2);
+        QVERIFY(!repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().contains("Unknown filter key: 'state'", Qt::CaseInsensitive));
+
+        // Another unknown key in complex expression -> still keeps 2 rows
+        repos.m_filterEdit->setText("name:alpha AND invalid_key:bar");
+        QCOMPARE(repos.m_table->rowCount(), 2);
+        QVERIFY(!repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().contains("Unknown filter key: 'invalid_key'", Qt::CaseInsensitive));
+
         // Restore to empty filter -> shows all 3
         repos.m_filterEdit->setText("");
         QCOMPARE(repos.m_table->rowCount(), 3);

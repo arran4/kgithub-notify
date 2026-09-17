@@ -106,7 +106,8 @@ static QList<Token> tokenize(const QString& query, QString* lexError, int* lexEr
                 if (val.isEmpty()) {
                     if (lexError) *lexError = QStringLiteral("Missing value for key '%1'").arg(key);
                     if (lexErrorPos) *lexErrorPos = startPos;
-                    tokens.append({Token::LEX_ERROR, QStringLiteral("Missing value for key '%1'").arg(key), QString(), startPos});
+                    tokens.append(
+                        {Token::LEX_ERROR, QStringLiteral("Missing value for key '%1'").arg(key), QString(), startPos});
                     return tokens;
                 }
                 tokens.append({Token::KV, key, val, startPos});
@@ -344,6 +345,10 @@ class Parser {
             return QSharedPointer<ASTNode>();
         } else if (tok.type == Token::KV) {
             next();
+            if (!FilterParser::isSupportedKey(tok.val1)) {
+                setError(QStringLiteral("Unknown filter key: '%1'").arg(tok.val1), tok.pos);
+                return QSharedPointer<ASTNode>();
+            }
             return QSharedPointer<ASTNode>(new KeyValueNode(tok.val1, tok.val2));
         } else if (tok.type == Token::STR || tok.type == Token::WORD) {
             next();
@@ -354,6 +359,10 @@ class Parser {
                     return QSharedPointer<ASTNode>();
                 }
                 Token valTok = next();
+                if (!FilterParser::isSupportedKey(tok.val1)) {
+                    setError(QStringLiteral("Unknown filter key: '%1'").arg(tok.val1), tok.pos);
+                    return QSharedPointer<ASTNode>();
+                }
                 return QSharedPointer<ASTNode>(new InNode(tok.val1, valTok.val1));
             }
             return QSharedPointer<ASTNode>(new KeywordNode(tok.val1));
@@ -363,6 +372,20 @@ class Parser {
         return QSharedPointer<ASTNode>(new KeywordNode(tok.val1));
     }
 };
+
+const QSet<QString>& FilterParser::supportedKeys() {
+    static const QSet<QString> s_keys = {
+        QStringLiteral("name"),          QStringLiteral("repo"),           QStringLiteral("owner"),
+        QStringLiteral("fork"),          QStringLiteral("archived"),       QStringLiteral("visibility"),
+        QStringLiteral("created"),       QStringLiteral("createdat"),      QStringLiteral("created-at"),
+        QStringLiteral("created_at"),    QStringLiteral("updated"),        QStringLiteral("updatedat"),
+        QStringLiteral("updated-at"),    QStringLiteral("updated_at"),     QStringLiteral("created-before"),
+        QStringLiteral("created-after"), QStringLiteral("updated-before"), QStringLiteral("updated-after"),
+    };
+    return s_keys;
+}
+
+bool FilterParser::isSupportedKey(const QString& key) { return supportedKeys().contains(key.toLower()); }
 
 FilterParseResult FilterParser::parseWithResult(const QString& query) {
     QString q = query.trimmed();
@@ -420,6 +443,7 @@ bool NotNode::evaluate(const FilterDataAccessor& accessor) const { return !m_chi
 QString NotNode::toString() const { return QStringLiteral("NOT ") + m_child->toString(); }
 
 bool InNode::evaluate(const FilterDataAccessor& accessor) const {
+    if (!FilterParser::isSupportedKey(m_key)) return false;
     if (m_values.isEmpty()) return false;
     QString val = accessor.getValue(m_key);
     if (val.isEmpty()) return false;
@@ -437,6 +461,7 @@ static bool checkDateFilter(const QString& filterVal, const QString& dateStr, bo
 }
 
 bool KeyValueNode::evaluate(const FilterDataAccessor& accessor) const {
+    if (!FilterParser::isSupportedKey(m_key)) return false;
     QString lowerKey = m_key.toLower();
     if (lowerKey == QStringLiteral("created-before") || lowerKey == QStringLiteral("updated-before") ||
         lowerKey == QStringLiteral("created-after") || lowerKey == QStringLiteral("updated-after")) {

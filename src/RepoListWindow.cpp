@@ -38,11 +38,13 @@ class RepoAccessor : public FilterDataAccessor {
         QString lowerKey = key.toLower();
         if (lowerKey == "fork") return m_repo["fork"].toBool() ? "true" : "false";
         if (lowerKey == "archived") return m_repo["archived"].toBool() ? "true" : "false";
-        if (lowerKey == "name") return m_repo["name"].toString();
+        if (lowerKey == "name" || lowerKey == "repo") return m_repo["name"].toString();
         if (lowerKey == "owner") return m_repo["owner"].toObject()["login"].toString();
         if (lowerKey == "visibility") return m_repo["visibility"].toString();
-        if (lowerKey == "createdat") return m_repo["created_at"].toString();
-        if (lowerKey == "updatedat") return m_repo["updated_at"].toString();
+        if (lowerKey == "createdat" || lowerKey == "created" || lowerKey == "created-at" || lowerKey == "created_at")
+            return m_repo["created_at"].toString();
+        if (lowerKey == "updatedat" || lowerKey == "updated" || lowerKey == "updated-at" || lowerKey == "updated_at")
+            return m_repo["updated_at"].toString();
         return "";
     }
 
