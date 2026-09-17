@@ -353,14 +353,14 @@ void NotificationListWidget::focusNotification(const QString& id) {
 
 QStringList NotificationListWidget::getAvailableRepos() const {
     QSet<QString> repos;
-    // Iterate over visible items or all items?
-    // Usually repo filter is based on currently loaded items
-    for (int i = 0; i < listWidget->count(); ++i) {
-        QListWidgetItem* item = listWidget->item(i);
-        if (item == loadMoreItem) continue;
-        QString repo = item->data(Qt::UserRole + 3).toString();
-        if (!repo.isEmpty()) {
-            repos.insert(repo);
+    for (const Notification& n : m_allNotifications) {
+        if (!n.repository.isEmpty()) {
+            repos.insert(n.repository);
+        }
+        for (const Notification& child : n.groupedNotifications) {
+            if (!child.repository.isEmpty()) {
+                repos.insert(child.repository);
+            }
         }
     }
     QStringList repoList = repos.values();

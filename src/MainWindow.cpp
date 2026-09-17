@@ -222,18 +222,32 @@ void MainWindow::onListCountsChanged(int total, int unread, int newCount, const 
 
     // Update repo filter
     QString currentRepo = repoFilterComboBox->currentText();
-    bool wasBlocked = repoFilterComboBox->blockSignals(true);
-    repoFilterComboBox->clear();
-    repoFilterComboBox->addItem(tr("All Repositories"));
-    repoFilterComboBox->addItems(notificationListWidget->getAvailableRepos());
+    QStringList availableRepos = notificationListWidget->getAvailableRepos();
+    QStringList expectedItems;
+    expectedItems << tr("All Repositories") << availableRepos;
 
-    int index = repoFilterComboBox->findText(currentRepo);
-    if (index >= 0) {
-        repoFilterComboBox->setCurrentIndex(index);
-    } else {
-        repoFilterComboBox->setCurrentIndex(0);
+    QStringList currentItems;
+    for (int i = 0; i < repoFilterComboBox->count(); ++i) {
+        currentItems << repoFilterComboBox->itemText(i);
     }
-    repoFilterComboBox->blockSignals(wasBlocked);
+
+    if (currentItems != expectedItems) {
+        bool wasBlocked = repoFilterComboBox->blockSignals(true);
+        repoFilterComboBox->clear();
+        repoFilterComboBox->addItems(expectedItems);
+
+        int index = repoFilterComboBox->findText(currentRepo);
+        if (index >= 0) {
+            repoFilterComboBox->setCurrentIndex(index);
+            repoFilterComboBox->blockSignals(wasBlocked);
+        } else {
+            repoFilterComboBox->setCurrentIndex(0);
+            repoFilterComboBox->blockSignals(wasBlocked);
+            if (currentRepo != tr("All Repositories") && !currentRepo.isEmpty()) {
+                notificationListWidget->setRepoFilter(tr("All Repositories"));
+            }
+        }
+    }
 }
 
 void MainWindow::onListStatusMessage(const QString& message) {

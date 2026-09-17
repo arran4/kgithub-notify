@@ -1353,6 +1353,74 @@ class TestRequestConsumers : public QObject {
         QVERIFY(mutationErrWidget->errorLabel->isVisible() || !mutationErrWidget->errorLabel->text().isEmpty());
         QVERIFY(mutationErrWidget->errorLabel->text().contains("Mutation failed"));
     }
+
+    void testAuthoritativeRepoFilterChoices() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        // 1. Initial refresh with 2 notifications from different repos: "org/repo-a" (unread) and "org/repo-b" (read)
+        window.onRefreshClicked();
+        network->requests[0].reply->complete(
+            "[{\"id\":\"1\",\"unread\":true,\"subject\":{\"title\":\"Alpha\"},\"repository\":{\"full_name\":\"org/repo-a\"}},"
+            "{\"id\":\"2\",\"unread\":false,\"subject\":{\"title\":\"Beta\"},\"repository\":{\"full_name\":\"org/repo-b\"}}]"
+        );
+
+        auto* list = window.notificationListWidget;
+        auto* repoCombo = window.repoFilterComboBox;
+
+        // getAvailableRepos() must contain both "org/repo-a" and "org/repo-b"
+        QStringList repos = list->getAvailableRepos();
+        QCOMPARE(repos, QStringList({"org/repo-a", "org/repo-b"}));
+
+        // Combo box has "All Repositories", "org/repo-a", "org/repo-b"
+        QCOMPARE(repoCombo->count(), 3);
+        QCOMPARE(repoCombo->itemText(0), QString("All Repositories"));
+        QCOMPARE(repoCombo->itemText(1), QString("org/repo-a"));
+        QCOMPARE(repoCombo->itemText(2), QString("org/repo-b"));
+
+        // 2. Read/unread filter does not remove loaded repository choice
+        // Default filter mode is 0 (All Unread), so repo-b item is not visible in listWidget,
+        // but it MUST still be in getAvailableRepos() and repoCombo!
+        QCOMPARE(list->getAvailableRepos(), QStringList({"org/repo-a", "org/repo-b"}));
+
+        // 3. Repository hidden by search remains selectable
+        list->setSearchFilter("Alpha");
+        QCOMPARE(list->getAvailableRepos(), QStringList({"org/repo-a", "org/repo-b"}));
+        list->setSearchFilter("");
+
+        // 4. Select repo "org/repo-b"
+        repoCombo->setCurrentIndex(2);
+        QCOMPARE(repoCombo->currentText(), QString("org/repo-b"));
+
+        // 5. Pagination append arriving with new repo "org/repo-c"
+        Notification notifC;
+        notifC.id = "3";
+        notifC.unread = true;
+        notifC.title = "Gamma";
+        notifC.repository = "org/repo-c";
+        list->setNotifications({notifC}, true /* append */, false);
+
+        // Newly arriving repo present, selected repo preserved
+        QCOMPARE(list->getAvailableRepos(), QStringList({"org/repo-a", "org/repo-b", "org/repo-c"}));
+        // Selected repo was "org/repo-b", verify it is preserved
+        QCOMPARE(repoCombo->currentText(), QString("org/repo-b"));
+
+        // 6. Fallback to All Repositories only when selected repo genuinely disappears
+        // New refresh with only "org/repo-a"
+        Notification notifA;
+        notifA.id = "4";
+        notifA.unread = true;
+        notifA.title = "Delta";
+        notifA.repository = "org/repo-a";
+        list->setNotifications({notifA}, false /* replace */, false);
+
+        QCOMPARE(list->getAvailableRepos(), QStringList({"org/repo-a"}));
+        // Since "org/repo-b" disappeared, repoCombo must fallback to "All Repositories"
+        QCOMPARE(repoCombo->currentIndex(), 0);
+        QCOMPARE(repoCombo->currentText(), QString("All Repositories"));
+    }
 };
 
 QTEST_MAIN(TestRequestConsumers)
