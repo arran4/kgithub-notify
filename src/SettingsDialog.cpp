@@ -18,6 +18,7 @@
 #include "GitHubClient.h"
 #include "RulesDialog.h"
 #include "WalletManager.h"
+#include "utils/DesktopEntryHelper.h"
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nullptr) {
     setWindowTitle("Settings");
@@ -230,41 +231,21 @@ void SettingsDialog::saveSettings() {
 }
 
 void SettingsDialog::updateAutostartEntry() {
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
-    QDir dir(configPath);
-    if (!dir.exists("autostart")) {
-        dir.mkdir("autostart");
-    }
-    QString path = configPath + "/autostart/kgithub-notify.desktop";
-
-    if (autostartCheckBox->isChecked()) {
-        QFile file(path);
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream out(&file);
-            out << "[Desktop Entry]\n";
-            out << "Type=Application\n";
-            out << "Name=KGitHub Notify\n";
-            out << "Comment=GitHub Notification System Tray\n";
-            QString exec = QCoreApplication::applicationFilePath();
-            if (startMinimizedCheckBox->isChecked()) {
-                exec += " --background";
-            }
-            out << "Exec=" << exec << "\n";
-            out << "Icon=kgithub-notify\n";
-            out << "Categories=Development;Utility;Qt;KDE;\n";
-            out << "StartupWMClass=Kgithub-notify\n";
-            out << "Terminal=false\n";
-            out << "X-KDE-autostart-after=panel\n";
-        }
-    } else {
-        QFile::remove(path);
+    QString error;
+    bool ok = DesktopEntryHelper::writeAutostartEntry(
+        autostartCheckBox->isChecked(),
+        startMinimizedCheckBox->isChecked(),
+        QString(),
+        &error);
+    if (!ok && !error.isEmpty()) {
+        statusLabel->setText(error);
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
     }
 }
 
 bool SettingsDialog::isAutostartEnabled() {
-    QString path =
-        QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart/kgithub-notify.desktop";
-    return QFile::exists(path);
+    return DesktopEntryHelper::isAutostartEnabled();
 }
 
 QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }

@@ -49,6 +49,19 @@ target_link_libraries(TestUrlHelper
 add_test(NAME TestUrlHelper COMMAND TestUrlHelper)
 set_tests_properties(TestUrlHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(TestDesktopEntryHelper
+    tests/TestDesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.h
+)
+target_link_libraries(TestDesktopEntryHelper
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+)
+add_test(NAME TestDesktopEntryHelper COMMAND TestDesktopEntryHelper)
+set_tests_properties(TestDesktopEntryHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(TestCapabilityVerification
     tests/TestCapabilityVerification.cpp
     tests/MockNetworkReply.cpp
@@ -121,6 +134,8 @@ add_executable(kgithub-notify
     src/NotificationRuleEngine.h
     src/utils/FilterParser.cpp
     src/utils/FilterParser.h
+    src/utils/DesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.h
     src/RulesDialog.cpp
     src/RulesDialog.h
     src/DebugWindow.cpp
