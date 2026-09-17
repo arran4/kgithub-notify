@@ -15,6 +15,7 @@
 #include "../src/RepoListWindow.h"
 #include "../src/SettingsDialog.h"
 #include "../src/WalletManager.h"
+#include "../src/WorkItemWindow.h"
 #include "../src/trending/TrendingWindow.h"
 #include "FakeNetworkAccessManager.h"
 class MockWalletBackend : public WalletBackend {
@@ -101,7 +102,13 @@ class TestRequestConsumers : public QObject {
     }
 
     void init() {
-        QFile::remove(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/repos_cache.json");
+        QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QFile::remove(appData + "/repos_cache.json");
+        QDir dir(appData);
+        const QStringList workItemFiles = dir.entryList({"workitems_*.json"}, QDir::Files);
+        for (const QString& file : workItemFiles) {
+            dir.remove(file);
+        }
     }
 
     void testDebugAndTrendingSimultaneous() {
@@ -1546,6 +1553,203 @@ class TestRequestConsumers : public QObject {
 
         QVERIFY(window.m_authIncident.inIncident());
         QCOMPARE(window.m_authIncident.latestReason(), QString("Invalid Token"));
+    }
+
+    static QByteArray makeWorkItemSearchResponse(int totalCount, const QStringList& titles) {
+        QJsonArray items;
+        for (const QString& title : titles) {
+            QJsonObject item;
+            item["title"] = title;
+            item["html_url"] = "https://github.com/test/repo/issues/1";
+            item["state"] = "open";
+            item["created_at"] = "2026-01-01T00:00:00Z";
+            item["user"] = QJsonObject{{"login", "author1"}};
+            item["repository_url"] = "https://api.github.com/repos/test/repo";
+            items.append(item);
+        }
+        QJsonObject root;
+        root["total_count"] = totalCount;
+        root["items"] = items;
+        return QJsonDocument(root).toJson();
+    }
+
+    void testWorkItemRefreshWhilePage2InFlight() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-refresh-while-page-2-in-flight", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1);
+        QUuid gen1 = window.m_currentGenerationId;
+        QVERIFY(!gen1.isNull());
+
+        // Complete Page 1 of G1 with 1 item, total_count = 200
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(200, {"Issue 1 (G1)"}));
+
+        // Page 2 of G1 should now be in flight
+        QCOMPARE(fakeManager.requests.size(), 2);
+        QCOMPARE(fakeManager.requests[1].reply->property("page").toInt(), 2);
+        QCOMPARE(fakeManager.requests[1].reply->property("generationId").toString(), gen1.toString());
+
+        // User triggers refresh -> starts G2
+        window.startRefresh();
+        QUuid gen2 = window.m_currentGenerationId;
+        QVERIFY(!gen2.isNull());
+        QVERIFY(gen2 != gen1);
+        QCOMPARE(fakeManager.requests.size(), 3);
+        QCOMPARE(fakeManager.requests[2].reply->property("page").toInt(), 1);
+        QCOMPARE(fakeManager.requests[2].reply->property("generationId").toString(), gen2.toString());
+
+        // Now Page 2 of G1 arrives from network
+        fakeManager.requests[1].reply->complete(makeWorkItemSearchResponse(200, {"Issue 2 (stale G1)"}));
+
+        // Verify that G1's page 2 was dropped and did not commit
+        QCOMPARE(window.m_table->rowCount(), 0);
+        QVERIFY(!window.m_stagedPages.contains(2));
+
+        // Complete Page 1 of G2 with total_count = 1
+        fakeManager.requests[2].reply->complete(makeWorkItemSearchResponse(1, {"Issue 1 (G2)"}));
+
+        // G2 commits
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("Issue 1 (G2)"));
+    }
+
+    void testWorkItemOldReplyAfterNewGenerationPage1() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-old-reply-after-new-generation", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1); // Page 1 of G1 in flight
+
+        // User refreshes to G2 before G1 arrives
+        window.startRefresh();
+        QCOMPARE(fakeManager.requests.size(), 2); // Page 1 of G2 in flight
+
+        // Page 1 of G2 arrives first and commits
+        fakeManager.requests[1].reply->complete(makeWorkItemSearchResponse(1, {"G2 Fresh Item"}));
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("G2 Fresh Item"));
+
+        // Now old Page 1 of G1 arrives
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(1, {"G1 Stale Item"}));
+
+        // Table still displays G2 Fresh Item
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("G2 Fresh Item"));
+    }
+
+    void testWorkItemStaleErrorAfterNewRefresh() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-stale-error-after-new-refresh", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1);
+
+        // User refreshes to G2
+        window.startRefresh();
+        QUuid gen2 = window.m_currentGenerationId;
+        QCOMPARE(fakeManager.requests.size(), 2);
+
+        // Stale error from G1 arrives
+        fakeManager.requests[0].reply->completeWithError(QNetworkReply::HostNotFoundError, "Stale Network Error", 0);
+
+        // G2 generation should NOT be cancelled
+        QCOMPARE(window.m_currentGenerationId, gen2);
+        QVERIFY(!window.m_statusLabel->text().contains("Error"));
+
+        // G2 completes successfully
+        fakeManager.requests[1].reply->complete(makeWorkItemSearchResponse(1, {"Active Item"}));
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("Active Item"));
+    }
+
+    void testWorkItemDuplicatePageDelivery() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-duplicate-page-delivery", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1);
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(1, {"Single Item"}));
+
+        QCOMPARE(window.m_table->rowCount(), 1);
+
+        // Simulate duplicate delivery
+        window.onReplyFinished(fakeManager.requests[0].reply);
+        QCOMPARE(window.m_table->rowCount(), 1);
+    }
+
+    void testWorkItemLaterPageFailurePreservesData() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-later-page-failure", nullptr, &fakeManager);
+
+        // Initial fetch: 1 item committed
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(1, {"Initial Item"}));
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("Initial Item"));
+
+        // User starts refresh -> G2
+        window.startRefresh();
+        QCOMPARE(fakeManager.requests.size(), 2); // G2 page 1
+
+        // G2 Page 1 arrives with 1 item, total_count = 200
+        fakeManager.requests[1].reply->complete(makeWorkItemSearchResponse(200, {"New Page 1"}));
+        QCOMPARE(fakeManager.requests.size(), 3); // G2 page 2 in flight
+
+        // Table still preserves "Initial Item" while G2 is in progress
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("Initial Item"));
+
+        // G2 Page 2 fails!
+        fakeManager.requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Server error", 500);
+
+        // Staged data discarded, generation cancelled
+        QVERIFY(window.m_stagedPages.isEmpty());
+        QVERIFY(window.m_currentGenerationId.isNull());
+
+        // Existing table data preserved!
+        QCOMPARE(window.m_table->rowCount(), 1);
+        QCOMPARE(window.m_table->item(0, 1)->text(), QString("Initial Item"));
+        QVERIFY(window.m_statusLabel->text().contains("Error"));
+    }
+
+    void testWorkItemDuplicateNextPagePrevention() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        WorkItemWindow window(&client, "Issues", WorkItemWindow::EndpointIssues, "query-duplicate-next-page-prevention", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1);
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(200, {"Page 1 Item"}));
+
+        // Page 2 is now in flight
+        QCOMPARE(fakeManager.requests.size(), 2);
+        QVERIFY(window.m_inFlightPages.contains(2));
+
+        // Attempting duplicate fetch of page 2 should be a no-op
+        window.fetchPage(window.m_currentGenerationId, 2);
+        QCOMPARE(fakeManager.requests.size(), 2);
+    }
+
+    void testWorkItemDestructionWithInFlightRequest() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+        auto* window = new WorkItemWindow(&client, "Issues", WorkItemWindow::EndpointIssues, "query-destruction-with-in-flight-request", nullptr, &fakeManager);
+
+        QCOMPARE(fakeManager.requests.size(), 1);
+        QVERIFY(!fakeManager.requests[0].reply->isFinished());
+
+        // Delete window while request is in flight
+        delete window;
+
+        // Completing or interacting with reply afterwards must not crash
+        fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(1, {"Orphaned Item"}));
     }
 };
 
