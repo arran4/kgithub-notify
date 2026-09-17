@@ -36,6 +36,18 @@ target_link_libraries(TestGitHubClient
 )
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
+set_tests_properties(TestGitHubClient PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(TestUrlHelper
+    tests/TestUrlHelper.cpp
+    src/utils/UrlHelper.h
+)
+target_link_libraries(TestUrlHelper
+    Qt6::Test
+    Qt6::Gui
+)
+add_test(NAME TestUrlHelper COMMAND TestUrlHelper)
+set_tests_properties(TestUrlHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(TestCapabilityVerification
     tests/TestCapabilityVerification.cpp
@@ -57,6 +69,7 @@ target_link_libraries(TestCapabilityVerification
 )
 
 add_test(NAME TestCapabilityVerification COMMAND TestCapabilityVerification)
+set_tests_properties(TestCapabilityVerification PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(TestFilterParser
     tests/TestFilterParser.cpp
@@ -92,6 +105,7 @@ target_link_libraries(TestRulesDialog
 )
 
 add_test(NAME TestRulesDialog COMMAND TestRulesDialog)
+set_tests_properties(TestRulesDialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
 add_executable(kgithub-notify

@@ -14,6 +14,7 @@
 #include <QStatusBar>
 #include <QTextEdit>
 #include <QUrl>
+#include "utils/UrlHelper.h"
 
 class CommentWidget : public QWidget {
     Q_OBJECT
@@ -585,8 +586,8 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
     QString blobUrl = item->data(Qt::UserRole).toString();
     if (!blobUrl.isEmpty()) {
         QUrl url(blobUrl);
-        if (url.isValid() && (url.scheme() == "http" || url.scheme() == "https")) {
-            if (!QDesktopServices::openUrl(url)) {
+        if (UrlHelper::isSafeWebUrl(url)) {
+            if (!UrlHelper::openUrl(url)) {
                 QMessageBox::warning(this, tr("Error"), tr("Failed to open the URL in your web browser."));
             }
         } else {
@@ -635,8 +636,8 @@ void PullRequestWindow::setupMenus() {
     QAction* openUrlAction = new QAction(QIcon::fromTheme("internet-web-browser"), tr("Open PR in Browser"), this);
     connect(openUrlAction, &QAction::triggered, this, [this]() {
         const QUrl url(GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id));
-        if (url.isValid() && (url.scheme() == "http" || url.scheme() == "https")) {
-            if (!QDesktopServices::openUrl(url)) {
+        if (UrlHelper::isSafeWebUrl(url)) {
+            if (!UrlHelper::openUrl(url)) {
                 QMessageBox::warning(this, tr("Error"), tr("Failed to open the URL in your web browser."));
             }
         } else {

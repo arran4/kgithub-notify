@@ -27,6 +27,7 @@
 #include "NotificationWindow.h"
 #include "RulesDialog.h"
 #include "SettingsDialog.h"
+#include "utils/UrlHelper.h"
 
 NotificationListWidget::NotificationListWidget(QWidget* parent)
     : QWidget(parent),
@@ -65,10 +66,6 @@ NotificationListWidget::NotificationListWidget(QWidget* parent)
     openWindowAction = new QAction(tr("Open"), this);
     connect(openWindowAction, &QAction::triggered, this, &NotificationListWidget::openWindowCurrentItem);
     contextMenu->addAction(openWindowAction);
-
-    openUrlAction = new QAction(tr("Open URL"), this);
-    connect(openUrlAction, &QAction::triggered, this, &NotificationListWidget::openUrlCurrentItem);
-    contextMenu->addAction(openUrlAction);
 
     copyLinkAction = new QAction(tr("Copy Link"), this);
     connect(copyLinkAction, &QAction::triggered, this, &NotificationListWidget::copyLinkCurrentItem);
@@ -493,7 +490,7 @@ void NotificationListWidget::insertNotificationItem(int row, const Notification&
     connect(widget, &NotificationItemWidget::openClicked, this, [this, item]() { openUrlForItem(item); });
 
     connect(widget, &NotificationItemWidget::childOpenClicked, this,
-            [this](const QString& url) { QDesktopServices::openUrl(QUrl(url)); });
+            [this](const QString& url) { UrlHelper::openUrl(url); });
 
     connect(widget, &NotificationItemWidget::childCopyClicked, this,
             [this](const QString& url) { QApplication::clipboard()->setText(url); });
@@ -842,7 +839,7 @@ void NotificationListWidget::openUrlForItem(QListWidgetItem* item) {
 
     QString htmlUrl = GitHubClient::apiToHtmlUrl(apiUrl, id);
     emit linkActivated(QUrl(htmlUrl));
-    QDesktopServices::openUrl(QUrl(htmlUrl));
+    UrlHelper::openUrl(htmlUrl);
 
     markAsReadAndRemoveItem(item);
 }

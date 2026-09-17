@@ -28,6 +28,7 @@
 
 #include "NewIssueDialog.h"
 #include "utils/FilterParser.h"
+#include "utils/UrlHelper.h"
 
 class RepoAccessor : public FilterDataAccessor {
    public:
@@ -352,7 +353,7 @@ void RepoListWindow::onCustomContextMenuRequested(const QPoint& pos) {
     QAction* selected = menu.exec(m_table->viewport()->mapToGlobal(pos));
 
     if (selected == openAction) {
-        QDesktopServices::openUrl(QUrl(url));
+        UrlHelper::openUrl(url);
     } else if (selected == copyAction) {
         QApplication::clipboard()->setText(url);
     } else if (selected == newIssueAction) {

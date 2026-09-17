@@ -39,6 +39,7 @@
 #include "SettingsDialog.h"
 #include "WorkItemWindow.h"
 #include "trending/TrendingWindow.h"
+#include "utils/UrlHelper.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -618,7 +619,7 @@ void MainWindow::updateTrayMenu() {
             connect(itemAction, &QAction::triggered, [this, url, id]() {
                 if (notificationListWidget) notificationListWidget->requestMarkAsRead(id);
                 QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
-                QDesktopServices::openUrl(QUrl(htmlUrl));
+                UrlHelper::openUrl(htmlUrl);
 
                 if (notificationListWidget) notificationListWidget->focusNotification(id);
             });
@@ -1151,7 +1152,7 @@ void MainWindow::sendNotification(const Notification& n) {
     auto action1 = notification->addAction(tr("Open in GitHub"));
     connect(action1, &KNotificationAction::activated, this, [this, n]() {
         QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+        UrlHelper::openUrl(htmlUrl);
     });
 
     auto action2 = notification->addAction(tr("Open kgithub-notify"));

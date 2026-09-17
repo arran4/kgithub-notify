@@ -21,6 +21,7 @@
 #include <QTextStream>
 #include <QToolBar>
 #include <QUrl>
+#include "utils/UrlHelper.h"
 
 WorkItemWindow::WorkItemWindow(GitHubClient* client, const QString& windowTitle, EndpointType endpointType,
                                const QString& baseQuery, QWidget* parent)
@@ -342,7 +343,7 @@ void WorkItemWindow::openInBrowser() {
     int row = selection.first().row();
     QString url = getHtmlUrlForRow(row);
     if (!url.isEmpty()) {
-        QDesktopServices::openUrl(QUrl(url));
+        UrlHelper::openUrl(url);
     }
 }
 
