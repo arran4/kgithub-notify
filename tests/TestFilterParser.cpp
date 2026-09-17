@@ -157,6 +157,137 @@ class TestFilterParser : public QObject {
         QVERIFY(FilterParser::parse("owner IN \"john-doe, jane-doe\"")->evaluate(accessor) == true);
         QVERIFY(FilterParser::parse("owner IN \"jim-doe, jane-doe\"")->evaluate(accessor) == false);
     }
+
+    void testParseDiagnostics() {
+        // Unterminated quotes
+        {
+            FilterParseResult res = FilterParser::parseWithResult("\"unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+            QVERIFY(res.errorPos >= 0);
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("name:\"unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("'single unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("owner:'single unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+
+        // Unmatched parentheses
+        {
+            FilterParseResult res = FilterParser::parseWithResult("(fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched opening parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false)");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("((fork:false)");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched opening parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("()");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Empty parentheses"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult(")");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+
+        // Incomplete operands
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete AND"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false OR");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete OR"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete NOT"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND NOT");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete NOT"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("owner IN");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete IN"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("AND fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing operand"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("OR fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing operand"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing value for key"));
+        }
+
+        // Unexpected trailing tokens
+        {
+            FilterParseResult res = FilterParser::parseWithResult("(fork:false) )");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+    }
+
+    void testParseWithResultValid() {
+        {
+            FilterParseResult res = FilterParser::parseWithResult("");
+            QVERIFY(res.ok);
+            QVERIFY(res.ast.isNull());
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("   ");
+            QVERIFY(res.ok);
+            QVERIFY(res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND archived:false");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("= fork:false AND archived:false");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT NOT (fork:true OR name:\"test\")");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+    }
 };
 
 QTEST_MAIN(TestFilterParser)

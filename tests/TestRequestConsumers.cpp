@@ -1438,6 +1438,60 @@ class TestRequestConsumers : public QObject {
         QVERIFY(QFile::exists(targetPath));
         QVERIFY(dialog.statusLabel->text().contains("Successfully installed"));
     }
+
+    void testRepoListWindowFilterAtomicity() {
+        GitHubClient client;
+        RepoListWindow repos(&client);
+
+        QJsonObject repo1;
+        repo1["name"] = "alpha";
+        repo1["fork"] = false;
+        repo1["archived"] = false;
+        repo1["owner"] = QJsonObject{{"login", "user1"}};
+
+        QJsonObject repo2;
+        repo2["name"] = "beta";
+        repo2["fork"] = true;
+        repo2["archived"] = false;
+        repo2["owner"] = QJsonObject{{"login", "user1"}};
+
+        QJsonObject repo3;
+        repo3["name"] = "gamma";
+        repo3["fork"] = false;
+        repo3["archived"] = true;
+        repo3["owner"] = QJsonObject{{"login", "user2"}};
+
+        repos.m_allRepos = QJsonArray{repo1, repo2, repo3};
+
+        // Initially filter is "fork:false AND archived:false", so only alpha matches
+        repos.addReposToTable(repos.m_allRepos);
+        QCOMPARE(repos.m_table->rowCount(), 1);
+        QCOMPARE(repos.m_table->item(0, RepoListWindow::ColName)->text(), QString("alpha"));
+
+        // Change filter to "fork:false" -> alpha and gamma match
+        repos.m_filterEdit->setText("fork:false");
+        QCOMPARE(repos.m_table->rowCount(), 2);
+        QVERIFY(repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().isEmpty());
+
+        // Introduce syntax error: incomplete parenthesis -> should keep previous 2 rows untouched!
+        repos.m_filterEdit->setText("fork:false AND (");
+        QCOMPARE(repos.m_table->rowCount(), 2);
+        QVERIFY(!repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().contains("parenthesis", Qt::CaseInsensitive));
+
+        // Another syntax error: unterminated quote -> still keeps 2 rows
+        repos.m_filterEdit->setText("\"unterminated");
+        QCOMPARE(repos.m_table->rowCount(), 2);
+        QVERIFY(!repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().contains("quote", Qt::CaseInsensitive));
+
+        // Restore to empty filter -> shows all 3
+        repos.m_filterEdit->setText("");
+        QCOMPARE(repos.m_table->rowCount(), 3);
+        QVERIFY(repos.m_filterEdit->styleSheet().isEmpty());
+        QVERIFY(repos.m_filterEdit->toolTip().isEmpty());
+    }
 };
 
 QTEST_MAIN(TestRequestConsumers)

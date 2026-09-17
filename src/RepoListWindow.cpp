@@ -145,7 +145,10 @@ void RepoListWindow::setupUI() {
 
     m_filterEdit = new QLineEdit(this);
     m_filterEdit->setPlaceholderText(tr("Filter repositories... e.g. fork:false AND archived:false"));
-    m_filterEdit->setText("fork:false AND archived:false");
+    m_filterEdit->setText(QStringLiteral("fork:false AND archived:false"));
+    m_lastValidFilterText = m_filterEdit->text();
+    FilterParseResult initRes = FilterParser::parseWithResult(m_lastValidFilterText);
+    m_lastValidAst = initRes.ok ? initRes.ast : QSharedPointer<ASTNode>();
 
     connect(m_filterCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
         QString preset = m_filterCombo->itemData(index).toString();
@@ -174,7 +177,45 @@ void RepoListWindow::onRefreshClicked() {
     m_client->fetchUserRepos(QString(), m_refreshRequestId);
 }
 
-void RepoListWindow::onFilterChanged() { addReposToTable(m_allRepos); }
+void RepoListWindow::onFilterChanged() {
+    QString filterQuery = m_filterEdit ? m_filterEdit->text().trimmed() : QString();
+    if (filterQuery.isEmpty()) {
+        m_lastValidFilterText.clear();
+        m_lastValidAst.clear();
+        if (m_filterEdit) {
+            m_filterEdit->setStyleSheet(QString());
+            m_filterEdit->setToolTip(QString());
+        }
+        if (m_statusBar) {
+            m_statusBar->clearMessage();
+        }
+        addReposToTable(m_allRepos);
+        return;
+    }
+
+    FilterParseResult result = FilterParser::parseWithResult(filterQuery);
+    if (!result.ok) {
+        if (m_filterEdit) {
+            m_filterEdit->setStyleSheet(QStringLiteral("QLineEdit { border: 1px solid red; }"));
+            m_filterEdit->setToolTip(result.error);
+        }
+        if (m_statusBar) {
+            m_statusBar->showMessage(tr("Filter error: %1").arg(result.error));
+        }
+        return;
+    }
+
+    if (m_filterEdit) {
+        m_filterEdit->setStyleSheet(QString());
+        m_filterEdit->setToolTip(QString());
+    }
+    if (m_statusBar) {
+        m_statusBar->clearMessage();
+    }
+    m_lastValidAst = result.ast;
+    m_lastValidFilterText = filterQuery;
+    addReposToTable(m_allRepos);
+}
 
 void RepoListWindow::onExportClicked() {
     QString fileName = QFileDialog::getSaveFileName(this, tr("Export Repositories"),
@@ -236,11 +277,7 @@ void RepoListWindow::addReposToTable(const QJsonArray& repos) {
     m_table->setSortingEnabled(false);
     m_table->setRowCount(0);  // clear rows
 
-    QString filterQuery = m_filterEdit ? m_filterEdit->text().trimmed() : "";
-    QSharedPointer<ASTNode> ast;
-    if (!filterQuery.isEmpty()) {
-        ast = FilterParser::parse(filterQuery);
-    }
+    QSharedPointer<ASTNode> ast = m_lastValidAst;
 
     int row = 0;
     for (int i = 0; i < repos.size(); ++i) {
@@ -394,8 +431,8 @@ void RepoListWindow::loadCache() {
             }
 
             if (obj.contains("repos") && obj["repos"].isArray()) {
-                QJsonArray repos = obj["repos"].toArray();
-                addReposToTable(repos);
+                m_allRepos = obj["repos"].toArray();
+                addReposToTable(m_allRepos);
             }
         }
     }

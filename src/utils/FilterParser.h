@@ -100,8 +100,16 @@ class KeywordNode : public ASTNode {
     QString m_keyword;
 };
 
+struct FilterParseResult {
+    bool ok = false;
+    QSharedPointer<ASTNode> ast;
+    QString error;
+    int errorPos = -1;
+};
+
 class FilterParser {
    public:
+    static FilterParseResult parseWithResult(const QString& query);
     static QSharedPointer<ASTNode> parse(const QString& query);
 };
 
