@@ -999,8 +999,6 @@ void MainWindow::setupMenus() {
         {tr("My repos"), "my_repos", "user:@me archived:false", "user:@me archived:false", "user:@me archived:false"},
         {tr("My forks"), "my_forks", "user:@me fork:true archived:false", "user:@me fork:true archived:false",
          "user:@me fork:true archived:false"},
-        {tr("Repos I have admin access to"), "admin_access", "user:@me archived:false", "user:@me archived:false",
-         "user:@me archived:false"},
         {tr("Archived"), "archived", "archived:true involves:@me", "archived:true involves:@me",
          "archived:true user:@me"},
         {tr("All (Unfiltered)"), "unfiltered", "involves:@me", "involves:@me", "user:@me"}};
