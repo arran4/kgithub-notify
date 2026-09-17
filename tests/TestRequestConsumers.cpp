@@ -1492,6 +1492,61 @@ class TestRequestConsumers : public QObject {
         QVERIFY(repos.m_filterEdit->styleSheet().isEmpty());
         QVERIFY(repos.m_filterEdit->toolTip().isEmpty());
     }
+
+    void testMainWindowAuthIncidentLifecycle() {
+        GitHubClient client;
+        auto* network = installNetwork(client);
+        MainWindow window;
+        prepareMain(window, client);
+
+        QVERIFY(!window.m_authIncident.inIncident());
+
+        // First refresh fails with 401
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 1);
+        network->requests[0].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Bad credentials", 401);
+
+        QVERIFY(window.m_authIncident.inIncident());
+        QCOMPARE(window.m_authIncident.latestReason(), QString("Invalid Token"));
+        // Incident has been recorded and notification triggered (willNotify is now false)
+        QVERIFY(!window.m_authIncident.willNotify());
+
+        // Second refresh fails with 401 (e.g. after editing token but token is still bad)
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 2);
+        network->requests[1].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Still bad credentials", 401);
+
+        QVERIFY(window.m_authIncident.inIncident());
+        QCOMPARE(window.m_authIncident.latestReason(), QString("Invalid Token"));
+        // No duplicate notification
+        QVERIFY(!window.m_authIncident.willNotify());
+
+        // Network error occurs on third refresh
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 3);
+        network->requests[2].reply->completeWithError(QNetworkReply::HostNotFoundError, "Host not found", 0);
+
+        // Network error does not clear incident
+        QVERIFY(window.m_authIncident.inIncident());
+        QCOMPARE(window.m_authIncident.latestReason(), QString("Invalid Token"));
+
+        // Fourth refresh succeeds!
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 4);
+        network->requests[3].reply->complete("[]");
+
+        // Incident is cleared
+        QVERIFY(!window.m_authIncident.inIncident());
+        QVERIFY(window.m_authIncident.latestReason().isEmpty());
+
+        // Fifth refresh fails with 401: new incident begins and will notify
+        window.onRefreshClicked();
+        QCOMPARE(network->requests.size(), 5);
+        network->requests[4].reply->completeWithError(QNetworkReply::AuthenticationRequiredError, "Token expired", 401);
+
+        QVERIFY(window.m_authIncident.inIncident());
+        QCOMPARE(window.m_authIncident.latestReason(), QString("Invalid Token"));
+    }
 };
 
 QTEST_MAIN(TestRequestConsumers)
