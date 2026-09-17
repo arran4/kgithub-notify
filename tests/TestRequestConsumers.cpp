@@ -1421,6 +1421,23 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(repoCombo->currentIndex(), 0);
         QCOMPARE(repoCombo->currentText(), QString("All Repositories"));
     }
+
+    void testInstallNotifyRcIdempotence() {
+        SettingsDialog dialog;
+        dialog.installNotifyRc();
+
+        QString targetDir =
+            QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/knotifications6");
+        QString targetPath = targetDir + QStringLiteral("/kgithub-notify.notifyrc");
+
+        QVERIFY(QFile::exists(targetPath));
+        QVERIFY(dialog.statusLabel->text().contains("Successfully installed"));
+
+        // Repeated installation should succeed cleanly
+        dialog.installNotifyRc();
+        QVERIFY(QFile::exists(targetPath));
+        QVERIFY(dialog.statusLabel->text().contains("Successfully installed"));
+    }
 };
 
 QTEST_MAIN(TestRequestConsumers)

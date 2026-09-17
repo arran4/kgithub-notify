@@ -398,9 +398,11 @@ void MainWindow::dismissAllNotifications() {
 void MainWindow::onTokenLoaded() {
     WalletResult result = tokenWatcher->result();
     if (!result.success) {
-        KNotification* notification = new KNotification("authError");
-        notification->setTitle("GitHub Notification Error");
-        notification->setText("Failed to load KWallet token: " + result.errorMessage);
+        KNotification* notification = new KNotification(QStringLiteral("AuthError"));
+        notification->setComponentName(QStringLiteral("kgithub-notify"));
+        notification->setTitle(tr("GitHub Notification Error"));
+        notification->setText(tr("Failed to load KWallet token: %1").arg(result.errorMessage));
+        connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
         notification->sendEvent();
         m_loadedToken = QString();
     } else {
@@ -548,12 +550,6 @@ void MainWindow::openKdeNotificationSettings() {
     bool launched = QProcess::startDetached(QStringLiteral("systemsettings"), {QStringLiteral("kcm_notifications")});
     if (!launched)
         launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
 
     if (!launched) {
         showTrayMessage(tr("Notification settings unavailable"),
