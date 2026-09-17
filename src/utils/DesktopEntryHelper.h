@@ -17,6 +17,18 @@ struct DesktopEntryDiagnosis {
 
 class DesktopEntryHelper {
    public:
+    // Layer 1: Exec command-line argument quoting & escaping
+    static QString formatExecArgument(const QString& arg);
+
+    // Layer 2: Desktop Entry string-value escaping
+    static QString serializeStringValue(const QString& execCommandLine);
+
+    // Layer 2 inverse: Desktop Entry string-value unescaping
+    static QString deserializeStringValue(const QString& serializedString);
+
+    // Layer 1 inverse: Exec command-line first argument parsing
+    static QString parseExecFirstArgument(const QString& commandLine);
+
     static QString escapeExec(const QString& executablePath, bool background = false);
     static QString unquoteExec(const QString& execLine);
 

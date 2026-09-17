@@ -13,6 +13,7 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
 find_package(KF6Wallet REQUIRED)
 find_package(KF6Notifications REQUIRED)
+find_package(KF6Config REQUIRED)
 
 enable_testing()
 
@@ -58,6 +59,7 @@ target_link_libraries(TestDesktopEntryHelper
     Qt6::Test
     Qt6::Core
     Qt6::Gui
+    KF6::ConfigCore
 )
 add_test(NAME TestDesktopEntryHelper COMMAND TestDesktopEntryHelper)
 set_tests_properties(TestDesktopEntryHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

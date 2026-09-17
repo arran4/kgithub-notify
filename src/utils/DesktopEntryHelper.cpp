@@ -5,38 +5,27 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <algorithm>
 
-QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool background) {
-    if (executablePath.isEmpty()) {
-        return background ? QStringLiteral("--background") : QString();
-    }
-
-    bool needsQuotes = std::any_of(executablePath.begin(), executablePath.end(), [](const QChar& c) {
-        return c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') || c == QChar('>') ||
-               c == QChar('<') || c == QChar('&') || c == QChar(';') || c == QChar('|') || c == QChar('$') ||
-               c == QChar('*') || c == QChar('?') || c == QChar('!') || c == QChar('`') || c == QChar('~') ||
-               c == QChar('#') || c == QChar('(') || c == QChar(')');
-    });
+QString DesktopEntryHelper::formatExecArgument(const QString& arg) {
+    bool needsQuotes = arg.isEmpty() || std::any_of(arg.begin(), arg.end(), [](const QChar& c) {
+                           return c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') ||
+                                  c == QChar('>') || c == QChar('<') || c == QChar('~') || c == QChar('|') ||
+                                  c == QChar('&') || c == QChar(';') || c == QChar('$') || c == QChar('*') ||
+                                  c == QChar('?') || c == QChar('#') || c == QChar('(') || c == QChar(')') ||
+                                  c == QChar('`');
+                       });
 
     QString result;
     if (needsQuotes) {
         result.append(QChar('"'));
-        for (const QChar& c : executablePath) {
-            if (c == QChar('"')) {
+        for (const QChar& c : arg) {
+            if (c == QChar('"') || c == QChar('`') || c == QChar('$') || c == QChar('\\')) {
                 result.append(QChar('\\'));
-                result.append(QChar('"'));
-            } else if (c == QChar('\\')) {
-                result.append(QChar('\\'));
-                result.append(QChar('\\'));
-            } else if (c == QChar('$')) {
-                result.append(QChar('\\'));
-                result.append(QChar('$'));
-            } else if (c == QChar('`')) {
-                result.append(QChar('\\'));
-                result.append(QChar('`'));
+                result.append(c);
             } else if (c == QChar('%')) {
                 result.append(QStringLiteral("%%"));
             } else {
@@ -45,7 +34,7 @@ QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool backg
         }
         result.append(QChar('"'));
     } else {
-        for (const QChar& c : executablePath) {
+        for (const QChar& c : arg) {
             if (c == QChar('%')) {
                 result.append(QStringLiteral("%%"));
             } else {
@@ -53,59 +42,131 @@ QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool backg
             }
         }
     }
+    return result;
+}
 
-    if (background) {
-        result.append(QStringLiteral(" --background"));
+QString DesktopEntryHelper::serializeStringValue(const QString& execCommandLine) {
+    QString result;
+    result.reserve(execCommandLine.size());
+    for (const QChar& c : execCommandLine) {
+        if (c == QChar('\\')) {
+            result.append(QStringLiteral("\\\\"));
+        } else if (c == QChar('\t')) {
+            result.append(QStringLiteral("\\t"));
+        } else if (c == QChar('\n')) {
+            result.append(QStringLiteral("\\n"));
+        } else if (c == QChar('\r')) {
+            result.append(QStringLiteral("\\r"));
+        } else {
+            result.append(c);
+        }
+    }
+    return result;
+}
+
+QString DesktopEntryHelper::deserializeStringValue(const QString& serializedString) {
+    QString result;
+    result.reserve(serializedString.size());
+    int len = serializedString.length();
+    int i = 0;
+    while (i < len) {
+        QChar c = serializedString.at(i);
+        if (c == QChar('\\') && i + 1 < len) {
+            QChar next = serializedString.at(i + 1);
+            if (next == QChar('s')) {
+                result.append(QChar(' '));
+                i += 2;
+            } else if (next == QChar('n')) {
+                result.append(QChar('\n'));
+                i += 2;
+            } else if (next == QChar('t')) {
+                result.append(QChar('\t'));
+                i += 2;
+            } else if (next == QChar('r')) {
+                result.append(QChar('\r'));
+                i += 2;
+            } else if (next == QChar('\\')) {
+                result.append(QChar('\\'));
+                i += 2;
+            } else {
+                // Preserve backslash and next char for Exec layer
+                result.append(c);
+                result.append(next);
+                i += 2;
+            }
+        } else {
+            result.append(c);
+            i++;
+        }
+    }
+    return result;
+}
+
+QString DesktopEntryHelper::parseExecFirstArgument(const QString& commandLine) {
+    QString trimmed = commandLine.trimmed();
+    if (trimmed.isEmpty()) return QString();
+
+    QString result;
+    if (trimmed.startsWith(QChar('"'))) {
+        int i = 1;
+        int len = trimmed.length();
+        while (i < len) {
+            QChar c = trimmed.at(i);
+            if (c == QChar('\\') && i + 1 < len) {
+                result.append(trimmed.at(i + 1));
+                i += 2;
+            } else if (c == QChar('"')) {
+                break;
+            } else if (c == QChar('%') && i + 1 < len && trimmed.at(i + 1) == QChar('%')) {
+                result.append(QChar('%'));
+                i += 2;
+            } else {
+                result.append(c);
+                i++;
+            }
+        }
+    } else {
+        int i = 0;
+        int len = trimmed.length();
+        while (i < len) {
+            QChar c = trimmed.at(i);
+            if (c.isSpace()) {
+                break;
+            }
+            if (c == QChar('\\') && i + 1 < len) {
+                result.append(trimmed.at(i + 1));
+                i += 2;
+            } else if (c == QChar('%') && i + 1 < len && trimmed.at(i + 1) == QChar('%')) {
+                result.append(QChar('%'));
+                i += 2;
+            } else {
+                result.append(c);
+                i++;
+            }
+        }
+    }
+    return result;
+}
+
+QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool background) {
+    if (executablePath.isEmpty()) {
+        return background ? QStringLiteral("--background") : QString();
     }
 
-    return result;
+    QString execCmd = formatExecArgument(executablePath);
+    if (background) {
+        execCmd.append(QStringLiteral(" --background"));
+    }
+
+    return serializeStringValue(execCmd);
 }
 
 QString DesktopEntryHelper::unquoteExec(const QString& execLine) {
     QString trimmed = execLine.trimmed();
     if (trimmed.isEmpty()) return QString();
 
-    QString result;
-    if (trimmed.startsWith(QChar('"'))) {
-        int i = 1;
-        bool escaping = false;
-        while (i < trimmed.length()) {
-            QChar c = trimmed.at(i);
-            if (escaping) {
-                result.append(c);
-                escaping = false;
-            } else if (c == QChar('\\')) {
-                escaping = true;
-            } else if (c == QChar('"')) {
-                break;
-            } else if (c == QChar('%') && i + 1 < trimmed.length() && trimmed.at(i + 1) == QChar('%')) {
-                result.append(QChar('%'));
-                i++;
-            } else {
-                result.append(c);
-            }
-            i++;
-        }
-    } else {
-        int spaceIdx = -1;
-        for (int i = 0; i < trimmed.length(); ++i) {
-            if (trimmed.at(i).isSpace()) {
-                spaceIdx = i;
-                break;
-            }
-        }
-        QString firstToken = (spaceIdx == -1) ? trimmed : trimmed.left(spaceIdx);
-        for (int i = 0; i < firstToken.length(); ++i) {
-            if (firstToken.at(i) == QChar('%') && i + 1 < firstToken.length() && firstToken.at(i + 1) == QChar('%')) {
-                result.append(QChar('%'));
-                i++;
-            } else {
-                result.append(firstToken.at(i));
-            }
-        }
-    }
-
-    return result;
+    QString inMemoryCommandLine = deserializeStringValue(trimmed);
+    return parseExecFirstArgument(inMemoryCommandLine);
 }
 
 DesktopEntryDiagnosis DesktopEntryHelper::diagnose(const QString& desktopFileName, const QStringList& searchDirs,
@@ -261,33 +322,22 @@ bool DesktopEntryHelper::registerDesktopEntry(const QString& targetDir, bool ove
         }
     }
 
-    QString tempPath = targetPath + QStringLiteral(".tmp.%1").arg(QCoreApplication::applicationPid());
-    QFile tempFile(tempPath);
-    if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (error) *error = QStringLiteral("Failed to open temporary file for writing: %1").arg(tempFile.errorString());
+    QSaveFile file(targetPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (error) *error = QStringLiteral("Failed to open file for writing: %1").arg(file.errorString());
         return false;
     }
 
     QByteArray utf8 = content.toUtf8();
-    if (tempFile.write(utf8) != utf8.size()) {
-        tempFile.close();
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to write desktop entry content completely");
-        return false;
-    }
-    tempFile.close();
-
-    QFile::setPermissions(tempPath, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
-
-    if (QFile::exists(targetPath) && !QFile::remove(targetPath)) {
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to replace existing desktop entry: %1").arg(targetPath);
+    if (file.write(utf8) != utf8.size()) {
+        file.cancelWriting();
+        if (error)
+            *error = QStringLiteral("Failed to write desktop entry content completely: %1").arg(file.errorString());
         return false;
     }
 
-    if (!QFile::rename(tempPath, targetPath)) {
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to move temporary file to: %1").arg(targetPath);
+    if (!file.commit()) {
+        if (error) *error = QStringLiteral("Failed to commit desktop entry file: %1").arg(file.errorString());
         return false;
     }
 
@@ -332,31 +382,21 @@ bool DesktopEntryHelper::writeAutostartEntry(bool enable, bool background, const
     out << "Terminal=false\n";
     out << "X-KDE-autostart-after=panel\n";
 
-    QString tempPath = targetPath + QStringLiteral(".tmp.%1").arg(QCoreApplication::applicationPid());
-    QFile tempFile(tempPath);
-    if (!tempFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (error) *error = QStringLiteral("Failed to open temporary autostart file: %1").arg(tempFile.errorString());
+    QSaveFile file(targetPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (error) *error = QStringLiteral("Failed to open autostart file for writing: %1").arg(file.errorString());
         return false;
     }
 
     QByteArray utf8 = content.toUtf8();
-    if (tempFile.write(utf8) != utf8.size()) {
-        tempFile.close();
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to write autostart content completely");
-        return false;
-    }
-    tempFile.close();
-
-    if (QFile::exists(targetPath) && !QFile::remove(targetPath)) {
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to replace existing autostart entry: %1").arg(targetPath);
+    if (file.write(utf8) != utf8.size()) {
+        file.cancelWriting();
+        if (error) *error = QStringLiteral("Failed to write autostart content completely: %1").arg(file.errorString());
         return false;
     }
 
-    if (!QFile::rename(tempPath, targetPath)) {
-        QFile::remove(tempPath);
-        if (error) *error = QStringLiteral("Failed to move temporary file to autostart target: %1").arg(targetPath);
+    if (!file.commit()) {
+        if (error) *error = QStringLiteral("Failed to commit autostart file: %1").arg(file.errorString());
         return false;
     }
 

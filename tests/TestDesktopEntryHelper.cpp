@@ -1,6 +1,10 @@
+#include <KConfigGroup>
+#include <KDesktopFile>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QtTest>
@@ -11,54 +15,255 @@ class TestDesktopEntryHelper : public QObject {
     Q_OBJECT
    private slots:
     void testEscapeExecNormal() {
-        QString exec = "/usr/bin/kgithub-notify";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("/usr/bin/kgithub-notify"));
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, true), QString("/usr/bin/kgithub-notify --background"));
+        QString exec = QStringLiteral("/usr/bin/kgithub-notify");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QStringLiteral("/usr/bin/kgithub-notify"));
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, true), QStringLiteral("/usr/bin/kgithub-notify --background"));
+        QCOMPARE(DesktopEntryHelper::unquoteExec(QStringLiteral("/usr/bin/kgithub-notify")), exec);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(QStringLiteral("/usr/bin/kgithub-notify --background")), exec);
     }
 
     void testEscapeExecSpaces() {
-        QString exec = "/opt/my apps/kgithub-notify";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("\"/opt/my apps/kgithub-notify\""));
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, true), QString("\"/opt/my apps/kgithub-notify\" --background"));
+        QString exec = QStringLiteral("/opt/my apps/kgithub-notify");
+        QString expectedNoBg = QString::fromUtf8(R"("/opt/my apps/kgithub-notify")");
+        QString expectedBg = QString::fromUtf8(R"("/opt/my apps/kgithub-notify" --background)");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expectedNoBg);
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, true), expectedBg);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expectedNoBg), exec);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expectedBg), exec);
     }
 
     void testEscapeExecQuotes() {
-        QString exec = "/opt/\"quoted\"/app";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("\"/opt/\\\"quoted\\\"/app\""));
+        QString exec = QString::fromUtf8(R"(/opt/"quoted"/app)");
+        // Layer 1: quotes argument, escapes " as \" -> "/opt/\"quoted\"/app"
+        // Layer 2: escapes \ as \\ -> "/opt/\\"quoted\\"/app"
+        QString expected = QString::fromUtf8(R"("/opt/\\"quoted\\"/app")");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expected);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expected), exec);
     }
 
     void testEscapeExecBackslashes() {
-        QString exec = "/opt\\path\\app";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("\"/opt\\\\path\\\\app\""));
+        QString exec = QString::fromUtf8(R"(/opt\path\app)");
+        // Layer 1: quotes argument, escapes \ as \\ -> "/opt\\path\\app" (2 backslashes each)
+        // Layer 2: escapes each \ as \\ -> "/opt\\\\path\\\\app" (4 backslashes each)
+        QString expected = QString::fromUtf8(R"("/opt\\\\path\\\\app")");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expected);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expected), exec);
     }
 
     void testEscapeExecDollar() {
-        QString exec = "/opt/$HOME/app";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("\"/opt/\\$HOME/app\""));
+        QString exec = QString::fromUtf8(R"(/opt/$HOME/app)");
+        // Layer 1: quotes argument, escapes $ as \$ -> "/opt/\$HOME/app"
+        // Layer 2: escapes \ as \\ -> "/opt/\\$HOME/app"
+        QString expected = QString::fromUtf8(R"("/opt/\\$HOME/app")");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expected);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expected), exec);
     }
 
     void testEscapeExecBackticks() {
-        QString exec = "/opt/`cmd`/app";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("\"/opt/\\`cmd\\`/app\""));
+        QString exec = QString::fromUtf8(R"(/opt/`cmd`/app)");
+        // Layer 1: quotes argument, escapes ` as \` -> "/opt/\`cmd\`/app"
+        // Layer 2: escapes \ as \\ -> "/opt/\\`cmd\\`/app"
+        QString expected = QString::fromUtf8(R"("/opt/\\`cmd\\`/app")");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expected);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expected), exec);
     }
 
     void testEscapeExecLiteralPercent() {
-        QString exec = "/opt/%20/app";
-        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), QString("/opt/%%20/app"));
+        QString exec = QStringLiteral("/opt/%20/app");
+        // Layer 1: % -> %% (no quoting needed)
+        // Layer 2: no backslashes
+        QString expected = QStringLiteral("/opt/%%20/app");
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expected);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expected), exec);
     }
 
     void testEscapeExecComplexCombination() {
-        QString exec = "/opt/my apps/%20/\"test\"/$var/`run`/bin";
-        QString escaped = DesktopEntryHelper::escapeExec(exec, true);
-        QVERIFY(escaped.startsWith('"'));
-        QVERIFY(escaped.contains("%%20"));
-        QVERIFY(escaped.contains("\\\"test\\\""));
-        QVERIFY(escaped.contains("\\$var"));
-        QVERIFY(escaped.contains("\\`run\\`"));
-        QVERIFY(escaped.endsWith("\" --background"));
+        QString exec = QString::fromUtf8(R"RAW(/opt/my apps/%20/"test"/$var/`run`/bin\dir)RAW");
+        // Layer 1: quotes argument, escapes ", $, `, \, %
+        // Layer 2: escapes backslash as double-backslash
+        QString expectedBg =
+            QString::fromUtf8(R"RAW("/opt/my apps/%%20/\\"test\\"/\\$var/\\`run\\`/bin\\\\dir" --background)RAW");
+        QString expectedNoBg = QString::fromUtf8(R"RAW("/opt/my apps/%%20/\\"test\\"/\\$var/\\`run\\`/bin\\\\dir")RAW");
 
-        QString unquoted = DesktopEntryHelper::unquoteExec(escaped);
-        QCOMPARE(unquoted, exec);
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, true), expectedBg);
+        QCOMPARE(DesktopEntryHelper::escapeExec(exec, false), expectedNoBg);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expectedBg), exec);
+        QCOMPARE(DesktopEntryHelper::unquoteExec(expectedNoBg), exec);
+    }
+
+    void testEscapeExecAllReservedCharacters() {
+        struct TestCase {
+            QString input;
+            bool mustBeQuoted;
+            QString mustContain;
+        };
+
+        QList<TestCase> cases = {
+            {QStringLiteral("/usr/bin/app with space"), true, QStringLiteral("with space")},
+            {QStringLiteral("/usr/bin/app\twith\ttab"), true, QString::fromUtf8(R"(with\ttab)")},
+            {QString::fromUtf8(R"RAW(/usr/bin/app"with"quotes)RAW"), true, QString::fromUtf8(R"RAW(\\"with\\")RAW")},
+            {QStringLiteral("/usr/bin/app'with'single"), true, QStringLiteral("'with'single")},
+            {QString::fromUtf8(R"RAW(/usr/bin/app\with\backslash)RAW"), true,
+             QString::fromUtf8(R"RAW(\\\\with\\\\)RAW")},
+            {QString::fromUtf8(R"RAW(/usr/bin/app`with`backtick)RAW"), true, QString::fromUtf8(R"RAW(\\`)RAW")},
+            {QString::fromUtf8(R"RAW(/usr/bin/app$with$dollar)RAW"), true, QString::fromUtf8(R"RAW(\\$with\\$)RAW")},
+            {QStringLiteral("/usr/bin/app%20with%percent"), false, QStringLiteral("%%20with%%percent")},
+            {QStringLiteral("/usr/bin/app~with~tilde"), true, QStringLiteral("~with~tilde")},
+            {QStringLiteral("/usr/bin/app#with#hash"), true, QStringLiteral("#with#hash")},
+            {QStringLiteral("/usr/bin/app(with)parens"), true, QStringLiteral("(with)parens")},
+        };
+
+        for (const auto& tc : cases) {
+            QString escaped = DesktopEntryHelper::escapeExec(tc.input, false);
+            if (tc.mustBeQuoted) {
+                QVERIFY2(escaped.startsWith('"') && escaped.endsWith('"'),
+                         qPrintable(QStringLiteral("Expected quotes for %1, got %2").arg(tc.input, escaped)));
+            }
+            QVERIFY2(escaped.contains(tc.mustContain),
+                     qPrintable(QStringLiteral("Expected %1 to contain %2").arg(escaped, tc.mustContain)));
+
+            QString roundTrip = DesktopEntryHelper::unquoteExec(escaped);
+            QCOMPARE(roundTrip, tc.input);
+        }
+    }
+
+    void testKDesktopFileIntegration() {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+
+        QStringList testPaths = {
+            QStringLiteral("/usr/bin/simple-app"),
+            QStringLiteral("/opt/my apps/space-app"),
+            QString::fromUtf8(R"(/opt/"quoted"/app)"),
+            QString::fromUtf8(R"(/opt\path\app)"),
+            QString::fromUtf8(R"(/opt/$HOME/app)"),
+            QString::fromUtf8(R"(/opt/`cmd`/app)"),
+            QStringLiteral("/opt/%20/app"),
+            QString::fromUtf8(R"(/opt/my apps/%20/"test"/$var/`run`/bin\dir)"),
+        };
+
+        for (int i = 0; i < testPaths.size(); ++i) {
+            const QString& path = testPaths.at(i);
+            QString desktopFilePath = tempDir.path() + QStringLiteral("/integration_%1.desktop").arg(i);
+
+            QString escapedExec = DesktopEntryHelper::escapeExec(path, true);
+
+            QFile file(desktopFilePath);
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=TestApp\n";
+            out << "Exec=" << escapedExec << "\n";
+            file.close();
+
+            // 1. Verify KDE's KDesktopFile correctly parses the desktop entry string layer
+            KDesktopFile df(desktopFilePath);
+            QVERIFY(df.desktopGroup().exists());
+            QString kExec = df.desktopGroup().readEntry("Exec");
+
+            // KDesktopFile decodes the Desktop Entry string value escaping layer (Layer 2)
+            QString expectedLayer1CommandLine = DesktopEntryHelper::deserializeStringValue(escapedExec);
+            QCOMPARE(kExec, expectedLayer1CommandLine);
+
+            // 2. Verify DesktopEntryHelper::parseExecFirstArgument correctly decodes Layer 1
+            QString parsedExecutable = DesktopEntryHelper::parseExecFirstArgument(kExec);
+            QCOMPARE(parsedExecutable, path);
+
+            // 3. Verify DesktopEntryHelper::unquoteExec also inverts both layers from raw file line
+            QString unquotedDirect = DesktopEntryHelper::unquoteExec(escapedExec);
+            QCOMPARE(unquotedDirect, path);
+        }
+    }
+
+    void testManuallyAuthoredDesktopEntries() {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+
+        // Create a real mock binary in tempDir so QFileInfo::exists() is true
+        QString dummyBinary = tempDir.path() + QStringLiteral("/my-app");
+        {
+            QFile bin(dummyBinary);
+            QVERIFY(bin.open(QIODevice::WriteOnly));
+            bin.write("#!/bin/sh\nexit 0\n");
+            bin.close();
+            bin.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        }
+
+        // 1. Manually authored with standard unquoted Exec and field codes
+        {
+            QString dfPath = tempDir.path() + QStringLiteral("/manual1.desktop");
+            QFile file(dfPath);
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=Manual1\n";
+            out << "Exec=" << dummyBinary << " %u %F\n";
+            file.close();
+
+            DesktopEntryDiagnosis diag =
+                DesktopEntryHelper::diagnose(QStringLiteral("manual1.desktop"), {tempDir.path()}, dummyBinary);
+            QCOMPARE(diag.status, DesktopEntryStatus::ValidUsable);
+            QVERIFY(diag.isUsable);
+            QCOMPARE(diag.currentExecInEntry, dummyBinary);
+        }
+
+        // 2. Manually authored with spec-compliant 4-backslash serialization
+        {
+            QString dfPath = tempDir.path() + QStringLiteral("/manual2.desktop");
+            QFile file(dfPath);
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=Manual2\n";
+            // Raw text: Exec="/custom\\\\path\\\\binary" --flag
+            out << "Exec=\"/custom\\\\\\\\path\\\\\\\\binary\" --flag\n";
+            file.close();
+
+            DesktopEntryDiagnosis diag =
+                DesktopEntryHelper::diagnose(QStringLiteral("manual2.desktop"), {tempDir.path()});
+            // Binary doesn't exist on disk, so PresentUnusable
+            QCOMPARE(diag.status, DesktopEntryStatus::PresentUnusable);
+            QCOMPARE(diag.currentExecInEntry, QString::fromUtf8(R"(/custom\path\binary)"));
+        }
+
+        // 3. Manually authored with spec-compliant \\$ and \\` and \\"
+        {
+            QString dfPath = tempDir.path() + QStringLiteral("/manual3.desktop");
+            QFile file(dfPath);
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=Manual3\n";
+            out << "Exec=\"/custom/\\\\$HOME/\\\\`bin\\\\`/\\\\\"app\\\\\"\"\n";
+            file.close();
+
+            DesktopEntryDiagnosis diag =
+                DesktopEntryHelper::diagnose(QStringLiteral("manual3.desktop"), {tempDir.path()});
+            QCOMPARE(diag.status, DesktopEntryStatus::PresentUnusable);
+            QCOMPARE(diag.currentExecInEntry, QString::fromUtf8(R"(/custom/$HOME/`bin`/"app")"));
+        }
+
+        // 4. Manually authored unquoted Exec with escaped space and percent
+        {
+            QString dfPath = tempDir.path() + QStringLiteral("/manual4.desktop");
+            QFile file(dfPath);
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream out(&file);
+            out << "[Desktop Entry]\n";
+            out << "Type=Application\n";
+            out << "Name=Manual4\n";
+            out << "Exec=/usr/bin/app\\ with\\ spaces%%20 --option\n";
+            file.close();
+
+            DesktopEntryDiagnosis diag =
+                DesktopEntryHelper::diagnose(QStringLiteral("manual4.desktop"), {tempDir.path()});
+            QCOMPARE(diag.status, DesktopEntryStatus::PresentUnusable);
+            QCOMPARE(diag.currentExecInEntry, QStringLiteral("/usr/bin/app with spaces%20"));
+        }
     }
 
     void testDiagnosisMissing() {
@@ -160,41 +365,6 @@ class TestDesktopEntryHelper : public QObject {
         QVERIFY(ok);
         QVERIFY(!DesktopEntryHelper::isAutostartEnabled(tempDir.path()));
         QVERIFY(!QFile::exists(autostartFile));
-    }
-
-    void testEscapeExecAllReservedCharacters() {
-        struct TestCase {
-            QString input;
-            bool mustBeQuoted;
-            QString mustContain;
-        };
-
-        QList<TestCase> cases = {
-            {"/usr/bin/app with space", true, "with space"},
-            {"/usr/bin/app\twith\ttab", true, "with\ttab"},
-            {"/usr/bin/app\"with\"quotes", true, "\\\"with\\\""},
-            {"/usr/bin/app'with'single", true, "'with'single"},
-            {"/usr/bin/app\\with\\backslash", true, "\\\\with\\\\"},
-            {"/usr/bin/app`with`backtick", true, "\\`with\\`"},
-            {"/usr/bin/app$with$dollar", true, "\\$with\\$"},
-            {"/usr/bin/app%20with%percent", false, "%%20with%%percent"},
-            {"/usr/bin/app~with~tilde", true, "~with~tilde"},
-            {"/usr/bin/app#with#hash", true, "#with#hash"},
-            {"/usr/bin/app(with)parens", true, "(with)parens"},
-        };
-
-        for (const auto& tc : cases) {
-            QString escaped = DesktopEntryHelper::escapeExec(tc.input, false);
-            if (tc.mustBeQuoted) {
-                QVERIFY2(escaped.startsWith('"') && escaped.endsWith('"'),
-                         qPrintable(QString("Expected quotes for %1, got %2").arg(tc.input, escaped)));
-            }
-            QVERIFY2(escaped.contains(tc.mustContain),
-                     qPrintable(QString("Expected %1 to contain %2").arg(escaped, tc.mustContain)));
-
-            QString roundTrip = DesktopEntryHelper::unquoteExec(escaped);
-            QCOMPARE(roundTrip, tc.input);
-        }
     }
 
     void testRegistrationMissingCreatesEntry() {
