@@ -10,6 +10,7 @@
 #include <QStandardPaths>
 #include <QUrl>
 #include <QVBoxLayout>
+
 #include "utils/UrlHelper.h"
 
 NewIssueDialog::NewIssueDialog(GitHubClient* client, QWidget* parent)

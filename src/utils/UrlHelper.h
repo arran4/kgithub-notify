@@ -6,7 +6,7 @@
 #include <QUrl>
 
 class UrlHelper {
-public:
+   public:
     static bool isSafeWebUrl(const QUrl& url) {
         if (!url.isValid() || url.isEmpty()) {
             return false;

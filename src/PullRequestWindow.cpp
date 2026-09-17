@@ -14,6 +14,7 @@
 #include <QStatusBar>
 #include <QTextEdit>
 #include <QUrl>
+
 #include "utils/UrlHelper.h"
 
 class CommentWidget : public QWidget {

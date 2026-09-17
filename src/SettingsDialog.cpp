@@ -232,11 +232,8 @@ void SettingsDialog::saveSettings() {
 
 void SettingsDialog::updateAutostartEntry() {
     QString error;
-    bool ok = DesktopEntryHelper::writeAutostartEntry(
-        autostartCheckBox->isChecked(),
-        startMinimizedCheckBox->isChecked(),
-        QString(),
-        &error);
+    bool ok = DesktopEntryHelper::writeAutostartEntry(autostartCheckBox->isChecked(),
+                                                      startMinimizedCheckBox->isChecked(), QString(), &error);
     if (!ok && !error.isEmpty()) {
         statusLabel->setText(error);
         statusLabel->setStyleSheet(QStringLiteral("color: red;"));
@@ -244,9 +241,7 @@ void SettingsDialog::updateAutostartEntry() {
     }
 }
 
-bool SettingsDialog::isAutostartEnabled() {
-    return DesktopEntryHelper::isAutostartEnabled();
-}
+bool SettingsDialog::isAutostartEnabled() { return DesktopEntryHelper::isAutostartEnabled(); }
 
 QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
@@ -323,7 +318,8 @@ void SettingsDialog::onTestClicked() {
 }
 
 void SettingsDialog::installNotifyRc() {
-    QString targetDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/knotifications6");
+    QString targetDir =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/knotifications6");
     QDir dir;
     if (!dir.mkpath(targetDir)) {
         statusLabel->setText(tr("Failed to create knotifications6 directory: %1").arg(targetDir));
