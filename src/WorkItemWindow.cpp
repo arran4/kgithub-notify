@@ -30,8 +30,7 @@
 
 // 3. Constructor / Destructor
 WorkItemWindow::WorkItemWindow(GitHubClient* client, const QString& windowTitle, EndpointType endpointType,
-                               const QString& baseQuery, QWidget* parent,
-                               QNetworkAccessManager* manager)
+                               const QString& baseQuery, QWidget* parent, QNetworkAccessManager* manager)
     : KXmlGuiWindow(parent),
       m_client(client),
       m_windowTitle(windowTitle),
@@ -292,12 +291,7 @@ void WorkItemWindow::setupUi() {
     connect(exportJsonAction, &QAction::triggered, this, &WorkItemWindow::exportToJson);
     actionCollection()->addAction(QStringLiteral("export_json"), exportJsonAction);
 
-    QAction* refreshAction = KStandardAction::redisplay(
-        this,
-        [this]() {
-            startRefresh();
-        },
-        actionCollection());
+    QAction* refreshAction = KStandardAction::redisplay(this, [this]() { startRefresh(); }, actionCollection());
 
     KStandardAction::close(this, &WorkItemWindow::close, actionCollection());
 
@@ -369,6 +363,8 @@ void WorkItemWindow::commitStagedData(int totalCount, int maxPages) {
 
     int loadedCount = m_allData.size();
     m_stagedPages.clear();
+    m_inFlightPages.clear();
+    m_currentGenerationId = QUuid();
     saveCache();
 
     QString limitMsg = (totalCount > 1000) ? tr(" (GitHub Search Limit Reached)") : "";
