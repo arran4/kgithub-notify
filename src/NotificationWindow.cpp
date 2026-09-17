@@ -20,6 +20,7 @@
 #include "NotificationRuleEngine.h"
 #include "PullRequestWindow.h"
 #include "RulesDialog.h"
+#include "utils/UrlHelper.h"
 
 NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window), m_notification(n), m_client(client) {
@@ -219,7 +220,7 @@ NotificationWindow::NotificationWindow(const Notification& n, GitHubClient* clie
 
 void NotificationWindow::onOpenUrl() {
     QString url = GitHubClient::apiToHtmlUrl(m_notification.url, m_notification.id);
-    QDesktopServices::openUrl(QUrl(url));
+    UrlHelper::openUrl(url);
 }
 
 void NotificationWindow::onCopyLink() {

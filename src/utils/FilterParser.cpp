@@ -1,189 +1,423 @@
 #include "FilterParser.h"
 
 #include <QRegularExpression>
-#include <QRegularExpressionMatch>
-#include <QRegularExpressionMatchIterator>
 #include <QStringList>
 #include <QtGlobal>
+#include <algorithm>
 
 struct Token {
-    enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD };
+    enum Type { LPAREN, RPAREN, AND, OR, NOT, IN, KV, STR, WORD, LEX_ERROR };
     Type type = WORD;
     QString val1;
     QString val2;
+    int pos = 0;
 };
 
-static QList<Token> tokenize(const QString& query) {
+static QList<Token> tokenize(const QString& query, QString* lexError, int* lexErrorPos) {
     QList<Token> tokens;
-    QRegularExpression re(
-        QStringLiteral("\\s*(?:"
-                       "(\\()|"
-                       "(\\))|"
-                       "\\b(OR|AND|NOT|IN)\\b|"
-                       "([a-zA-Z0-9_-]+:)(?:\"([^\"]*)\"|([^\\s\\(\\)]+))|"
-                       "(=)\"([^\"]+)\"|"
-                       "(=)([^\\s\\(\\)]+)|"
-                       "(\"([^\"]+)\")|"
-                       "([^\\s\\(\\)]+)"
-                       ")\\s*"));
+    int i = 0;
+    int len = query.length();
 
-    QRegularExpressionMatchIterator i = re.globalMatch(query);
-    while (i.hasNext()) {
-        QRegularExpressionMatch match = i.next();
-        if (!match.captured(1).isEmpty()) {
-            tokens.append({Token::LPAREN, QStringLiteral("("), QString()});
-        } else if (!match.captured(2).isEmpty()) {
-            tokens.append({Token::RPAREN, QStringLiteral(")"), QString()});
-        } else if (!match.captured(3).isEmpty()) {
-            QString op = match.captured(3);
-            if (op == QStringLiteral("OR"))
-                tokens.append({Token::OR, op, QString()});
-            else if (op == QStringLiteral("AND"))
-                tokens.append({Token::AND, op, QString()});
-            else if (op == QStringLiteral("NOT"))
-                tokens.append({Token::NOT, op, QString()});
-            else if (op == QStringLiteral("IN"))
-                tokens.append({Token::IN, op, QString()});
-        } else if (!match.captured(4).isEmpty()) {
-            QString key = match.captured(4);
-            key.chop(1);  // remove ':'
-            QString val = match.captured(5).isEmpty() ? match.captured(6) : match.captured(5);
-            tokens.append({Token::KV, key, val});
-        } else if (!match.captured(7).isEmpty()) {
-            tokens.append({Token::WORD, match.captured(8), QString()});
-        } else if (!match.captured(9).isEmpty()) {
-            tokens.append({Token::WORD, match.captured(10), QString()});
-        } else if (!match.captured(11).isEmpty()) {
-            tokens.append({Token::STR, match.captured(12), QString()});
-        } else if (!match.captured(13).isEmpty()) {
-            tokens.append({Token::WORD, match.captured(13), QString()});
+    while (i < len) {
+        // Skip whitespace
+        while (i < len && query.at(i).isSpace()) {
+            i++;
+        }
+        if (i >= len) break;
+
+        int startPos = i;
+        QChar c = query.at(i);
+
+        if (c == QChar('(')) {
+            tokens.append({Token::LPAREN, QStringLiteral("("), QString(), startPos});
+            i++;
+            continue;
+        }
+        if (c == QChar(')')) {
+            tokens.append({Token::RPAREN, QStringLiteral(")"), QString(), startPos});
+            i++;
+            continue;
+        }
+
+        if (c == QChar('"') || c == QChar('\'')) {
+            // Quoted string
+            QChar quoteChar = c;
+            i++;
+            int strStart = i;
+            bool closed = false;
+            while (i < len) {
+                if (query.at(i) == quoteChar) {
+                    closed = true;
+                    break;
+                }
+                i++;
+            }
+            if (!closed) {
+                if (lexError) *lexError = QStringLiteral("Unterminated quote");
+                if (lexErrorPos) *lexErrorPos = startPos;
+                tokens.append({Token::LEX_ERROR, QStringLiteral("Unterminated quote"), QString(), startPos});
+                return tokens;
+            }
+            QString strVal = query.mid(strStart, i - strStart);
+            i++;  // skip closing quote
+            tokens.append({Token::STR, strVal, QString(), startPos});
+            continue;
+        }
+
+        // Check if this token starts with a key: [a-zA-Z0-9_-]+:
+        int keyEnd = i;
+        while (keyEnd < len && (query.at(keyEnd).isLetterOrNumber() || query.at(keyEnd) == QChar('-') ||
+                                query.at(keyEnd) == QChar('_'))) {
+            keyEnd++;
+        }
+        if (keyEnd > i && keyEnd < len && query.at(keyEnd) == QChar(':')) {
+            QString key = query.mid(i, keyEnd - i);
+            i = keyEnd + 1;  // skip ':'
+            if (i < len && (query.at(i) == QChar('"') || query.at(i) == QChar('\''))) {
+                // key:"quoted value"
+                QChar quoteChar = query.at(i);
+                int qStart = i;
+                i++;  // skip opening quote
+                int valStart = i;
+                bool closed = false;
+                while (i < len) {
+                    if (query.at(i) == quoteChar) {
+                        closed = true;
+                        break;
+                    }
+                    i++;
+                }
+                if (!closed) {
+                    if (lexError) *lexError = QStringLiteral("Unterminated quote");
+                    if (lexErrorPos) *lexErrorPos = qStart;
+                    tokens.append({Token::LEX_ERROR, QStringLiteral("Unterminated quote"), QString(), qStart});
+                    return tokens;
+                }
+                QString val = query.mid(valStart, i - valStart);
+                i++;  // skip closing quote
+                tokens.append({Token::KV, key, val, startPos});
+                continue;
+            } else {
+                // key:unquoted_value
+                int valStart = i;
+                while (i < len && !query.at(i).isSpace() && query.at(i) != QChar('(') && query.at(i) != QChar(')')) {
+                    i++;
+                }
+                QString val = query.mid(valStart, i - valStart);
+                if (val.isEmpty()) {
+                    if (lexError) *lexError = QStringLiteral("Missing value for key '%1'").arg(key);
+                    if (lexErrorPos) *lexErrorPos = startPos;
+                    tokens.append(
+                        {Token::LEX_ERROR, QStringLiteral("Missing value for key '%1'").arg(key), QString(), startPos});
+                    return tokens;
+                }
+                tokens.append({Token::KV, key, val, startPos});
+                continue;
+            }
+        }
+
+        // Word or operator
+        int wordStart = i;
+        while (i < len && !query.at(i).isSpace() && query.at(i) != QChar('(') && query.at(i) != QChar(')') &&
+               query.at(i) != QChar('"')) {
+            i++;
+        }
+        QString word = query.mid(wordStart, i - wordStart);
+        if (word == QStringLiteral("AND")) {
+            tokens.append({Token::AND, word, QString(), wordStart});
+        } else if (word == QStringLiteral("OR")) {
+            tokens.append({Token::OR, word, QString(), wordStart});
+        } else if (word == QStringLiteral("NOT")) {
+            tokens.append({Token::NOT, word, QString(), wordStart});
+        } else if (word == QStringLiteral("IN")) {
+            tokens.append({Token::IN, word, QString(), wordStart});
+        } else {
+            tokens.append({Token::WORD, word, QString(), wordStart});
         }
     }
+
     return tokens;
 }
 
 class Parser {
     QList<Token> m_tokens;
     int m_pos;
+    bool m_error = false;
+    QString m_errorMsg;
+    int m_errorPos = -1;
 
    public:
     explicit Parser(const QList<Token>& tokens) : m_tokens(tokens), m_pos(0) {}
 
-    QSharedPointer<ASTNode> parse() {
-        if (m_tokens.isEmpty()) return QSharedPointer<ASTNode>();
-        return parseOr();
+    FilterParseResult parse() {
+        FilterParseResult res;
+        if (m_tokens.isEmpty()) {
+            res.ok = true;
+            res.ast = QSharedPointer<ASTNode>();
+            return res;
+        }
+
+        auto errIt = std::find_if(m_tokens.begin(), m_tokens.end(),
+                                  [](const Token& tok) { return tok.type == Token::LEX_ERROR; });
+        if (errIt != m_tokens.end()) {
+            res.ok = false;
+            res.error = errIt->val1;
+            res.errorPos = errIt->pos;
+            return res;
+        }
+
+        QSharedPointer<ASTNode> ast = parseOr();
+        if (m_error) {
+            res.ok = false;
+            res.error = m_errorMsg;
+            res.errorPos = m_errorPos;
+            return res;
+        }
+
+        if (!atEnd()) {
+            Token trailing = current();
+            res.ok = false;
+            if (trailing.type == Token::RPAREN) {
+                res.error = QStringLiteral("Unmatched closing parenthesis");
+            } else {
+                res.error = QStringLiteral("Unexpected trailing token: %1").arg(trailing.val1);
+            }
+            res.errorPos = trailing.pos;
+            return res;
+        }
+
+        res.ok = true;
+        res.ast = ast;
+        return res;
     }
 
    private:
     Token current() const {
         if (m_pos < m_tokens.size()) return m_tokens[m_pos];
-        return {Token::WORD, QString(), QString()};
+        return {Token::WORD, QString(), QString(), -1};
     }
+
     Token next() {
         if (m_pos < m_tokens.size()) return m_tokens[m_pos++];
-        return {Token::WORD, QString(), QString()};
+        return {Token::WORD, QString(), QString(), -1};
     }
+
     bool atEnd() const { return m_pos >= m_tokens.size(); }
 
+    void setError(const QString& msg, int pos) {
+        if (!m_error) {
+            m_error = true;
+            m_errorMsg = msg;
+            m_errorPos = pos;
+        }
+    }
+
     QSharedPointer<ASTNode> parseOr() {
-        QList<QSharedPointer<ASTNode>> nodes;
         QSharedPointer<ASTNode> firstChild = parseAnd();
-        if (firstChild) {
-            if (auto* childOr = dynamic_cast<OrNode*>(firstChild.data())) {
-                nodes.append(childOr->children());
-            } else {
-                nodes.append(firstChild);
-            }
+        if (m_error) return QSharedPointer<ASTNode>();
+        if (!firstChild) return QSharedPointer<ASTNode>();
+
+        QList<QSharedPointer<ASTNode>> nodes;
+        if (auto* childOr = dynamic_cast<OrNode*>(firstChild.data())) {
+            nodes.append(childOr->children());
+        } else {
+            nodes.append(firstChild);
         }
 
         while (!atEnd() && current().type == Token::OR) {
-            next();
+            Token orTok = next();
+            if (atEnd() || current().type == Token::RPAREN || current().type == Token::OR ||
+                current().type == Token::AND) {
+                setError(QStringLiteral("Incomplete OR: missing right operand"), orTok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+
             QSharedPointer<ASTNode> child = parseAnd();
-            if (child) {
-                if (auto* childOr = dynamic_cast<OrNode*>(child.data())) {
-                    nodes.append(childOr->children());
-                } else {
-                    nodes.append(child);
-                }
+            if (m_error) return QSharedPointer<ASTNode>();
+            if (!child) {
+                setError(QStringLiteral("Incomplete OR: missing right operand"), orTok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+
+            if (auto* childOr = dynamic_cast<OrNode*>(child.data())) {
+                nodes.append(childOr->children());
+            } else {
+                nodes.append(child);
             }
         }
+
         if (nodes.size() == 1) return nodes.first();
         return QSharedPointer<ASTNode>(new OrNode(nodes));
     }
 
     QSharedPointer<ASTNode> parseAnd() {
-        QList<QSharedPointer<ASTNode>> nodes;
         QSharedPointer<ASTNode> firstChild = parseUnary();
-        if (firstChild) {
-            if (auto* childAnd = dynamic_cast<AndNode*>(firstChild.data())) {
-                nodes.append(childAnd->children());
-            } else {
-                nodes.append(firstChild);
-            }
+        if (m_error) return QSharedPointer<ASTNode>();
+        if (!firstChild) return QSharedPointer<ASTNode>();
+
+        QList<QSharedPointer<ASTNode>> nodes;
+        if (auto* childAnd = dynamic_cast<AndNode*>(firstChild.data())) {
+            nodes.append(childAnd->children());
+        } else {
+            nodes.append(firstChild);
         }
 
         while (!atEnd() && current().type != Token::RPAREN && current().type != Token::OR) {
             if (current().type == Token::AND) {
-                next();
-            } else {
-                // implicit AND: do not consume token
-            }
-            QSharedPointer<ASTNode> child = parseUnary();
-            if (child) {
-                if (auto* childAnd = dynamic_cast<AndNode*>(child.data())) {
-                    nodes.append(childAnd->children());
-                } else {
-                    nodes.append(child);
+                Token andTok = next();
+                if (atEnd() || current().type == Token::RPAREN || current().type == Token::OR ||
+                    current().type == Token::AND) {
+                    setError(QStringLiteral("Incomplete AND: missing right operand"), andTok.pos);
+                    return QSharedPointer<ASTNode>();
                 }
             }
+
+            QSharedPointer<ASTNode> child = parseUnary();
+            if (m_error) return QSharedPointer<ASTNode>();
+            if (!child) {
+                break;
+            }
+
+            if (auto* childAnd = dynamic_cast<AndNode*>(child.data())) {
+                nodes.append(childAnd->children());
+            } else {
+                nodes.append(child);
+            }
         }
+
         if (nodes.size() == 1) return nodes.first();
         return QSharedPointer<ASTNode>(new AndNode(nodes));
     }
 
     QSharedPointer<ASTNode> parseUnary() {
         if (!atEnd() && current().type == Token::NOT) {
-            next();
-            return QSharedPointer<ASTNode>(new NotNode(parseUnary()));
+            Token notTok = next();
+            if (atEnd() || current().type == Token::RPAREN || current().type == Token::OR ||
+                current().type == Token::AND) {
+                setError(QStringLiteral("Incomplete NOT: missing operand"), notTok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+
+            QSharedPointer<ASTNode> inner = parseUnary();
+            if (m_error) return QSharedPointer<ASTNode>();
+            if (!inner) {
+                setError(QStringLiteral("Incomplete NOT: missing operand"), notTok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+            return QSharedPointer<ASTNode>(new NotNode(inner));
         }
+
         return parsePrimary();
     }
 
     QSharedPointer<ASTNode> parsePrimary() {
-        if (atEnd()) return QSharedPointer<ASTNode>(new KeywordNode(QString()));
+        if (atEnd()) return QSharedPointer<ASTNode>();
 
-        Token tok = next();
+        Token tok = current();
         if (tok.type == Token::LPAREN) {
-            QSharedPointer<ASTNode> node = parseOr();
-            if (!atEnd() && current().type == Token::RPAREN) {
-                next();
+            next();
+            if (atEnd()) {
+                setError(QStringLiteral("Unmatched opening parenthesis"), tok.pos);
+                return QSharedPointer<ASTNode>();
             }
+            if (current().type == Token::RPAREN) {
+                setError(QStringLiteral("Empty parentheses"), tok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+
+            QSharedPointer<ASTNode> node = parseOr();
+            if (m_error) return QSharedPointer<ASTNode>();
+            if (!node) {
+                setError(QStringLiteral("Empty parentheses or missing expression"), tok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+
+            if (atEnd() || current().type != Token::RPAREN) {
+                setError(QStringLiteral("Unmatched opening parenthesis"), tok.pos);
+                return QSharedPointer<ASTNode>();
+            }
+            next();  // consume RPAREN
             return node;
+        } else if (tok.type == Token::RPAREN) {
+            setError(QStringLiteral("Unmatched closing parenthesis"), tok.pos);
+            return QSharedPointer<ASTNode>();
+        } else if (tok.type == Token::AND || tok.type == Token::OR || tok.type == Token::IN) {
+            setError(QStringLiteral("Missing operand before '%1'").arg(tok.val1), tok.pos);
+            return QSharedPointer<ASTNode>();
         } else if (tok.type == Token::KV) {
+            next();
+            if (!FilterParser::isSupportedKey(tok.val1)) {
+                setError(QStringLiteral("Unknown filter key: '%1'").arg(tok.val1), tok.pos);
+                return QSharedPointer<ASTNode>();
+            }
             return QSharedPointer<ASTNode>(new KeyValueNode(tok.val1, tok.val2));
         } else if (tok.type == Token::STR || tok.type == Token::WORD) {
+            next();
             if (!atEnd() && current().type == Token::IN) {
-                next();
-                QString valuesStr = QString();
-                if (!atEnd() && (current().type == Token::STR || current().type == Token::WORD)) {
-                    valuesStr = next().val1;
+                Token inTok = next();
+                if (atEnd() || (current().type != Token::STR && current().type != Token::WORD)) {
+                    setError(QStringLiteral("Incomplete IN: missing value list"), inTok.pos);
+                    return QSharedPointer<ASTNode>();
                 }
-                return QSharedPointer<ASTNode>(new InNode(tok.val1, valuesStr));
+                Token valTok = next();
+                if (!FilterParser::isSupportedKey(tok.val1)) {
+                    setError(QStringLiteral("Unknown filter key: '%1'").arg(tok.val1), tok.pos);
+                    return QSharedPointer<ASTNode>();
+                }
+                return QSharedPointer<ASTNode>(new InNode(tok.val1, valTok.val1));
             }
             return QSharedPointer<ASTNode>(new KeywordNode(tok.val1));
         }
+
+        next();
         return QSharedPointer<ASTNode>(new KeywordNode(tok.val1));
     }
 };
 
-QSharedPointer<ASTNode> FilterParser::parse(const QString& query) {
+const QSet<QString>& FilterParser::supportedKeys() {
+    static const QSet<QString> s_keys = {
+        QStringLiteral("name"),          QStringLiteral("repo"),           QStringLiteral("owner"),
+        QStringLiteral("fork"),          QStringLiteral("archived"),       QStringLiteral("visibility"),
+        QStringLiteral("created"),       QStringLiteral("createdat"),      QStringLiteral("created-at"),
+        QStringLiteral("created_at"),    QStringLiteral("updated"),        QStringLiteral("updatedat"),
+        QStringLiteral("updated-at"),    QStringLiteral("updated_at"),     QStringLiteral("created-before"),
+        QStringLiteral("created-after"), QStringLiteral("updated-before"), QStringLiteral("updated-after"),
+    };
+    return s_keys;
+}
+
+bool FilterParser::isSupportedKey(const QString& key) { return supportedKeys().contains(key.toLower()); }
+
+FilterParseResult FilterParser::parseWithResult(const QString& query) {
     QString q = query.trimmed();
     if (q.startsWith(QLatin1Char('='))) {
-        q = q.mid(1);
+        q = q.mid(1).trimmed();
     }
-    QList<Token> tokens = tokenize(q);
+    if (q.isEmpty()) {
+        FilterParseResult res;
+        res.ok = true;
+        res.ast = QSharedPointer<ASTNode>();
+        return res;
+    }
+
+    QString lexError;
+    int lexErrorPos = -1;
+    QList<Token> tokens = tokenize(q, &lexError, &lexErrorPos);
+    if (!lexError.isEmpty()) {
+        FilterParseResult res;
+        res.ok = false;
+        res.error = lexError;
+        res.errorPos = lexErrorPos;
+        return res;
+    }
+
     Parser parser(tokens);
     return parser.parse();
+}
+
+QSharedPointer<ASTNode> FilterParser::parse(const QString& query) {
+    FilterParseResult res = parseWithResult(query);
+    return res.ok ? res.ast : QSharedPointer<ASTNode>();
 }
 
 bool AndNode::evaluate(const FilterDataAccessor& accessor) const {
@@ -210,6 +444,7 @@ bool NotNode::evaluate(const FilterDataAccessor& accessor) const { return !m_chi
 QString NotNode::toString() const { return QStringLiteral("NOT ") + m_child->toString(); }
 
 bool InNode::evaluate(const FilterDataAccessor& accessor) const {
+    if (!FilterParser::isSupportedKey(m_key)) return false;
     if (m_values.isEmpty()) return false;
     QString val = accessor.getValue(m_key);
     if (val.isEmpty()) return false;
@@ -227,6 +462,7 @@ static bool checkDateFilter(const QString& filterVal, const QString& dateStr, bo
 }
 
 bool KeyValueNode::evaluate(const FilterDataAccessor& accessor) const {
+    if (!FilterParser::isSupportedKey(m_key)) return false;
     QString lowerKey = m_key.toLower();
     if (lowerKey == QStringLiteral("created-before") || lowerKey == QStringLiteral("updated-before") ||
         lowerKey == QStringLiteral("created-after") || lowerKey == QStringLiteral("updated-after")) {

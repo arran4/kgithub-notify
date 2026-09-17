@@ -15,6 +15,7 @@
 
 #include "GitHubClient.h"
 #include "MainWindow.h"
+#include "utils/DesktopEntryHelper.h"
 
 #ifndef KGHN_APP_VERSION
 #define KGHN_APP_VERSION "dev"
@@ -49,36 +50,69 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main", "Start in the background (system tray only)."));
     parser.addOption(backgroundOption);
 
-    QCommandLineOption diagnoseOption(QStringList() << "diagnose",
+    QCommandLineOption diagnoseOption(QStringList() << QStringLiteral("diagnose"),
                                       QCoreApplication::translate("main", "Run self-diagnostics and exit."));
     parser.addOption(diagnoseOption);
+
+    QCommandLineOption registerOption(
+        QStringList{QStringLiteral("register-desktop")},
+        QCoreApplication::translate("main", "Register desktop entry for current executable."));
+    parser.addOption(registerOption);
+
+    QCommandLineOption registerOverwriteOption(
+        QStringList{QStringLiteral("register-desktop-overwrite"), QStringLiteral("force-register-desktop")},
+        QCoreApplication::translate("main",
+                                    "Register or overwrite desktop entry for current executable even if mismatched."));
+    parser.addOption(registerOverwriteOption);
 
     parser.process(app);
 
     // Check for desktop file to warn about potential portal issues
-    QString desktopFileName = QGuiApplication::desktopFileName() + ".desktop";
-    bool desktopFileFound = false;
+    QString desktopFileName = QGuiApplication::desktopFileName() + QStringLiteral(".desktop");
     QStringList appPaths = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
-    for (const QString& path : appPaths) {
-        if (QFileInfo::exists(path + "/" + desktopFileName)) {
-            desktopFileFound = true;
-            break;
+
+    bool doRegister = parser.isSet(registerOption) || parser.isSet(registerOverwriteOption);
+    bool doOverwrite = parser.isSet(registerOverwriteOption);
+
+    if (doRegister) {
+        QString err;
+        if (!DesktopEntryHelper::registerDesktopEntry(QString(), doOverwrite, &err)) {
+            qCritical().noquote() << "Failed to register desktop file:" << err;
+            return 1;
         }
+        qInfo() << "Successfully registered desktop file for current executable.";
+        return 0;
     }
 
     if (parser.isSet(diagnoseOption)) {
         qDebug() << "=== KGitHub Notify Diagnostics ===";
         qDebug() << "App Name:" << QCoreApplication::applicationName();
         qDebug() << "Desktop File Name:" << QGuiApplication::desktopFileName();
-        qDebug() << "Looking for Desktop File:" << desktopFileName;
-
+        qDebug() << "Expected Executable:" << QCoreApplication::applicationFilePath();
         qDebug() << "Standard Applications Paths:" << appPaths;
 
-        if (desktopFileFound) {
-            qDebug() << "Desktop File Status: [FOUND]";
+        DesktopEntryDiagnosis diag = DesktopEntryHelper::diagnose(desktopFileName, appPaths);
+        if (diag.status == DesktopEntryStatus::ValidUsable) {
+            qDebug() << "Desktop File Status: [FOUND - VALID]";
+            qDebug() << "Path:" << diag.foundPath;
+            qDebug() << "Usable: YES";
+        } else if (diag.status == DesktopEntryStatus::PresentMismatched) {
+            qDebug() << "Desktop File Status: [FOUND - MISMATCHED]";
+            qDebug() << "Path:" << diag.foundPath;
+            qDebug() << "Current Exec:" << diag.currentExecInEntry;
+            qDebug() << "Reason:" << diag.reason;
+            qDebug() << "Usable: YES";
+        } else if (diag.status == DesktopEntryStatus::PresentUnusable) {
+            qDebug() << "Desktop File Status: [FOUND - UNUSABLE]";
+            qDebug() << "Path:" << diag.foundPath;
+            qDebug() << "Reason:" << diag.reason;
+            qDebug() << "Usable: NO";
         } else {
             qDebug() << "Desktop File Status: [MISSING]";
-            qDebug() << "  -> Ensure" << desktopFileName << "is installed to one of the above paths.";
+            qDebug() << "Reason:" << diag.reason;
+            qDebug() << "Usable: NO";
+            qDebug() << "  -> Ensure" << desktopFileName
+                     << "is installed to one of the above paths or run with --register-desktop.";
         }
 
         if (QDBusConnection::sessionBus().isConnected()) {
@@ -97,32 +131,13 @@ int main(int argc, char* argv[]) {
 
     window.setClient(&client);
 
-    if (!desktopFileFound) {
-        QString userAppsPath = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation);
-        QString destPath = userAppsPath + "/" + desktopFileName;
-        bool copied = false;
+    DesktopEntryDiagnosis diag = DesktopEntryHelper::diagnose(desktopFileName, appPaths);
+    if (!diag.isUsable) {
+        qWarning() << "Warning: Desktop file" << desktopFileName << "not found or not usable in standard locations.";
+        qWarning() << "Reason:" << diag.reason;
+        qWarning() << "System tray and notifications may not work correctly with portals.";
 
-        if (QFile::exists(":/kgithub-notify.desktop")) {
-            // Ensure the directory exists
-            QDir dir(userAppsPath);
-            if (!dir.exists()) {
-                dir.mkpath(".");
-            }
-            if (QFile::copy(":/kgithub-notify.desktop", destPath)) {
-                // Set appropriate permissions
-                QFile::setPermissions(destPath,
-                                      QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
-                copied = true;
-                desktopFileFound = true;
-            }
-        }
-
-        if (!copied) {
-            qWarning() << "Warning: Desktop file" << desktopFileName << "not found in standard locations.";
-            qWarning() << "System tray and notifications may not work correctly with portals.";
-
-            window.showDesktopFileWarning(desktopFileName, appPaths);
-        }
+        window.showDesktopFileWarning(desktopFileName, appPaths);
     }
 
     if (!parser.isSet(backgroundOption)) {

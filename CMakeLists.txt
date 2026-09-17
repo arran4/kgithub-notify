@@ -13,6 +13,7 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 COMPONENTS Widgets Network Svg DBus Test REQUIRED)
 find_package(KF6Wallet REQUIRED)
 find_package(KF6Notifications REQUIRED)
+find_package(KF6Config REQUIRED)
 
 enable_testing()
 
@@ -36,6 +37,32 @@ target_link_libraries(TestGitHubClient
 )
 
 add_test(NAME TestGitHubClient COMMAND TestGitHubClient)
+set_tests_properties(TestGitHubClient PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(TestUrlHelper
+    tests/TestUrlHelper.cpp
+    src/utils/UrlHelper.h
+)
+target_link_libraries(TestUrlHelper
+    Qt6::Test
+    Qt6::Gui
+)
+add_test(NAME TestUrlHelper COMMAND TestUrlHelper)
+set_tests_properties(TestUrlHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(TestDesktopEntryHelper
+    tests/TestDesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.h
+)
+target_link_libraries(TestDesktopEntryHelper
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+    KF6::ConfigCore
+)
+add_test(NAME TestDesktopEntryHelper COMMAND TestDesktopEntryHelper)
+set_tests_properties(TestDesktopEntryHelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(TestCapabilityVerification
     tests/TestCapabilityVerification.cpp
@@ -57,6 +84,7 @@ target_link_libraries(TestCapabilityVerification
 )
 
 add_test(NAME TestCapabilityVerification COMMAND TestCapabilityVerification)
+set_tests_properties(TestCapabilityVerification PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(TestFilterParser
     tests/TestFilterParser.cpp
@@ -92,6 +120,7 @@ target_link_libraries(TestRulesDialog
 )
 
 add_test(NAME TestRulesDialog COMMAND TestRulesDialog)
+set_tests_properties(TestRulesDialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
 add_executable(kgithub-notify
@@ -107,6 +136,8 @@ add_executable(kgithub-notify
     src/NotificationRuleEngine.h
     src/utils/FilterParser.cpp
     src/utils/FilterParser.h
+    src/utils/DesktopEntryHelper.cpp
+    src/utils/DesktopEntryHelper.h
     src/RulesDialog.cpp
     src/RulesDialog.h
     src/DebugWindow.cpp
@@ -199,3 +230,9 @@ add_executable(TestCredentialPersistence tests/TestCredentialPersistence.cpp ${c
 target_link_libraries(TestCredentialPersistence PRIVATE ${consumer_libraries} Qt6::Test)
 add_test(NAME TestCredentialPersistence COMMAND TestCredentialPersistence)
 set_tests_properties(TestCredentialPersistence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+if(BUILD_TESTING)
+    add_executable(TestAuthIncidentState tests/TestAuthIncidentState.cpp)
+    target_link_libraries(TestAuthIncidentState PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME AuthIncidentState COMMAND TestAuthIncidentState)
+endif()

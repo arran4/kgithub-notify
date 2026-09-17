@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QList>
 #include <QMap>
+#include <QSet>
 #include <QSharedPointer>
 #include <QString>
 
@@ -100,8 +101,18 @@ class KeywordNode : public ASTNode {
     QString m_keyword;
 };
 
+struct FilterParseResult {
+    bool ok = false;
+    QSharedPointer<ASTNode> ast;
+    QString error;
+    int errorPos = -1;
+};
+
 class FilterParser {
    public:
+    static const QSet<QString>& supportedKeys();
+    static bool isSupportedKey(const QString& key);
+    static FilterParseResult parseWithResult(const QString& query);
     static QSharedPointer<ASTNode> parse(const QString& query);
 };
 

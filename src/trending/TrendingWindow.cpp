@@ -23,6 +23,7 @@
 
 #include "../GitHubClient.h"
 #include "../NewIssueDialog.h"
+#include "../utils/UrlHelper.h"
 
 TrendingWindow::TrendingWindow(GitHubClient* client, QWidget* parent)
     : KXmlGuiWindow(parent, Qt::Window), m_client(client) {
@@ -404,7 +405,7 @@ void TrendingWindow::onItemActivated(QTableWidgetItem* item) {
     if (!item) return;
     QString url = item->data(Qt::UserRole).toString();
     if (!url.isEmpty()) {
-        QDesktopServices::openUrl(QUrl(url));
+        UrlHelper::openUrl(url);
     }
 }
 

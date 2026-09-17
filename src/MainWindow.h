@@ -1,4 +1,5 @@
 #include "WalletManager.h"
+#include "utils/AuthIncidentState.h"
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -122,8 +123,7 @@ class MainWindow : public KXmlGuiWindow {
     NotificationListWidget* notificationListWidget;
     GitHubClient* client;
 
-    bool pendingAuthError;
-    bool authNotificationSent = false;
+    AuthIncidentState m_authIncident;
     QString lastError;
 
     // Toolbar

@@ -18,6 +18,7 @@
 #include "GitHubClient.h"
 #include "RulesDialog.h"
 #include "WalletManager.h"
+#include "utils/DesktopEntryHelper.h"
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), testClient(nullptr) {
     setWindowTitle("Settings");
@@ -230,42 +231,17 @@ void SettingsDialog::saveSettings() {
 }
 
 void SettingsDialog::updateAutostartEntry() {
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
-    QDir dir(configPath);
-    if (!dir.exists("autostart")) {
-        dir.mkdir("autostart");
-    }
-    QString path = configPath + "/autostart/kgithub-notify.desktop";
-
-    if (autostartCheckBox->isChecked()) {
-        QFile file(path);
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream out(&file);
-            out << "[Desktop Entry]\n";
-            out << "Type=Application\n";
-            out << "Name=KGitHub Notify\n";
-            out << "Comment=GitHub Notification System Tray\n";
-            QString exec = QCoreApplication::applicationFilePath();
-            if (startMinimizedCheckBox->isChecked()) {
-                exec += " --background";
-            }
-            out << "Exec=" << exec << "\n";
-            out << "Icon=kgithub-notify\n";
-            out << "Categories=Development;Utility;Qt;KDE;\n";
-            out << "StartupWMClass=Kgithub-notify\n";
-            out << "Terminal=false\n";
-            out << "X-KDE-autostart-after=panel\n";
-        }
-    } else {
-        QFile::remove(path);
+    QString error;
+    bool ok = DesktopEntryHelper::writeAutostartEntry(autostartCheckBox->isChecked(),
+                                                      startMinimizedCheckBox->isChecked(), QString(), &error);
+    if (!ok && !error.isEmpty()) {
+        statusLabel->setText(error);
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
     }
 }
 
-bool SettingsDialog::isAutostartEnabled() {
-    QString path =
-        QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart/kgithub-notify.desktop";
-    return QFile::exists(path);
-}
+bool SettingsDialog::isAutostartEnabled() { return DesktopEntryHelper::isAutostartEnabled(); }
 
 QFuture<WalletResult> SettingsDialog::getTokenAsync() { return WalletManager::loadTokenAsync(); }
 
@@ -342,34 +318,68 @@ void SettingsDialog::onTestClicked() {
 }
 
 void SettingsDialog::installNotifyRc() {
-    QString targetDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/knotifications5";
+    QString targetDir =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/knotifications6");
     QDir dir;
     if (!dir.mkpath(targetDir)) {
-        statusLabel->setText("Failed to create knotifications5 directory.");
-        statusLabel->setStyleSheet("color: red;");
+        statusLabel->setText(tr("Failed to create knotifications6 directory: %1").arg(targetDir));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
         statusLabel->show();
         return;
     }
 
-    QString targetPath = targetDir + "/kgithub-notify.notifyrc";
-    QFile sourceFile(":/kgithub-notify.notifyrc");
+    QString resPath = QStringLiteral(":/knotifications6/kgithub-notify.notifyrc");
+    if (!QFile::exists(resPath)) {
+        resPath = QStringLiteral(":/kgithub-notify.notifyrc");
+    }
+    QFile sourceFile(resPath);
+    if (!sourceFile.open(QIODevice::ReadOnly)) {
+        statusLabel->setText(tr("Failed to read notifyrc resource."));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
+        return;
+    }
+    QByteArray content = sourceFile.readAll();
+    sourceFile.close();
 
-    if (QFile::exists(targetPath)) {
-        if (!QFile::remove(targetPath)) {
-            statusLabel->setText("Failed to remove existing notifyrc file.");
-            statusLabel->setStyleSheet("color: red;");
-            statusLabel->show();
-            return;
-        }
+    QString targetPath = targetDir + QStringLiteral("/kgithub-notify.notifyrc");
+    QString tempPath = targetPath + QStringLiteral(".tmp.%1").arg(QCoreApplication::applicationPid());
+    QFile tempFile(tempPath);
+    if (!tempFile.open(QIODevice::WriteOnly)) {
+        statusLabel->setText(tr("Failed to create temporary notifyrc file."));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
+        return;
     }
 
-    if (sourceFile.copy(targetPath)) {
-        statusLabel->setText("Successfully installed kgithub-notify.notifyrc");
-        statusLabel->setStyleSheet("color: green;");
-    } else {
-        statusLabel->setText("Failed to install notifyrc file.");
-        statusLabel->setStyleSheet("color: red;");
+    if (tempFile.write(content) != content.size()) {
+        tempFile.close();
+        QFile::remove(tempPath);
+        statusLabel->setText(tr("Failed to write complete notifyrc file."));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
+        return;
     }
+    tempFile.close();
+
+    if (QFile::exists(targetPath) && !QFile::remove(targetPath)) {
+        QFile::remove(tempPath);
+        statusLabel->setText(tr("Failed to replace existing notifyrc file."));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
+        return;
+    }
+
+    if (!QFile::rename(tempPath, targetPath)) {
+        QFile::remove(tempPath);
+        statusLabel->setText(tr("Failed to install notifyrc file to %1").arg(targetPath));
+        statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        statusLabel->show();
+        return;
+    }
+
+    statusLabel->setText(tr("Successfully installed kgithub-notify.notifyrc"));
+    statusLabel->setStyleSheet(QStringLiteral("color: green;"));
     statusLabel->show();
 }
 

@@ -7,12 +7,15 @@
 #include <QJsonArray>
 #include <QLabel>
 #include <QLineEdit>
+#include <QSharedPointer>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTimer>
 #include <QToolBar>
 
 #include "GitHubClient.h"
+
+class ASTNode;
 
 class RepoListWindow : public KXmlGuiWindow {
     Q_OBJECT
@@ -63,6 +66,8 @@ class RepoListWindow : public KXmlGuiWindow {
     QTimer* m_updateTimer;
     QDateTime m_lastRefresh;
     QJsonArray m_allRepos;
+    QSharedPointer<ASTNode> m_lastValidAst;
+    QString m_lastValidFilterText;
 };
 
 #endif  // REPOLISTWINDOW_H

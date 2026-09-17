@@ -12,14 +12,24 @@ class TestRepoAccessor : public FilterDataAccessor {
         QString lowerKey = key.toLower();
         if (lowerKey == "fork") return m_repo["fork"].toBool() ? "true" : "false";
         if (lowerKey == "archived") return m_repo["archived"].toBool() ? "true" : "false";
-        if (lowerKey == "name") return m_repo["name"].toString();
+        if (lowerKey == "name" || lowerKey == "repo") return m_repo["name"].toString();
         if (lowerKey == "owner") return m_repo["owner"].toObject()["login"].toString();
+        if (lowerKey == "visibility") return m_repo["visibility"].toString();
+        if (lowerKey == "createdat" || lowerKey == "created" || lowerKey == "created-at" || lowerKey == "created_at")
+            return m_repo["created_at"].toString();
+        if (lowerKey == "updatedat" || lowerKey == "updated" || lowerKey == "updated-at" || lowerKey == "updated_at")
+            return m_repo["updated_at"].toString();
         return "";
     }
 
     QList<QString> getAllValues() const override {
-        return {m_repo["fork"].toBool() ? "true" : "false", m_repo["archived"].toBool() ? "true" : "false",
-                m_repo["name"].toString(), m_repo["owner"].toObject()["login"].toString()};
+        return {m_repo["fork"].toBool() ? "true" : "false",
+                m_repo["archived"].toBool() ? "true" : "false",
+                m_repo["name"].toString(),
+                m_repo["owner"].toObject()["login"].toString(),
+                m_repo["visibility"].toString(),
+                m_repo["created_at"].toString(),
+                m_repo["updated_at"].toString()};
     }
 
    private:
@@ -156,6 +166,255 @@ class TestFilterParser : public QObject {
         // IN
         QVERIFY(FilterParser::parse("owner IN \"john-doe, jane-doe\"")->evaluate(accessor) == true);
         QVERIFY(FilterParser::parse("owner IN \"jim-doe, jane-doe\"")->evaluate(accessor) == false);
+    }
+
+    void testParseDiagnostics() {
+        // Unterminated quotes
+        {
+            FilterParseResult res = FilterParser::parseWithResult("\"unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+            QVERIFY(res.errorPos >= 0);
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("name:\"unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("'single unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("owner:'single unterminated");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unterminated quote"));
+        }
+
+        // Unmatched parentheses
+        {
+            FilterParseResult res = FilterParser::parseWithResult("(fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched opening parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false)");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("((fork:false)");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched opening parenthesis"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("()");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Empty parentheses"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult(")");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+
+        // Incomplete operands
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete AND"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false OR");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete OR"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete NOT"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND NOT");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete NOT"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("owner IN");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Incomplete IN"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("AND fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing operand"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("OR fork:false");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing operand"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Missing value for key"));
+        }
+
+        // Unexpected trailing tokens
+        {
+            FilterParseResult res = FilterParser::parseWithResult("(fork:false) )");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unmatched closing parenthesis"));
+        }
+    }
+
+    void testParseWithResultValid() {
+        {
+            FilterParseResult res = FilterParser::parseWithResult("");
+            QVERIFY(res.ok);
+            QVERIFY(res.ast.isNull());
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("   ");
+            QVERIFY(res.ok);
+            QVERIFY(res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("fork:false AND archived:false");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("= fork:false AND archived:false");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT NOT (fork:true OR name:\"test\")");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+    }
+
+    void testStructuredKeyDiagnostics() {
+        // 1. Valid known keys
+        const QStringList validKeys = {
+            "name",       "repo",       "owner",          "fork",          "archived",       "visibility",
+            "created",    "createdat",  "created-at",     "created_at",    "updated",        "updatedat",
+            "updated-at", "updated_at", "created-before", "created-after", "updated-before", "updated-after",
+            "FORK",       "Repo",       "Owner"};
+        for (const QString& k : validKeys) {
+            FilterParseResult res = FilterParser::parseWithResult(QStringLiteral("%1:testval").arg(k));
+            QVERIFY2(res.ok,
+                     qPrintable(QStringLiteral("Expected key '%1' to be valid, but got: %2").arg(k, res.error)));
+            QVERIFY(res.error.isEmpty());
+            QVERIFY(!res.ast.isNull());
+        }
+
+        // 2. Unknown structured keys
+        {
+            FilterParseResult res = FilterParser::parseWithResult("state:open");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'state'"));
+            QCOMPARE(res.errorPos, 0);
+            QVERIFY(res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("foo:bar");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'foo'"));
+            QCOMPARE(res.errorPos, 0);
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("unknown:\"quoted value\"");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'unknown'"));
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("invalid IN \"val1, val2\"");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'invalid'"));
+        }
+
+        // 3. Unknown key mixed with AND/OR/NOT
+        {
+            FilterParseResult res = FilterParser::parseWithResult("name:foo AND state:open");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'state'"));
+            QCOMPARE(res.errorPos, 13);
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT (invalid:123 OR fork:false)");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'invalid'"));
+            QCOMPARE(res.errorPos, 5);
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("state:open OR owner:bar");
+            QVERIFY(!res.ok);
+            QVERIFY(res.error.contains("Unknown filter key: 'state'"));
+            QCOMPARE(res.errorPos, 0);
+        }
+
+        // 4. Quoted values for known keys
+        {
+            FilterParseResult res = FilterParser::parseWithResult("name:\"my awesome repo\"");
+            QVERIFY(res.ok);
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("owner:'john doe'");
+            QVERIFY(res.ok);
+            QVERIFY(res.error.isEmpty());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("repo:\"quoted-repo\"");
+            QVERIFY(res.ok);
+            QVERIFY(res.error.isEmpty());
+        }
+
+        // 5. Free-text queries must NOT be rejected as unknown keys
+        {
+            FilterParseResult res = FilterParser::parseWithResult("awesome");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("open");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("state");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("\"state:open\"");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+        {
+            FilterParseResult res = FilterParser::parseWithResult("NOT open");
+            QVERIFY(res.ok);
+            QVERIFY(!res.ast.isNull());
+        }
+
+        // 6. Direct evaluation guard test
+        {
+            QJsonObject repo;
+            repo["name"] = "my-repo";
+            TestRepoAccessor accessor(repo);
+
+            KeyValueNode badKeyNode("bad_key", "val");
+            QVERIFY(!badKeyNode.evaluate(accessor));
+
+            InNode badInNode("bad_key", "val1, val2");
+            QVERIFY(!badInNode.evaluate(accessor));
+        }
     }
 };
 

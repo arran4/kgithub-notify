@@ -11,6 +11,8 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include "utils/UrlHelper.h"
+
 NewIssueDialog::NewIssueDialog(GitHubClient* client, QWidget* parent)
     : QDialog(parent), m_client(client), m_verifyTimer(new QTimer(this)), m_isFetchingRepos(false) {
     setupUI();
@@ -240,7 +242,7 @@ void NewIssueDialog::onIssueCreated(const QUuid& reqId, const QByteArray& data) 
         QString url = doc.object()["html_url"].toString();
         m_statusLabel->setText(tr("Issue created successfully."));
         m_statusLabel->setStyleSheet("color: green;");
-        QDesktopServices::openUrl(QUrl(url));
+        UrlHelper::openUrl(url);
         accept();
     } else {
         QString errMsg = tr("Failed to create issue.");

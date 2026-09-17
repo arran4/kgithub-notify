@@ -39,6 +39,7 @@
 #include "SettingsDialog.h"
 #include "WorkItemWindow.h"
 #include "trending/TrendingWindow.h"
+#include "utils/UrlHelper.h"
 
 // -----------------------------------------------------------------------------
 // Constants / Static Helpers
@@ -66,7 +67,7 @@ MainWindow::MainWindow(QWidget* parent)
       trayIconMenu(nullptr),
       notificationListWidget(nullptr),
       client(nullptr),
-      pendingAuthError(false),
+
       m_lastUnreadCount(0) {
     setupWindow();
     setupCentralWidget();
@@ -188,8 +189,9 @@ void MainWindow::updateNotifications(const QUuid& reqId, const QList<Notificatio
                                      bool hasMore) {
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
+    m_authIncident.recordAuthenticatedSuccess();
     m_lastCheckTime = QDateTime::currentDateTime();
-    pendingAuthError = false;
+
     lastError.clear();
 
     notificationListWidget->setNotifications(notifications, append, hasMore);
@@ -221,18 +223,32 @@ void MainWindow::onListCountsChanged(int total, int unread, int newCount, const 
 
     // Update repo filter
     QString currentRepo = repoFilterComboBox->currentText();
-    bool wasBlocked = repoFilterComboBox->blockSignals(true);
-    repoFilterComboBox->clear();
-    repoFilterComboBox->addItem(tr("All Repositories"));
-    repoFilterComboBox->addItems(notificationListWidget->getAvailableRepos());
+    QStringList availableRepos = notificationListWidget->getAvailableRepos();
+    QStringList expectedItems;
+    expectedItems << tr("All Repositories") << availableRepos;
 
-    int index = repoFilterComboBox->findText(currentRepo);
-    if (index >= 0) {
-        repoFilterComboBox->setCurrentIndex(index);
-    } else {
-        repoFilterComboBox->setCurrentIndex(0);
+    QStringList currentItems;
+    for (int i = 0; i < repoFilterComboBox->count(); ++i) {
+        currentItems << repoFilterComboBox->itemText(i);
     }
-    repoFilterComboBox->blockSignals(wasBlocked);
+
+    if (currentItems != expectedItems) {
+        bool wasBlocked = repoFilterComboBox->blockSignals(true);
+        repoFilterComboBox->clear();
+        repoFilterComboBox->addItems(expectedItems);
+
+        int index = repoFilterComboBox->findText(currentRepo);
+        if (index >= 0) {
+            repoFilterComboBox->setCurrentIndex(index);
+            repoFilterComboBox->blockSignals(wasBlocked);
+        } else {
+            repoFilterComboBox->setCurrentIndex(0);
+            repoFilterComboBox->blockSignals(wasBlocked);
+            if (currentRepo != tr("All Repositories") && !currentRepo.isEmpty()) {
+                notificationListWidget->setRepoFilter(tr("All Repositories"));
+            }
+        }
+    }
 }
 
 void MainWindow::onListStatusMessage(const QString& message) {
@@ -242,6 +258,9 @@ void MainWindow::onListStatusMessage(const QString& message) {
 }
 
 void MainWindow::showError(const QUuid& reqId, const QString& error) {
+    if (reqId == m_currentRefreshId) {
+        m_authIncident.recordNetworkError();
+    }
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
     if (notificationListWidget) notificationListWidget->resetLoadMoreState();
@@ -280,7 +299,7 @@ void MainWindow::showError(const QUuid& reqId, const QString& error) {
 void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
     if (reqId.isNull() || reqId != m_currentRefreshId || !m_notificationLoading) return;
     m_notificationLoading = false;
-    pendingAuthError = true;
+    m_authIncident.recordAuthFailure(message);
 
     errorLabel->setText(tr("Authentication Error: %1\n\nPlease update your token in Settings.").arg(message));
     stackWidget->setCurrentWidget(errorPage);
@@ -289,7 +308,7 @@ void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
         notificationListWidget->resetLoadMoreState();
     }
 
-    if (!authNotificationSent) {
+    if (m_authIncident.shouldNotify()) {
         KNotification* notification = new KNotification("AuthError");
         notification->setComponentName(QStringLiteral("kgithub-notify"));
         notification->setTitle(tr("GitHub Authentication Error"));
@@ -300,7 +319,6 @@ void MainWindow::onAuthError(const QUuid& reqId, const QString& message) {
         connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
 
         notification->sendEvent();
-        authNotificationSent = true;
     }
 
     if (!trayIcon || !trayIcon->isVisible()) {
@@ -326,7 +344,7 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason) {
 }
 
 void MainWindow::onTrayMessageClicked() {
-    if (pendingAuthError) {
+    if (m_authIncident.inIncident()) {
         showSettings();
     }
 }
@@ -380,16 +398,16 @@ void MainWindow::dismissAllNotifications() {
 void MainWindow::onTokenLoaded() {
     WalletResult result = tokenWatcher->result();
     if (!result.success) {
-        KNotification* notification = new KNotification("authError");
-        notification->setTitle("GitHub Notification Error");
-        notification->setText("Failed to load KWallet token: " + result.errorMessage);
+        KNotification* notification = new KNotification(QStringLiteral("AuthError"));
+        notification->setComponentName(QStringLiteral("kgithub-notify"));
+        notification->setTitle(tr("GitHub Notification Error"));
+        notification->setText(tr("Failed to load KWallet token: %1").arg(result.errorMessage));
+        connect(notification, &KNotification::closed, notification, &QObject::deleteLater);
         notification->sendEvent();
         m_loadedToken = QString();
     } else {
         m_loadedToken = result.token;
     }
-
-    authNotificationSent = false;
 
     if (m_loadedToken.isEmpty()) {
         stackWidget->setCurrentWidget(loginPage);
@@ -532,12 +550,6 @@ void MainWindow::openKdeNotificationSettings() {
     bool launched = QProcess::startDetached(QStringLiteral("systemsettings"), {QStringLiteral("kcm_notifications")});
     if (!launched)
         launched = QProcess::startDetached(QStringLiteral("kcmshell6"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("systemsettings5"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("kcmshell5"), {QStringLiteral("kcm_notifications")});
-    if (!launched)
-        launched = QProcess::startDetached(QStringLiteral("kcmshell"), {QStringLiteral("kcm_notifications")});
 
     if (!launched) {
         showTrayMessage(tr("Notification settings unavailable"),
@@ -603,7 +615,7 @@ void MainWindow::updateTrayMenu() {
             connect(itemAction, &QAction::triggered, [this, url, id]() {
                 if (notificationListWidget) notificationListWidget->requestMarkAsRead(id);
                 QString htmlUrl = GitHubClient::apiToHtmlUrl(url, id);
-                QDesktopServices::openUrl(QUrl(htmlUrl));
+                UrlHelper::openUrl(htmlUrl);
 
                 if (notificationListWidget) notificationListWidget->focusNotification(id);
             });
@@ -998,8 +1010,6 @@ void MainWindow::setupMenus() {
         {tr("My repos"), "my_repos", "user:@me archived:false", "user:@me archived:false", "user:@me archived:false"},
         {tr("My forks"), "my_forks", "user:@me fork:true archived:false", "user:@me fork:true archived:false",
          "user:@me fork:true archived:false"},
-        {tr("Repos I have admin access to"), "admin_access", "user:@me archived:false", "user:@me archived:false",
-         "user:@me archived:false"},
         {tr("Archived"), "archived", "archived:true involves:@me", "archived:true involves:@me",
          "archived:true user:@me"},
         {tr("All (Unfiltered)"), "unfiltered", "involves:@me", "involves:@me", "user:@me"}};
@@ -1138,7 +1148,7 @@ void MainWindow::sendNotification(const Notification& n) {
     auto action1 = notification->addAction(tr("Open in GitHub"));
     connect(action1, &KNotificationAction::activated, this, [this, n]() {
         QString htmlUrl = GitHubClient::apiToHtmlUrl(n.url, n.id);
-        QDesktopServices::openUrl(QUrl(htmlUrl));
+        UrlHelper::openUrl(htmlUrl);
     });
 
     auto action2 = notification->addAction(tr("Open kgithub-notify"));
