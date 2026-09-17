@@ -4,12 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-enum class DesktopEntryStatus {
-    Missing,
-    ValidUsable,
-    PresentMismatched,
-    PresentUnusable
-};
+enum class DesktopEntryStatus { Missing, ValidUsable, PresentMismatched, PresentUnusable };
 
 struct DesktopEntryDiagnosis {
     DesktopEntryStatus status = DesktopEntryStatus::Missing;

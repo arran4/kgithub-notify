@@ -15,10 +15,10 @@ QString DesktopEntryHelper::escapeExec(const QString& executablePath, bool backg
 
     bool needsQuotes = false;
     for (const QChar& c : executablePath) {
-        if (c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') ||
-            c == QChar('>') || c == QChar('<') || c == QChar('&') || c == QChar(';') ||
-            c == QChar('|') || c == QChar('$') || c == QChar('*') || c == QChar('?') ||
-            c == QChar('!') || c == QChar('`')) {
+        if (c.isSpace() || c == QChar('"') || c == QChar('\'') || c == QChar('\\') || c == QChar('>') ||
+            c == QChar('<') || c == QChar('&') || c == QChar(';') || c == QChar('|') || c == QChar('$') ||
+            c == QChar('*') || c == QChar('?') || c == QChar('!') || c == QChar('`') || c == QChar('~') ||
+            c == QChar('#') || c == QChar('(') || c == QChar(')')) {
             needsQuotes = true;
             break;
         }
@@ -111,9 +111,8 @@ QString DesktopEntryHelper::unquoteExec(const QString& execLine) {
     return result;
 }
 
-DesktopEntryDiagnosis DesktopEntryHelper::diagnose(const QString& desktopFileName,
-                                                  const QStringList& searchDirs,
-                                                  const QString& expectedExecutable) {
+DesktopEntryDiagnosis DesktopEntryHelper::diagnose(const QString& desktopFileName, const QStringList& searchDirs,
+                                                   const QString& expectedExecutable) {
     DesktopEntryDiagnosis diag;
     QString filename = desktopFileName;
     if (filename.isEmpty()) {
@@ -202,13 +201,13 @@ DesktopEntryDiagnosis DesktopEntryHelper::diagnose(const QString& desktopFileNam
         diag.isUsable = true;
     } else if (execExists && execInfo.isExecutable()) {
         diag.status = DesktopEntryStatus::PresentMismatched;
-        diag.reason = QStringLiteral("Desktop entry points to a different executable: %1 (expected %2)")
-                          .arg(execPath, expected);
+        diag.reason =
+            QStringLiteral("Desktop entry points to a different executable: %1 (expected %2)").arg(execPath, expected);
         diag.isUsable = true;
     } else {
         diag.status = DesktopEntryStatus::PresentUnusable;
-        diag.reason = QStringLiteral("Desktop entry Exec target '%1' does not exist or is not executable")
-                          .arg(execPath);
+        diag.reason =
+            QStringLiteral("Desktop entry Exec target '%1' does not exist or is not executable").arg(execPath);
         diag.isUsable = false;
     }
 
@@ -228,13 +227,7 @@ bool DesktopEntryHelper::registerDesktopEntry(const QString& targetDir, bool ove
     QString base = QGuiApplication::desktopFileName();
     if (base.isEmpty()) base = QStringLiteral("kgithub-notify");
     QString desktopFileName = base.endsWith(QLatin1String(".desktop")) ? base : base + QStringLiteral(".desktop");
-
     QString targetPath = dirPath + QLatin1Char('/') + desktopFileName;
-    if (QFile::exists(targetPath) && !overwrite) {
-        if (error)
-            *error = QStringLiteral("Desktop entry already exists and overwrite not requested: %1").arg(targetPath);
-        return false;
-    }
 
     QString execCmd = escapeExec(QCoreApplication::applicationFilePath(), false);
 
@@ -250,6 +243,26 @@ bool DesktopEntryHelper::registerDesktopEntry(const QString& targetDir, bool ove
     out << "Categories=Development;Utility;Qt;KDE;\n";
     out << "StartupWMClass=kgithub-notify\n";
     out << "Terminal=false\n";
+
+    if (QFile::exists(targetPath)) {
+        QFile existingFile(targetPath);
+        if (existingFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString existingContent = QString::fromUtf8(existingFile.readAll());
+            existingFile.close();
+            if (existingContent == content) {
+                return true;
+            }
+        }
+        if (!overwrite) {
+            if (error) {
+                *error = QStringLiteral(
+                             "Desktop entry '%1' already exists with different contents. "
+                             "Use --register-desktop-overwrite to replace.")
+                             .arg(targetPath);
+            }
+            return false;
+        }
+    }
 
     QString tempPath = targetPath + QStringLiteral(".tmp.%1").arg(QCoreApplication::applicationPid());
     QFile tempFile(tempPath);
@@ -285,7 +298,7 @@ bool DesktopEntryHelper::registerDesktopEntry(const QString& targetDir, bool ove
 }
 
 bool DesktopEntryHelper::writeAutostartEntry(bool enable, bool background, const QString& configLocation,
-                                            QString* error) {
+                                             QString* error) {
     QString configPath =
         configLocation.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) : configLocation;
 

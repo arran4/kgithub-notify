@@ -54,9 +54,16 @@ int main(int argc, char* argv[]) {
                                       QCoreApplication::translate("main", "Run self-diagnostics and exit."));
     parser.addOption(diagnoseOption);
 
-    QCommandLineOption registerOption(QStringList() << QStringLiteral("register-desktop"),
-                                      QCoreApplication::translate("main", "Register desktop entry for current executable."));
+    QCommandLineOption registerOption(
+        QStringList{QStringLiteral("register-desktop")},
+        QCoreApplication::translate("main", "Register desktop entry for current executable."));
     parser.addOption(registerOption);
+
+    QCommandLineOption registerOverwriteOption(
+        QStringList{QStringLiteral("register-desktop-overwrite"), QStringLiteral("force-register-desktop")},
+        QCoreApplication::translate("main",
+                                    "Register or overwrite desktop entry for current executable even if mismatched."));
+    parser.addOption(registerOverwriteOption);
 
     parser.process(app);
 
@@ -64,10 +71,13 @@ int main(int argc, char* argv[]) {
     QString desktopFileName = QGuiApplication::desktopFileName() + QStringLiteral(".desktop");
     QStringList appPaths = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
 
-    if (parser.isSet(registerOption)) {
+    bool doRegister = parser.isSet(registerOption) || parser.isSet(registerOverwriteOption);
+    bool doOverwrite = parser.isSet(registerOverwriteOption);
+
+    if (doRegister) {
         QString err;
-        if (!DesktopEntryHelper::registerDesktopEntry(QString(), true /* overwrite */, &err)) {
-            qCritical() << "Failed to register desktop file:" << err;
+        if (!DesktopEntryHelper::registerDesktopEntry(QString(), doOverwrite, &err)) {
+            qCritical().noquote() << "Failed to register desktop file:" << err;
             return 1;
         }
         qInfo() << "Successfully registered desktop file for current executable.";
