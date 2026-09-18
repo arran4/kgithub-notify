@@ -142,6 +142,19 @@ class TestDesktopEntryHelper : public QObject {
             QString::fromUtf8(R"(/opt/my apps/%20/"test"/$var/`run`/bin\dir)"),
         };
 
+        QStringList expectedDecodedPaths = {
+            QStringLiteral("/usr/bin/simple-app --background"),
+            QString::fromUtf8(R"("/opt/my apps/space-app" --background)"),
+            QString::fromUtf8(R"("/opt/\"quoted\"/app" --background)"),
+            QString::fromUtf8(R"("/opt\\path\\app" --background)"),
+            QString::fromUtf8(R"("/opt/\$HOME/app" --background)"),
+            QString::fromUtf8(R"("/opt/\`cmd\`/app" --background)"),
+            QStringLiteral("/opt/%%20/app --background"),
+            QString::fromUtf8(R"("/opt/my apps/%%20/\"test\"/\$var/\`run\`/bin\\dir" --background)"),
+        };
+
+        QCOMPARE(testPaths.size(), expectedDecodedPaths.size());
+
         for (int i = 0; i < testPaths.size(); ++i) {
             const QString& path = testPaths.at(i);
             QString desktopFilePath = tempDir.path() + QStringLiteral("/integration_%1.desktop").arg(i);
@@ -163,8 +176,8 @@ class TestDesktopEntryHelper : public QObject {
             QString kExec = df.desktopGroup().readEntry("Exec");
 
             // KDesktopFile decodes the Desktop Entry string value escaping layer (Layer 2)
-            QString expectedLayer1CommandLine = DesktopEntryHelper::deserializeStringValue(escapedExec);
-            QCOMPARE(kExec, expectedLayer1CommandLine);
+            // Hardcode expected output or provide independent oracle to prevent self-reference
+            QCOMPARE(kExec, expectedDecodedPaths.at(i));
 
             // 2. Verify DesktopEntryHelper::parseExecFirstArgument correctly decodes Layer 1
             QString parsedExecutable = DesktopEntryHelper::parseExecFirstArgument(kExec);
