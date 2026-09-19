@@ -169,7 +169,7 @@ jobs:
       profile: ${{ steps.profile.outputs.profile }}
       has_qt_cpp: ${{ steps.detect.outputs.has_qt_cpp }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: detect
         shell: bash
@@ -197,7 +197,7 @@ jobs:
       release_commit: ${{ steps.tag.outputs.release_commit }}
       next_version: ${{ steps.tag.outputs.next_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup git-tag-inc
@@ -328,7 +328,7 @@ jobs:
           git bundle create release.bundle HEAD
 
       - name: Upload release bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-bundle-${{ github.run_id }}
           path: release.bundle
@@ -340,10 +340,10 @@ jobs:
     if: ${{ needs.route.outputs.run_cleanup != 'true' && (needs.route.outputs.is_nightly == 'true' || needs.route.outputs.is_monthly == 'true') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -371,12 +371,12 @@ jobs:
     outputs:
       release_tag: ${{ steps.export.outputs.release_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download release bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-bundle-${{ github.run_id }}
           path: .
@@ -511,13 +511,13 @@ jobs:
           apt-get install -y git sudo curl jq ca-certificates
           git config --global --add safe.directory '*'
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download release bundle
         if: ${{ needs.route.outputs.run_tag_creation == 'true' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-bundle-${{ github.run_id }}
           path: .
@@ -552,7 +552,7 @@ jobs:
           QT_QPA_PLATFORM=offscreen ctest --output-on-failure
 
       - name: Upload Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts-ubuntu-latest
           path: build/kgithub-notify
@@ -572,7 +572,7 @@ jobs:
           apt-get install -y git sudo curl jq ca-certificates clang-format
           git config --global --add safe.directory '*'
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run autofix formatters
         shell: bash
@@ -615,41 +615,13 @@ jobs:
             --head "$BRANCH" \
             --label "ci-autofix"
 
-  flatpak-build:
-    name: Flatpak Build
-    needs: [route, discover]
-    if: ${{ !failure() && !cancelled() && needs.discover.outputs.has_qt_cpp == 'true' && needs.route.outputs.run_release == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-      - name: Install xvfb and flatpak-builder
-        run: |
-          sudo apt-get update && sudo apt-get install -y xvfb flatpak-builder flatpak
-          sudo mkdir -p /etc/polkit-1/rules.d/
-          echo 'polkit.addRule(function(action, subject) { if (action.id.indexOf("org.freedesktop.Flatpak.") === 0) { return polkit.Result.YES; } });' | sudo tee /etc/polkit-1/rules.d/99-flatpak.rules
-          sudo systemctl restart polkit || true
-          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-      - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: kgithub-notify.flatpak
-          manifest-path: com.arran4.kgithub_notify.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-      - name: Upload Flatpak Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: flatpak-bundle
-          path: kgithub-notify.flatpak
-
   cleanup-autofix-prs:
     name: Cleanup autofix PRs on parent close
     needs: [route]
     if: ${{ needs.route.outputs.run_cleanup == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PARENT_PR: ${{ github.event.pull_request.number }}
@@ -664,40 +636,33 @@ jobs:
 
   publish-release:
     name: Publish Release
-    needs: [route, cpp-qt-build-test, flatpak-build]
+    needs: [route, cpp-qt-build-test]
     if: ${{ !failure() && !cancelled() && needs.route.outputs.run_release == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
       discussions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-artifacts-ubuntu-latest
           path: build
-
-      - name: Download Flatpak Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: flatpak-bundle
-          path: .
 
       - name: Rename executable
         run: mv build/kgithub-notify build/kgithub-notify-linux-amd64
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           files: |
             build/kgithub-notify-linux-amd64
-            kgithub-notify.flatpak
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -709,7 +674,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout arrans_overlay
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: arran4/arrans_overlay
           path: arrans_overlay
