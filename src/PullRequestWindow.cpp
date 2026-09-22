@@ -346,7 +346,6 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         QString createdAt = obj["created_at"].toString();
         QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
 
-
         PREvent ev;
         ev.id = QString::number(obj["id"].toVariant().toLongLong());
         ev.type = PREvent::Body;
@@ -357,7 +356,6 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
 
         // Update RHS conversation metadata
         m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
-
 
         QString createdStr =
             createdDt.isValid() ? QLocale().toString(createdDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
@@ -405,7 +403,6 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     }
     reply->deleteLater();
 }
-
 
 QString PullRequestWindow::parseNextLink(QNetworkReply* reply) {
     if (reply->hasRawHeader("Link")) {
@@ -488,7 +485,8 @@ void PullRequestWindow::updateConversationUi() {
     m_events.erase(last, m_events.end());
 
     for (const PREvent& ev : m_events) {
-        QString formattedDate = ev.timestamp.isValid() ? QLocale().toString(ev.timestamp.toLocalTime(), QLocale::ShortFormat) : "";
+        QString formattedDate =
+            ev.timestamp.isValid() ? QLocale().toString(ev.timestamp.toLocalTime(), QLocale::ShortFormat) : "";
         if (ev.type == PREvent::TimelineEvent) {
             QString text = ev.actionText;
             if (!formattedDate.isEmpty()) {
@@ -500,7 +498,8 @@ void PullRequestWindow::updateConversationUi() {
             label->setStyleSheet("color: gray;");
             m_commentsContainerLayout->insertWidget(m_commentsContainerLayout->count() - 1, label);
         } else if (ev.type == PREvent::ReviewComment) {
-            QString fullBody = tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(ev.path, ev.diffHunk, ev.body);
+            QString fullBody =
+                tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(ev.path, ev.diffHunk, ev.body);
             addCommentToUI(ev.author, fullBody, ev.timestamp.toString(Qt::ISODate));
         } else {
             addCommentToUI(ev.author, ev.body, ev.timestamp.toString(Qt::ISODate));
@@ -511,7 +510,8 @@ void PullRequestWindow::updateConversationUi() {
 void PullRequestWindow::fetchTimeline(const QString& urlStr) {
     QString targetUrl = urlStr.isEmpty() ? m_timelineState.nextUrl : urlStr;
     if (targetUrl.isEmpty()) return;
-    m_timelineState.isLoading = true; updateCollectionStatusUi();
+    m_timelineState.isLoading = true;
+    updateCollectionStatusUi();
     m_timelineState.isFailed = false;
     m_timelineState.errorString.clear();
     QUrl url(targetUrl);
@@ -528,7 +528,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
         reply->deleteLater();
         return;
     }
-    m_timelineState.isLoading = false; updateCollectionStatusUi();
+    m_timelineState.isLoading = false;
+    updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
         m_timelineState.nextUrl = parseNextLink(reply);
         QByteArray data = reply->readAll();
@@ -543,6 +544,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 QString author = obj["user"].toObject()["login"].toString();
                 QString body = obj["body"].toString();
                 QString createdAt = obj["created_at"].toString();
+
                 PREvent ev;
                 ev.id = QString::number(obj["id"].toVariant().toLongLong());
                 ev.type = PREvent::IssueComment;
@@ -556,73 +558,35 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
 
                 if (event == "committed") {
                     QString sha = obj["sha"].toString().left(7);
-                    QString message = obj["message"].toString().section('\n', 0, 0);
-                    QJsonObject authorObj = obj["author"].toObject();
-                    QString author = authorObj["name"].toString();
-                    if (createdAt.isEmpty()) {
-                        createdAt = authorObj["date"].toString();
-                    }
-                    text = tr("<i>%1 committed %2: %3</i>")
-                               .arg(author.toHtmlEscaped(), sha.toHtmlEscaped(), message.toHtmlEscaped());
-                } else if (event == "assigned") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<i>%1 assigned %2</i>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
-                } else if (event == "unassigned") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<i>%1 unassigned %2</i>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
-                } else if (event == "labeled") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    QString label = obj["label"].toObject()["name"].toString();
-                    text = tr("<i>%1 added the %2 label</i>").arg(actor.toHtmlEscaped(), label.toHtmlEscaped());
-                } else if (event == "unlabeled") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    QString label = obj["label"].toObject()["name"].toString();
-                    text = tr("<i>%1 removed the %2 label</i>").arg(actor.toHtmlEscaped(), label.toHtmlEscaped());
-                } else if (event == "closed") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 closed this</i>").arg(actor.toHtmlEscaped());
-                } else if (event == "reopened") {
-                    QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 reopened this</i>").arg(actor.toHtmlEscaped());
+                    QString author = obj["author"].toObject()["name"].toString();
+                    text = tr("<b>%1</b> added commit <code>%2</code>").arg(author, sha);
+                    createdAt = obj["author"].toObject()["date"].toString();
                 } else if (event == "merged") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString commitId = obj["commit_id"].toString().left(7);
-                    text = tr("<i>%1 merged commit %2</i>").arg(actor.toHtmlEscaped(), commitId.toHtmlEscaped());
-                } else if (event == "review_requested") {
+                    text = tr("<b>%1</b> merged commit <code>%2</code>").arg(actor, commitId);
+                } else if (event == "closed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    QString requested = obj["requested_reviewer"].toObject()["login"].toString();
-                    if (requested.isEmpty()) {
-                        requested = obj["requested_team"].toObject()["name"].toString();
-                    }
-                    text = tr("<i>%1 requested a review from %2</i>")
-                               .arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
-                } else if (event == "review_request_removed") {
+                    text = tr("<b>%1</b> closed this").arg(actor);
+                } else if (event == "reopened") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    QString requested = obj["requested_reviewer"].toObject()["login"].toString();
-                    if (requested.isEmpty()) {
-                        requested = obj["requested_team"].toObject()["name"].toString();
-                    }
-                    text = tr("<i>%1 removed the request for review from %2</i>")
-                               .arg(actor.toHtmlEscaped(), requested.toHtmlEscaped());
-                } else if (event == "reviewed") {
-                    QString actor = obj["user"].toObject()["login"].toString();
-                    QString state = obj["state"].toString();
-                    text = tr("<i>%1 reviewed this (%2)</i>").arg(actor.toHtmlEscaped(), state.toHtmlEscaped());
-                } else if (event == "head_ref_force_pushed") {
+                    text = tr("<b>%1</b> reopened this").arg(actor);
+                } else if (event == "labeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<i>%1 force-pushed the branch</i>").arg(actor.toHtmlEscaped());
-                } else {
+                    QString labelName = obj["label"].toObject()["name"].toString();
+                    text = tr("<b>%1</b> added label <b>%2</b>").arg(actor, labelName);
+                } else if (event == "unlabeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    if (actor.isEmpty()) {
-                        actor = obj["user"].toObject()["login"].toString();
-                    }
-                    if (actor.isEmpty()) {
-                        text = tr("<i>Event: %1</i>").arg(event.toHtmlEscaped());
-                    } else {
-                        text = tr("<i>%1: %2</i>").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
-                    }
+                    QString labelName = obj["label"].toObject()["name"].toString();
+                    text = tr("<b>%1</b> removed label <b>%2</b>").arg(actor, labelName);
+                } else if (event == "assigned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString assignee = obj["assignee"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> assigned <b>%2</b>").arg(actor, assignee);
+                } else if (event == "unassigned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString assignee = obj["assignee"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor, assignee);
                 }
 
                 if (!text.isEmpty()) {
@@ -637,24 +601,25 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
         }
 
         if (!m_timelineState.nextUrl.isEmpty()) {
-            fetchTimeline(m_timelineState.nextUrl);
+            fetchTimeline();
         } else {
             m_timelineState.isComplete = true;
-            updateConversationUi();
         }
+        updateConversationUi();
+        updateCollectionStatusUi();
     } else {
         m_timelineState.isFailed = true;
         m_timelineState.errorString = reply->errorString();
-        qWarning() << "Failed to fetch timeline:" << reply->errorString();
+        updateCollectionStatusUi();
     }
-    updateCollectionStatusUi();
     reply->deleteLater();
 }
 
 void PullRequestWindow::fetchReviewComments(const QString& urlStr) {
     QString targetUrl = urlStr.isEmpty() ? m_reviewState.nextUrl : urlStr;
     if (targetUrl.isEmpty()) return;
-    m_reviewState.isLoading = true; updateCollectionStatusUi();
+    m_reviewState.isLoading = true;
+    updateCollectionStatusUi();
     m_reviewState.isFailed = false;
     m_reviewState.errorString.clear();
     QUrl url(targetUrl);
@@ -671,7 +636,8 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
         reply->deleteLater();
         return;
     }
-    m_reviewState.isLoading = false; updateCollectionStatusUi();
+    m_reviewState.isLoading = false;
+    updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
         m_reviewState.nextUrl = parseNextLink(reply);
         QByteArray data = reply->readAll();
@@ -680,15 +646,27 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
 
         for (const QJsonValue& val : array) {
             QJsonObject obj = val.toObject();
-            QString author = obj["user"].toObject()["login"].toString();
-            QString body = obj["body"].toString();
-            QString createdAt = obj["created_at"].toString();
-            QString path = obj["path"].toString();
-            QString diffHunk = obj["diff_hunk"].toString();
-
-            QString fullBody = tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(path, diffHunk, body);
-            addCommentToUI(author, fullBody, createdAt);
+            PREvent ev;
+            ev.id = QString::number(obj["id"].toVariant().toLongLong());
+            ev.type = PREvent::ReviewComment;
+            ev.timestamp = QDateTime::fromString(obj["created_at"].toString(), Qt::ISODate);
+            ev.author = obj["user"].toObject()["login"].toString();
+            ev.body = obj["body"].toString();
+            ev.diffHunk = obj["diff_hunk"].toString();
+            ev.path = obj["path"].toString();
+            m_events.append(ev);
         }
+        if (!m_reviewState.nextUrl.isEmpty()) {
+            fetchReviewComments();
+        } else {
+            m_reviewState.isComplete = true;
+        }
+        updateConversationUi();
+        updateCollectionStatusUi();
+    } else {
+        m_reviewState.isFailed = true;
+        m_reviewState.errorString = reply->errorString();
+        updateCollectionStatusUi();
     }
     reply->deleteLater();
 }
@@ -696,7 +674,8 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
 void PullRequestWindow::fetchCommits(const QString& urlStr) {
     QString targetUrl = urlStr.isEmpty() ? m_commitsState.nextUrl : urlStr;
     if (targetUrl.isEmpty()) return;
-    m_commitsState.isLoading = true; updateCollectionStatusUi();
+    m_commitsState.isLoading = true;
+    updateCollectionStatusUi();
     m_commitsState.isFailed = false;
     m_commitsState.errorString.clear();
     QUrl url(targetUrl);
@@ -708,30 +687,52 @@ void PullRequestWindow::fetchCommits(const QString& urlStr) {
 }
 
 void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
-    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration ||
+        reply->property("collectionGeneration").toUuid() != m_commitsState.generation) {
         reply->deleteLater();
         return;
     }
+    m_commitsState.isLoading = false;
+    updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
 
-        m_commitsTable->setRowCount(0);
         for (int i = 0; i < array.size(); ++i) {
             QJsonObject obj = array[i].toObject();
             QString sha = obj["sha"].toString().left(7);
             QJsonObject commitObj = obj["commit"].toObject();
-            QString message = commitObj["message"].toString().section('\n', 0, 0);  // First line only
+            QString message = commitObj["message"].toString().section('\n', 0, 0);
             QString author = commitObj["author"].toObject()["name"].toString();
             QString date = commitObj["author"].toObject()["date"].toString();
 
-            m_commitsTable->insertRow(i);
-            m_commitsTable->setItem(i, 0, new QTableWidgetItem(sha));
-            m_commitsTable->setItem(i, 1, new QTableWidgetItem(author));
-            m_commitsTable->setItem(i, 2, new QTableWidgetItem(message));
-            m_commitsTable->setItem(i, 3, new QTableWidgetItem(date));
+            int row = m_commitsTable->rowCount();
+            m_commitsTable->insertRow(row);
+            m_commitsTable->setItem(row, 0, new QTableWidgetItem(sha));
+            m_commitsTable->setItem(row, 1, new QTableWidgetItem(message));
+            m_commitsTable->setItem(row, 2, new QTableWidgetItem(author));
+            m_commitsTable->setItem(row, 3,
+                                    new QTableWidgetItem(QLocale().toString(QDateTime::fromString(date, Qt::ISODate),
+                                                                            QLocale::ShortFormat)));
         }
+
+        m_commitsState.nextUrl.clear();
+        if (reply->hasRawHeader("Link")) {
+            m_commitsState.nextUrl = parseNextLink(reply);
+            if (!m_commitsState.nextUrl.isEmpty()) {
+                fetchCommits();
+            }
+        }
+
+        if (m_commitsState.nextUrl.isEmpty()) {
+            m_commitsState.isComplete = true;
+        }
+        updateCollectionStatusUi();
+    } else {
+        m_commitsState.isFailed = true;
+        m_commitsState.errorString = reply->errorString();
+        updateCollectionStatusUi();
     }
     reply->deleteLater();
 }
@@ -739,7 +740,8 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
 void PullRequestWindow::fetchFiles(const QString& urlStr) {
     QString targetUrl = urlStr.isEmpty() ? m_filesState.nextUrl : urlStr;
     if (targetUrl.isEmpty()) return;
-    m_filesState.isLoading = true; updateCollectionStatusUi();
+    m_filesState.isLoading = true;
+    updateCollectionStatusUi();
     m_filesState.isFailed = false;
     m_filesState.errorString.clear();
     QUrl url(targetUrl);
@@ -751,39 +753,49 @@ void PullRequestWindow::fetchFiles(const QString& urlStr) {
 }
 
 void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
-    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration ||
+        reply->property("collectionGeneration").toUuid() != m_filesState.generation) {
         reply->deleteLater();
         return;
     }
+    m_filesState.isLoading = false;
+    updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
 
-        m_filesTable->setRowCount(0);
         for (int i = 0; i < array.size(); ++i) {
             QJsonObject obj = array[i].toObject();
             QString filename = obj["filename"].toString();
+            QString status = obj["status"].toString();
             int additions = obj["additions"].toInt();
             int deletions = obj["deletions"].toInt();
-            int changes = obj["changes"].toInt();
-            QString blobUrl = obj["blob_url"].toString();
 
-            m_filesTable->insertRow(i);
-            QTableWidgetItem* fileItem = new QTableWidgetItem(filename);
-            fileItem->setData(Qt::UserRole, blobUrl);
-            m_filesTable->setItem(i, 0, fileItem);
-
-            QTableWidgetItem* addItem = new QTableWidgetItem(QString::number(additions));
-            addItem->setForeground(QBrush(Qt::darkGreen));
-            m_filesTable->setItem(i, 1, addItem);
-
-            QTableWidgetItem* delItem = new QTableWidgetItem(QString::number(deletions));
-            delItem->setForeground(QBrush(Qt::darkRed));
-            m_filesTable->setItem(i, 2, delItem);
-
-            m_filesTable->setItem(i, 3, new QTableWidgetItem(QString::number(changes)));
+            int row = m_filesTable->rowCount();
+            m_filesTable->insertRow(row);
+            m_filesTable->setItem(row, 0, new QTableWidgetItem(filename));
+            m_filesTable->setItem(row, 1, new QTableWidgetItem(status));
+            m_filesTable->setItem(row, 2, new QTableWidgetItem(QString::number(additions)));
+            m_filesTable->setItem(row, 3, new QTableWidgetItem(QString::number(deletions)));
         }
+
+        m_filesState.nextUrl.clear();
+        if (reply->hasRawHeader("Link")) {
+            m_filesState.nextUrl = parseNextLink(reply);
+            if (!m_filesState.nextUrl.isEmpty()) {
+                fetchFiles();
+            }
+        }
+
+        if (m_filesState.nextUrl.isEmpty()) {
+            m_filesState.isComplete = true;
+        }
+        updateCollectionStatusUi();
+    } else {
+        m_filesState.isFailed = true;
+        m_filesState.errorString = reply->errorString();
+        updateCollectionStatusUi();
     }
     reply->deleteLater();
 }

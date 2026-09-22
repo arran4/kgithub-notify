@@ -18,7 +18,6 @@
 #include "GitHubClient.h"
 #include "Notification.h"
 
-
 struct PREvent {
     QString id;
     enum Type { Body, IssueComment, ReviewComment, TimelineEvent } type;
@@ -115,7 +114,6 @@ class PullRequestWindow : public KXmlGuiWindow {
     void updateConversationUi();
     void updateCollectionStatusUi();
     QString parseNextLink(QNetworkReply* reply);
-
 
     // Conversation Tab
     QWidget* m_conversationTab;
