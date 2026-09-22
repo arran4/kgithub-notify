@@ -595,6 +595,41 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(prNetwork.requests.size(), 6);  // No more requests
     }
 
+    void testPrHostileTimelineInput() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QJsonArray timeline;
+        QJsonObject event1;
+        event1["event"] = "labeled";
+        event1["actor"] = QJsonObject{{"login", "<script>alert(1)</script>"}};
+        event1["label"] = QJsonObject{{"name", "<b>evil</b>"}};
+        event1["id"] = 101;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timeline.append(event1);
+
+        prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
+
+        bool foundEscaped = false;
+        for (const PREvent& ev : pr.m_events) {
+            if (ev.type == PREvent::TimelineEvent) {
+                QVERIFY(ev.actionText.contains("&lt;script&gt;"));
+                QVERIFY(ev.actionText.contains("&lt;b&gt;evil&lt;/b&gt;"));
+                QVERIFY(!ev.actionText.contains("<script>"));
+                foundEscaped = true;
+            }
+        }
+        QVERIFY(foundEscaped);
+    }
+
     void testPrStaleReplyRejected() {
         GitHubClient client;
         FakeNetworkAccessManager prNetwork;

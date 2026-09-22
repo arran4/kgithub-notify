@@ -339,8 +339,6 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
             delete item;
         }
 
-        m_commentsContainerLayout->addStretch();
-
         QString author = obj["user"].toObject()["login"].toString();
         QString body = obj["body"].toString();
         QString createdAt = obj["created_at"].toString();
@@ -478,8 +476,6 @@ void PullRequestWindow::updateConversationUi() {
         delete item;
     }
 
-    m_commentsContainerLayout->addStretch();
-
     std::sort(m_events.begin(), m_events.end());
     auto last = std::unique(m_events.begin(), m_events.end());
     m_events.erase(last, m_events.end());
@@ -505,6 +501,7 @@ void PullRequestWindow::updateConversationUi() {
             addCommentToUI(ev.author, ev.body, ev.timestamp.toString(Qt::ISODate));
         }
     }
+    m_commentsContainerLayout->addStretch();
 }
 
 void PullRequestWindow::fetchTimeline(const QString& urlStr) {
@@ -559,34 +556,37 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (event == "committed") {
                     QString sha = obj["sha"].toString().left(7);
                     QString author = obj["author"].toObject()["name"].toString();
-                    text = tr("<b>%1</b> added commit <code>%2</code>").arg(author, sha);
+                    text =
+                        tr("<b>%1</b> added commit <code>%2</code>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped());
                     createdAt = obj["author"].toObject()["date"].toString();
                 } else if (event == "merged") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString commitId = obj["commit_id"].toString().left(7);
-                    text = tr("<b>%1</b> merged commit <code>%2</code>").arg(actor, commitId);
+                    text = tr("<b>%1</b> merged commit <code>%2</code>")
+                               .arg(actor.toHtmlEscaped(), commitId.toHtmlEscaped());
                 } else if (event == "closed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<b>%1</b> closed this").arg(actor);
+                    text = tr("<b>%1</b> closed this").arg(actor.toHtmlEscaped());
                 } else if (event == "reopened") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    text = tr("<b>%1</b> reopened this").arg(actor);
+                    text = tr("<b>%1</b> reopened this").arg(actor.toHtmlEscaped());
                 } else if (event == "labeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString labelName = obj["label"].toObject()["name"].toString();
-                    text = tr("<b>%1</b> added label <b>%2</b>").arg(actor, labelName);
+                    text = tr("<b>%1</b> added label <b>%2</b>").arg(actor.toHtmlEscaped(), labelName.toHtmlEscaped());
                 } else if (event == "unlabeled") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString labelName = obj["label"].toObject()["name"].toString();
-                    text = tr("<b>%1</b> removed label <b>%2</b>").arg(actor, labelName);
+                    text =
+                        tr("<b>%1</b> removed label <b>%2</b>").arg(actor.toHtmlEscaped(), labelName.toHtmlEscaped());
                 } else if (event == "assigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<b>%1</b> assigned <b>%2</b>").arg(actor, assignee);
+                    text = tr("<b>%1</b> assigned <b>%2</b>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
                 } else if (event == "unassigned") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
-                    text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor, assignee);
+                    text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
                 }
 
                 if (!text.isEmpty()) {
@@ -710,11 +710,11 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
             int row = m_commitsTable->rowCount();
             m_commitsTable->insertRow(row);
             m_commitsTable->setItem(row, 0, new QTableWidgetItem(sha));
-            m_commitsTable->setItem(row, 1, new QTableWidgetItem(message));
-            m_commitsTable->setItem(row, 2, new QTableWidgetItem(author));
-            m_commitsTable->setItem(row, 3,
+            m_commitsTable->setItem(row, 1, new QTableWidgetItem(author));
+            m_commitsTable->setItem(row, 2,
                                     new QTableWidgetItem(QLocale().toString(QDateTime::fromString(date, Qt::ISODate),
                                                                             QLocale::ShortFormat)));
+            m_commitsTable->setItem(row, 3, new QTableWidgetItem(message));
         }
 
         m_commitsState.nextUrl.clear();
@@ -771,13 +771,18 @@ void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
             QString status = obj["status"].toString();
             int additions = obj["additions"].toInt();
             int deletions = obj["deletions"].toInt();
+            QString blobUrl = obj["blob_url"].toString();
 
             int row = m_filesTable->rowCount();
             m_filesTable->insertRow(row);
-            m_filesTable->setItem(row, 0, new QTableWidgetItem(filename));
-            m_filesTable->setItem(row, 1, new QTableWidgetItem(status));
-            m_filesTable->setItem(row, 2, new QTableWidgetItem(QString::number(additions)));
-            m_filesTable->setItem(row, 3, new QTableWidgetItem(QString::number(deletions)));
+
+            auto* filenameItem = new QTableWidgetItem(filename);
+            filenameItem->setData(Qt::UserRole, blobUrl);
+
+            m_filesTable->setItem(row, 0, filenameItem);
+            m_filesTable->setItem(row, 1, new QTableWidgetItem(QString::number(additions)));
+            m_filesTable->setItem(row, 2, new QTableWidgetItem(QString::number(deletions)));
+            m_filesTable->setItem(row, 3, new QTableWidgetItem(status));
         }
 
         m_filesState.nextUrl.clear();
@@ -816,6 +821,7 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
             QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe or invalid URL."));
         }
     }
+    m_commentsContainerLayout->addStretch();
 }
 
 void PullRequestWindow::addCommentToUI(const QString& author, const QString& body, const QString& createdAt) {
