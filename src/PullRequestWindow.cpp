@@ -133,6 +133,21 @@ void PullRequestWindow::setupUi() {
     QVBoxLayout* leftConvLayout = new QVBoxLayout(leftConvWidget);
     leftConvLayout->setContentsMargins(0, 0, 0, 0);
 
+    m_conversationStatusLabel = new QLabel();
+    m_conversationStatusLabel->hide();
+    m_conversationRetryBtn = new QPushButton(tr("Retry"));
+    m_conversationRetryBtn->hide();
+    QHBoxLayout* convStatusLayout = new QHBoxLayout();
+    convStatusLayout->addWidget(m_conversationStatusLabel);
+    convStatusLayout->addWidget(m_conversationRetryBtn);
+    convStatusLayout->addStretch();
+    leftConvLayout->addLayout(convStatusLayout);
+
+    connect(m_conversationRetryBtn, &QPushButton::clicked, this, [this]() {
+        if (m_timelineState.isFailed) fetchTimeline();
+        if (m_reviewState.isFailed) fetchReviewComments();
+    });
+
     m_commentsScrollArea = new QScrollArea();
     m_commentsScrollArea->setWidgetResizable(true);
     m_commentsContainer = new QWidget();
@@ -194,6 +209,20 @@ void PullRequestWindow::setupUi() {
     // 2. Commits Tab
     m_commitsTab = new QWidget();
     m_commitsLayout = new QVBoxLayout(m_commitsTab);
+
+    m_commitsStatusLabel = new QLabel();
+    m_commitsStatusLabel->hide();
+    m_commitsRetryBtn = new QPushButton(tr("Retry"));
+    m_commitsRetryBtn->hide();
+    QHBoxLayout* commitsStatusLayout = new QHBoxLayout();
+    commitsStatusLayout->addWidget(m_commitsStatusLabel);
+    commitsStatusLayout->addWidget(m_commitsRetryBtn);
+    commitsStatusLayout->addStretch();
+    m_commitsLayout->addLayout(commitsStatusLayout);
+
+    connect(m_commitsRetryBtn, &QPushButton::clicked, this, [this]() {
+        if (m_commitsState.isFailed) fetchCommits();
+    });
     m_commitsTable = new QTableWidget();
     m_commitsTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_commitsTable->setColumnCount(4);
@@ -207,6 +236,20 @@ void PullRequestWindow::setupUi() {
     // 3. Changed Files Tab
     m_filesTab = new QWidget();
     m_filesLayout = new QVBoxLayout(m_filesTab);
+
+    m_filesStatusLabel = new QLabel();
+    m_filesStatusLabel->hide();
+    m_filesRetryBtn = new QPushButton(tr("Retry"));
+    m_filesRetryBtn->hide();
+    QHBoxLayout* filesStatusLayout = new QHBoxLayout();
+    filesStatusLayout->addWidget(m_filesStatusLabel);
+    filesStatusLayout->addWidget(m_filesRetryBtn);
+    filesStatusLayout->addStretch();
+    m_filesLayout->addLayout(filesStatusLayout);
+
+    connect(m_filesRetryBtn, &QPushButton::clicked, this, [this]() {
+        if (m_filesState.isFailed) fetchFiles();
+    });
     m_filesTable = new QTableWidget();
     m_filesTable->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_filesTable->setColumnCount(4);
@@ -273,6 +316,24 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_issueCommentsUrl = issueUrl + "/comments";
         m_timelineUrl = issueUrl + "/timeline";
 
+        m_timelineState = CollectionState();
+        m_timelineState.generation = QUuid::createUuid();
+        m_timelineState.nextUrl = m_timelineUrl + "?per_page=100";
+
+        m_reviewState = CollectionState();
+        m_reviewState.generation = QUuid::createUuid();
+        m_reviewState.nextUrl = m_reviewCommentsUrl + "?per_page=100";
+
+        m_commitsState = CollectionState();
+        m_commitsState.generation = QUuid::createUuid();
+        m_commitsState.nextUrl = m_commitsUrl + "?per_page=100";
+
+        m_filesState = CollectionState();
+        m_filesState.generation = QUuid::createUuid();
+        m_filesState.nextUrl = m_notification.url + "/files?per_page=100";
+
+        m_events.clear();
+
         while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
             delete item->widget();
             delete item;
@@ -280,16 +341,24 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
 
         m_commentsContainerLayout->addStretch();
 
-        // Add the PR body as the first comment
         QString author = obj["user"].toObject()["login"].toString();
         QString body = obj["body"].toString();
         QString createdAt = obj["created_at"].toString();
-        addCommentToUI(author, body, createdAt);
+        QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
+
+
+        PREvent ev;
+        ev.id = QString::number(obj["id"].toVariant().toLongLong());
+        ev.type = PREvent::Body;
+        ev.timestamp = createdDt;
+        ev.author = author;
+        ev.body = body;
+        m_events.append(ev);
 
         // Update RHS conversation metadata
         m_openedByLabel->setText(tr("<b>Opened by:</b> %1").arg(author));
 
-        QDateTime createdDt = QDateTime::fromString(createdAt, Qt::ISODate);
+
         QString createdStr =
             createdDt.isValid() ? QLocale().toString(createdDt.toLocalTime(), QLocale::ShortFormat) : tr("N/A");
         m_createdAtLabel->setText(tr("<b>Created:</b> %1").arg(createdStr));
@@ -337,21 +406,131 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchTimeline() {
-    if (m_timelineUrl.isEmpty()) return;
-    QUrl url(m_timelineUrl);
+
+QString PullRequestWindow::parseNextLink(QNetworkReply* reply) {
+    if (reply->hasRawHeader("Link")) {
+        QString linkHeader = reply->rawHeader("Link");
+        QRegularExpression re("<([^>]+)>;\\s*rel=\"next\"");
+        QRegularExpressionMatch match = re.match(linkHeader);
+        if (match.hasMatch()) {
+            return match.captured(1);
+        }
+    }
+    return QString();
+}
+
+void PullRequestWindow::updateCollectionStatusUi() {
+    if (m_timelineState.isFailed || m_reviewState.isFailed) {
+        m_conversationStatusLabel->setText(tr("Error loading conversation."));
+        m_conversationStatusLabel->show();
+        m_conversationRetryBtn->show();
+    } else if (m_timelineState.isLoading || m_reviewState.isLoading) {
+        m_conversationStatusLabel->setText(tr("Loading conversation..."));
+        m_conversationStatusLabel->show();
+        m_conversationRetryBtn->hide();
+    } else {
+        m_conversationStatusLabel->hide();
+        m_conversationRetryBtn->hide();
+    }
+
+    if (m_commitsState.isFailed) {
+        m_commitsStatusLabel->setText(tr("Error loading commits: %1").arg(m_commitsState.errorString));
+        m_commitsStatusLabel->show();
+        m_commitsRetryBtn->show();
+    } else if (m_commitsState.isLoading) {
+        m_commitsStatusLabel->setText(tr("Loading commits..."));
+        m_commitsStatusLabel->show();
+        m_commitsRetryBtn->hide();
+    } else {
+        if (m_commitsTable->rowCount() == 0) {
+            m_commitsStatusLabel->setText(tr("No commits."));
+            m_commitsStatusLabel->show();
+        } else {
+            m_commitsStatusLabel->hide();
+        }
+        m_commitsRetryBtn->hide();
+    }
+
+    if (m_filesState.isFailed) {
+        m_filesStatusLabel->setText(tr("Error loading changed files: %1").arg(m_filesState.errorString));
+        m_filesStatusLabel->show();
+        m_filesRetryBtn->show();
+    } else if (m_filesState.isLoading) {
+        m_filesStatusLabel->setText(tr("Loading changed files..."));
+        m_filesStatusLabel->show();
+        m_filesRetryBtn->hide();
+    } else {
+        if (m_filesTable->rowCount() == 0) {
+            m_filesStatusLabel->setText(tr("No changed files."));
+            m_filesStatusLabel->show();
+        } else {
+            m_filesStatusLabel->hide();
+        }
+        m_filesRetryBtn->hide();
+    }
+}
+
+void PullRequestWindow::updateConversationUi() {
+    if ((!m_timelineState.isComplete && !m_timelineState.isFailed) ||
+        (!m_reviewState.isComplete && !m_reviewState.isFailed)) {
+        return;
+    }
+
+    while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+
+    m_commentsContainerLayout->addStretch();
+
+    std::sort(m_events.begin(), m_events.end());
+    auto last = std::unique(m_events.begin(), m_events.end());
+    m_events.erase(last, m_events.end());
+
+    for (const PREvent& ev : m_events) {
+        QString formattedDate = ev.timestamp.isValid() ? QLocale().toString(ev.timestamp.toLocalTime(), QLocale::ShortFormat) : "";
+        if (ev.type == PREvent::TimelineEvent) {
+            QString text = ev.actionText;
+            if (!formattedDate.isEmpty()) {
+                text += tr(" on %1").arg(formattedDate);
+            }
+            QLabel* label = new QLabel(text);
+            label->setTextFormat(Qt::RichText);
+            label->setWordWrap(true);
+            label->setStyleSheet("color: gray;");
+            m_commentsContainerLayout->insertWidget(m_commentsContainerLayout->count() - 1, label);
+        } else if (ev.type == PREvent::ReviewComment) {
+            QString fullBody = tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(ev.path, ev.diffHunk, ev.body);
+            addCommentToUI(ev.author, fullBody, ev.timestamp.toString(Qt::ISODate));
+        } else {
+            addCommentToUI(ev.author, ev.body, ev.timestamp.toString(Qt::ISODate));
+        }
+    }
+}
+
+void PullRequestWindow::fetchTimeline(const QString& urlStr) {
+    QString targetUrl = urlStr.isEmpty() ? m_timelineState.nextUrl : urlStr;
+    if (targetUrl.isEmpty()) return;
+    m_timelineState.isLoading = true; updateCollectionStatusUi();
+    m_timelineState.isFailed = false;
+    m_timelineState.errorString.clear();
+    QUrl url(targetUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
     reply->setProperty("generation", m_detailsGeneration);
+    reply->setProperty("collectionGeneration", m_timelineState.generation);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onTimelineReply(reply); });
 }
 
 void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
-    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration ||
+        reply->property("collectionGeneration").toUuid() != m_timelineState.generation) {
         reply->deleteLater();
         return;
     }
+    m_timelineState.isLoading = false; updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
+        m_timelineState.nextUrl = parseNextLink(reply);
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
@@ -364,7 +543,13 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 QString author = obj["user"].toObject()["login"].toString();
                 QString body = obj["body"].toString();
                 QString createdAt = obj["created_at"].toString();
-                addCommentToUI(author, body, createdAt);
+                PREvent ev;
+                ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                ev.type = PREvent::IssueComment;
+                ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
+                ev.author = author;
+                ev.body = body;
+                m_events.append(ev);
             } else {
                 QString createdAt = obj["created_at"].toString();
                 QString text;
@@ -441,41 +626,54 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 }
 
                 if (!text.isEmpty()) {
-                    if (!createdAt.isEmpty()) {
-                        QDateTime dt = QDateTime::fromString(createdAt, Qt::ISODate);
-                        QString formattedDate =
-                            dt.isValid() ? QLocale().toString(dt.toLocalTime(), QLocale::ShortFormat) : createdAt;
-                        text += tr(" on %1").arg(formattedDate);
-                    }
-                    QLabel* label = new QLabel(text);
-                    label->setTextFormat(Qt::RichText);
-                    label->setWordWrap(true);
-                    label->setStyleSheet("color: gray;");
-                    m_commentsContainerLayout->addWidget(label);
+                    PREvent ev;
+                    ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                    ev.type = PREvent::TimelineEvent;
+                    ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
+                    ev.actionText = text;
+                    m_events.append(ev);
                 }
             }
         }
+
+        if (!m_timelineState.nextUrl.isEmpty()) {
+            fetchTimeline(m_timelineState.nextUrl);
+        } else {
+            m_timelineState.isComplete = true;
+            updateConversationUi();
+        }
     } else {
+        m_timelineState.isFailed = true;
+        m_timelineState.errorString = reply->errorString();
         qWarning() << "Failed to fetch timeline:" << reply->errorString();
     }
+    updateCollectionStatusUi();
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchReviewComments() {
-    if (m_reviewCommentsUrl.isEmpty()) return;
-    QUrl url(m_reviewCommentsUrl);
+void PullRequestWindow::fetchReviewComments(const QString& urlStr) {
+    QString targetUrl = urlStr.isEmpty() ? m_reviewState.nextUrl : urlStr;
+    if (targetUrl.isEmpty()) return;
+    m_reviewState.isLoading = true; updateCollectionStatusUi();
+    m_reviewState.isFailed = false;
+    m_reviewState.errorString.clear();
+    QUrl url(targetUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
     reply->setProperty("generation", m_detailsGeneration);
+    reply->setProperty("collectionGeneration", m_reviewState.generation);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onReviewCommentsReply(reply); });
 }
 
 void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
-    if (reply->property("generation").toUuid() != m_detailsGeneration) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration ||
+        reply->property("collectionGeneration").toUuid() != m_reviewState.generation) {
         reply->deleteLater();
         return;
     }
+    m_reviewState.isLoading = false; updateCollectionStatusUi();
     if (reply->error() == QNetworkReply::NoError) {
+        m_reviewState.nextUrl = parseNextLink(reply);
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonArray array = doc.array();
@@ -495,12 +693,17 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchCommits() {
-    if (m_commitsUrl.isEmpty()) return;
-    QUrl url(m_commitsUrl);
+void PullRequestWindow::fetchCommits(const QString& urlStr) {
+    QString targetUrl = urlStr.isEmpty() ? m_commitsState.nextUrl : urlStr;
+    if (targetUrl.isEmpty()) return;
+    m_commitsState.isLoading = true; updateCollectionStatusUi();
+    m_commitsState.isFailed = false;
+    m_commitsState.errorString.clear();
+    QUrl url(targetUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
     reply->setProperty("generation", m_detailsGeneration);
+    reply->setProperty("collectionGeneration", m_commitsState.generation);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onCommitsReply(reply); });
 }
 
@@ -533,11 +736,17 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchFiles() {
-    QUrl url(m_notification.url + "/files");
+void PullRequestWindow::fetchFiles(const QString& urlStr) {
+    QString targetUrl = urlStr.isEmpty() ? m_filesState.nextUrl : urlStr;
+    if (targetUrl.isEmpty()) return;
+    m_filesState.isLoading = true; updateCollectionStatusUi();
+    m_filesState.isFailed = false;
+    m_filesState.errorString.clear();
+    QUrl url(targetUrl);
     QNetworkRequest request = m_client->createAuthenticatedRequest(url);
     QNetworkReply* reply = m_manager->get(request);
     reply->setProperty("generation", m_detailsGeneration);
+    reply->setProperty("collectionGeneration", m_filesState.generation);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { onFilesReply(reply); });
 }
 
