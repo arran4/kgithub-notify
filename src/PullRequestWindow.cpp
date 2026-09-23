@@ -297,7 +297,6 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         return;
     }
     m_retryButton->setEnabled(true);
-    updateConversationUi();
     if (reply->error() == QNetworkReply::NoError) {
         m_requestStatus->setText(tr("PR details loaded."));
         QByteArray data = reply->readAll();
@@ -693,7 +692,6 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
     }
     m_commitsState.isLoading = false;
     updateCollectionStatusUi();
-    updateConversationUi();
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -704,7 +702,7 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
             QString fullSha = obj["sha"].toString();
             QString sha = fullSha.left(7);
             QJsonObject commitObj = obj["commit"].toObject();
-            QString message = commitObj["commit"].toObject()["message"].toString().section('\n', 0, 0);
+            QString message = commitObj["message"].toString().section('\n', 0, 0);
             QString author = commitObj["author"].toObject()["name"].toString();
             QString date = commitObj["author"].toObject()["date"].toString();
 
