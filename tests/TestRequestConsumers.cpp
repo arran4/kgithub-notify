@@ -729,8 +729,37 @@ class TestRequestConsumers : public QObject {
                 break;
             }
         }
-
         QVERIFY(foundBody);
+
+        // Now fail BOTH Timeline (req 1) and Review Comments (req 2)
+        prNetwork.requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Timeline Error");
+        prNetwork.requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Review Error");
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Body must STILL be visible
+        foundBody = false;
+        labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l && l->text().contains("This is the PR body text.")) {
+                foundBody = true;
+                break;
+            }
+        }
+        QVERIFY(foundBody);
+
+        // Verify Retry UI is actionable
+        bool retryVisible = false;
+        QList<QPushButton*> buttons = pr.findChildren<QPushButton*>();
+        for (QPushButton* btn : buttons) {
+            if (btn->text() == "Retry" && !btn->isHidden()) {
+                if (btn->parentWidget() && btn->parentWidget()->parentWidget() &&
+                    btn->parentWidget()->parentWidget()->objectName().isEmpty()) {
+                    retryVisible = true;
+                    break;
+                }
+            }
+        }
+        QVERIFY(retryVisible);
     }
 
     void testPrDeduplication() {
@@ -743,6 +772,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["body"] = "Body";
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         QJsonArray timeline;
@@ -750,30 +780,61 @@ class TestRequestConsumers : public QObject {
         QJsonObject event1;
         event1["event"] = "commented";
         event1["user"] = QJsonObject{{"login", "user1"}};
-        event1["body"] = "Same comment";
+        event1["body"] = "First body text";
         event1["id"] = 101;
         event1["created_at"] = "2024-01-01T12:00:00Z";
         timeline.append(event1);
 
-        // Exact same duplicate
-        timeline.append(event1);
-
-        // Same ID, different timestamp (should dedupe!)
-        QJsonObject event2 = event1;
-        event2["created_at"] = "2024-01-01T12:00:01Z";
-        timeline.append(event2);
-
         // Different ID, same text (should NOT dedupe!)
         QJsonObject event3 = event1;
         event3["id"] = 102;
+        event3["created_at"] = "2024-01-01T12:05:00Z";
         timeline.append(event3);
+
+        // Same ID as event1, different body and timestamp, separated by event3 (should dedupe!)
+        QJsonObject event2 = event1;
+        event2["body"] = "Different mutated body text";
+        event2["created_at"] = "2024-01-01T12:10:00Z";
+        timeline.append(event2);
 
         prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
         prNetwork.requests[2].reply->complete("[]");
 
-        // The exact duplicate and the same-ID duplicate should be filtered out
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
         // We should have: Body event + event1 + event3
         QCOMPARE(pr.m_events.size(), 3);
+
+        // Verify order: Body -> event1 -> event3
+        // Also verify the duplicate (event2) did NOT render.
+        bool foundBody = false;
+        bool foundFirst = false;
+        bool foundSecond = false;
+        bool foundDuplicate = false;
+
+        QList<QLabel*> labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l) {
+                if (l->text().contains("Body")) foundBody = true;
+                if (l->text().contains("First body text")) foundFirst = true;
+                if (l->text().contains("Different mutated body text")) foundDuplicate = true;
+            }
+        }
+
+        QVERIFY(foundBody);
+        QVERIFY(foundFirst);
+        // We appended event3 with the exact same text ("First body text") as event1, so finding "First body text"
+        // covers both.
+        QVERIFY(!foundDuplicate);
+
+        // We also want to assert the actual rendered count of conversation widgets.
+        int renderedEvents = 0;
+        for (int i = 0; i < pr.m_commentsContainerLayout->count(); ++i) {
+            if (pr.m_commentsContainerLayout->itemAt(i)->widget() != nullptr) {
+                renderedEvents++;
+            }
+        }
+        QCOMPARE(renderedEvents, 3);
     }
 
     void testPrConversationRetryIndependent() {
@@ -807,6 +868,87 @@ class TestRequestConsumers : public QObject {
         // The review comments should retry, the timeline should NOT.
         QCOMPARE(prNetwork.requests.size(), 6);
         QVERIFY(prNetwork.requests[5].request.url().toString().contains("/comments"));
+    }
+
+    void testPrChangedFilesPaginationAndRetry() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Files is index 4
+        ControlledFakeReply* oldFilesReply = prNetwork.requests[4].reply;
+        oldFilesReply->setRawHeader("Link", "<https://api.github.com/p2>; rel=\"next\"");
+
+        QJsonArray filesPage1;
+        QJsonObject file1;
+        file1["filename"] = "file1.txt";
+        file1["status"] = "added";
+        file1["additions"] = 10;
+        file1["deletions"] = 0;
+        file1["blob_url"] = "https://github.com/blob/1";
+        filesPage1.append(file1);
+
+        oldFilesReply->complete(QJsonDocument(filesPage1).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 6);
+
+        // Page 2 fails
+        prNetwork.requests[5].reply->completeWithError(QNetworkReply::InternalServerError, "Error");
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Verify UI state (1 item rendered, retry button visible)
+        QCOMPARE(pr.m_filesTable->rowCount(), 1);
+        QCOMPARE(pr.m_filesTable->item(0, 0)->text(), QString("file1.txt"));
+
+        // Click Retry on the files retry button
+        QVERIFY(pr.m_filesRetryBtn != nullptr);
+        QVERIFY(!pr.m_filesRetryBtn->isHidden());
+
+        pr.m_filesRetryBtn->clicked();
+
+        QCOMPARE(prNetwork.requests.size(), 7);  // Page 2 re-requested
+
+        // Page 2 returns file1.txt (overlap/duplicate) and file2.txt
+        QJsonArray filesPage2;
+        filesPage2.append(file1);  // Duplicate
+        QJsonObject file2;
+        file2["filename"] = "file2.txt";
+        file2["status"] = "modified";
+        file2["additions"] = 5;
+        file2["deletions"] = 2;
+        file2["changes"] = 7;
+        file2["blob_url"] = "https://github.com/blob/2";
+        filesPage2.append(file2);
+
+        prNetwork.requests[6].reply->complete(QJsonDocument(filesPage2).toJson());
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Ensure no duplicates! Exact 4 headers and corresponding cell values, no duplicate filename rows.
+        QCOMPARE(pr.m_filesTable->columnCount(), 4);
+        QCOMPARE(pr.m_filesTable->rowCount(), 2);
+        QCOMPARE(pr.m_filesTable->item(0, 0)->text(), QString("file1.txt"));
+        QCOMPARE(pr.m_filesTable->item(1, 0)->text(), QString("file2.txt"));
+        QCOMPARE(pr.m_filesTable->item(1, 1)->text(), QString("5"));  // Additions
+        QCOMPARE(pr.m_filesTable->item(1, 2)->text(), QString("2"));  // Deletions
+        QCOMPARE(pr.m_filesTable->item(1, 3)->text(), QString("7"));  // Changes
+
+        // Verify file double-click does not mutate the Conversation layout
+        QTableWidgetItem* item = pr.m_filesTable->item(0, 0);
+        int initialLayoutCount = pr.m_commentsContainerLayout->count();
+        emit pr.m_filesTable->itemDoubleClicked(item);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        QCOMPARE(pr.m_commentsContainerLayout->count(), initialLayoutCount);
     }
 
     void testPrCollectionStates() {
