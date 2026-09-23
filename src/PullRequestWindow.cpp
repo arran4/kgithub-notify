@@ -144,7 +144,8 @@ void PullRequestWindow::setupUi() {
     leftConvLayout->addLayout(convStatusLayout);
 
     connect(m_conversationRetryBtn, &QPushButton::clicked, this, [this]() {
-        if (m_timelineState.isFailed) fetchTimeline();
+        if (m_timelineState.isFailed) updateConversationUi();
+        fetchTimeline();
         if (m_reviewState.isFailed) fetchReviewComments();
     });
 
@@ -473,9 +474,23 @@ void PullRequestWindow::updateConversationUi() {
         delete item;
     }
 
+    QList<PREvent> deduped;
+    for (const PREvent& ev : m_events) {
+        bool found = false;
+        for (PREvent& existing : deduped) {
+            if (existing == ev) {
+                // If it's a newer payload for the same ID, we could update it, but PREvent::operator== checks ID
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            deduped.append(ev);
+        }
+    }
+    m_events = deduped;
+
     std::sort(m_events.begin(), m_events.end());
-    auto last = std::unique(m_events.begin(), m_events.end());
-    m_events.erase(last, m_events.end());
 
     for (const PREvent& ev : m_events) {
         QString formattedDate =
