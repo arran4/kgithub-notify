@@ -894,7 +894,7 @@ class TestRequestConsumers : public QObject {
         file1["status"] = "added";
         file1["additions"] = 10;
         file1["deletions"] = 0;
-        file1["blob_url"] = "https://github.com/blob/1";
+        file1["blob_url"] = "";
         filesPage1.append(file1);
 
         oldFilesReply->complete(QJsonDocument(filesPage1).toJson());
@@ -935,6 +935,10 @@ class TestRequestConsumers : public QObject {
 
         // Ensure no duplicates! Exact 4 headers and corresponding cell values, no duplicate filename rows.
         QCOMPARE(pr.m_filesTable->columnCount(), 4);
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(0)->text(), QString("Filename"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(1)->text(), QString("Additions"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(2)->text(), QString("Deletions"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(3)->text(), QString("Changes"));
         QCOMPARE(pr.m_filesTable->rowCount(), 2);
         QCOMPARE(pr.m_filesTable->item(0, 0)->text(), QString("file1.txt"));
         QCOMPARE(pr.m_filesTable->item(1, 0)->text(), QString("file2.txt"));
@@ -943,9 +947,8 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(pr.m_filesTable->item(1, 3)->text(), QString("7"));  // Changes
 
         // Verify file double-click does not mutate the Conversation layout
-        QTableWidgetItem* item = pr.m_filesTable->item(0, 0);
         int initialLayoutCount = pr.m_commentsContainerLayout->count();
-        emit pr.m_filesTable->itemDoubleClicked(item);
+        emit pr.m_filesTable->cellDoubleClicked(0, 0);
         QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
 
         QCOMPARE(pr.m_commentsContainerLayout->count(), initialLayoutCount);
