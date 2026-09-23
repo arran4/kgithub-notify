@@ -333,6 +333,8 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         m_filesState.nextUrl = m_notification.url + "/files?per_page=100";
 
         m_events.clear();
+        m_commitsTable->setRowCount(0);
+        m_filesTable->setRowCount(0);
 
         while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
             delete item->widget();
@@ -466,10 +468,7 @@ void PullRequestWindow::updateCollectionStatusUi() {
 }
 
 void PullRequestWindow::updateConversationUi() {
-    if ((!m_timelineState.isComplete && !m_timelineState.isFailed) ||
-        (!m_reviewState.isComplete && !m_reviewState.isFailed)) {
-        return;
-    }
+    // Render everything we have so far
 
     while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
         delete item->widget();
@@ -492,7 +491,7 @@ void PullRequestWindow::updateConversationUi() {
             label->setTextFormat(Qt::RichText);
             label->setWordWrap(true);
             label->setStyleSheet("color: gray;");
-            m_commentsContainerLayout->insertWidget(m_commentsContainerLayout->count() - 1, label);
+            m_commentsContainerLayout->addWidget(label);
         } else if (ev.type == PREvent::ReviewComment) {
             QString fullBody =
                 tr("**Review comment on %1:**\n\n```diff\n%2\n```\n\n%3").arg(ev.path, ev.diffHunk, ev.body);
@@ -701,20 +700,32 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
 
         for (int i = 0; i < array.size(); ++i) {
             QJsonObject obj = array[i].toObject();
-            QString sha = obj["sha"].toString().left(7);
+            QString fullSha = obj["sha"].toString();
+            QString sha = fullSha.left(7);
             QJsonObject commitObj = obj["commit"].toObject();
             QString message = commitObj["message"].toString().section('\n', 0, 0);
             QString author = commitObj["author"].toObject()["name"].toString();
             QString date = commitObj["author"].toObject()["date"].toString();
 
-            int row = m_commitsTable->rowCount();
-            m_commitsTable->insertRow(row);
-            m_commitsTable->setItem(row, 0, new QTableWidgetItem(sha));
-            m_commitsTable->setItem(row, 1, new QTableWidgetItem(author));
-            m_commitsTable->setItem(row, 2,
-                                    new QTableWidgetItem(QLocale().toString(QDateTime::fromString(date, Qt::ISODate),
-                                                                            QLocale::ShortFormat)));
-            m_commitsTable->setItem(row, 3, new QTableWidgetItem(message));
+            bool found = false;
+            for (int r = 0; r < m_commitsTable->rowCount(); ++r) {
+                if (m_commitsTable->item(r, 0)->data(Qt::UserRole).toString() == fullSha) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                int row = m_commitsTable->rowCount();
+                m_commitsTable->insertRow(row);
+                auto* shaItem = new QTableWidgetItem(sha);
+                shaItem->setData(Qt::UserRole, fullSha);
+                m_commitsTable->setItem(row, 0, shaItem);
+                m_commitsTable->setItem(row, 1, new QTableWidgetItem(author));
+                m_commitsTable->setItem(row, 2, new QTableWidgetItem(message));
+                m_commitsTable->setItem(row, 3,
+                                        new QTableWidgetItem(QLocale().toString(
+                                            QDateTime::fromString(date, Qt::ISODate), QLocale::ShortFormat)));
+            }
         }
 
         m_commitsState.nextUrl.clear();

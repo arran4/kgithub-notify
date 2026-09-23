@@ -29,15 +29,11 @@ struct PREvent {
     QString actionText;
 
     bool operator<(const PREvent& other) const {
-        if (timestamp != other.timestamp) {
-            return timestamp < other.timestamp;
-        }
-        if (type != other.type) {
-            return type < other.type;
-        }
-        if (id != other.id) {
-            return id < other.id;
-        }
+        if (timestamp != other.timestamp) return timestamp < other.timestamp;
+        if (type != other.type) return type < other.type;
+        if (!id.isEmpty() && !other.id.isEmpty() && id != other.id) return id < other.id;
+        if (id != other.id) return id < other.id;
+        if (author != other.author) return author < other.author;
         if (body != other.body) return body < other.body;
         if (actionText != other.actionText) return actionText < other.actionText;
         if (path != other.path) return path < other.path;
