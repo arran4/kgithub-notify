@@ -297,6 +297,7 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         return;
     }
     m_retryButton->setEnabled(true);
+    updateConversationUi();
     if (reply->error() == QNetworkReply::NoError) {
         m_requestStatus->setText(tr("PR details loaded."));
         QByteArray data = reply->readAll();
@@ -468,8 +469,6 @@ void PullRequestWindow::updateCollectionStatusUi() {
 }
 
 void PullRequestWindow::updateConversationUi() {
-    // Render everything we have so far
-
     while (QLayoutItem* item = m_commentsContainerLayout->takeAt(0)) {
         delete item->widget();
         delete item;
@@ -500,7 +499,6 @@ void PullRequestWindow::updateConversationUi() {
             addCommentToUI(ev.author, ev.body, ev.timestamp.toString(Qt::ISODate));
         }
     }
-    m_commentsContainerLayout->addStretch();
 }
 
 void PullRequestWindow::fetchTimeline(const QString& urlStr) {
@@ -609,6 +607,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
     } else {
         m_timelineState.isFailed = true;
         m_timelineState.errorString = reply->errorString();
+        updateConversationUi();
         updateCollectionStatusUi();
     }
     reply->deleteLater();
@@ -665,6 +664,7 @@ void PullRequestWindow::onReviewCommentsReply(QNetworkReply* reply) {
     } else {
         m_reviewState.isFailed = true;
         m_reviewState.errorString = reply->errorString();
+        updateConversationUi();
         updateCollectionStatusUi();
     }
     reply->deleteLater();
@@ -693,6 +693,7 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
     }
     m_commitsState.isLoading = false;
     updateCollectionStatusUi();
+    updateConversationUi();
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -703,7 +704,7 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
             QString fullSha = obj["sha"].toString();
             QString sha = fullSha.left(7);
             QJsonObject commitObj = obj["commit"].toObject();
-            QString message = commitObj["message"].toString().section('\n', 0, 0);
+            QString message = commitObj["commit"].toObject()["message"].toString().section('\n', 0, 0);
             QString author = commitObj["author"].toObject()["name"].toString();
             QString date = commitObj["author"].toObject()["date"].toString();
 
@@ -748,74 +749,6 @@ void PullRequestWindow::onCommitsReply(QNetworkReply* reply) {
     reply->deleteLater();
 }
 
-void PullRequestWindow::fetchFiles(const QString& urlStr) {
-    QString targetUrl = urlStr.isEmpty() ? m_filesState.nextUrl : urlStr;
-    if (targetUrl.isEmpty()) return;
-    m_filesState.isLoading = true;
-    updateCollectionStatusUi();
-    m_filesState.isFailed = false;
-    m_filesState.errorString.clear();
-    QUrl url(targetUrl);
-    QNetworkRequest request = m_client->createAuthenticatedRequest(url);
-    QNetworkReply* reply = m_manager->get(request);
-    reply->setProperty("generation", m_detailsGeneration);
-    reply->setProperty("collectionGeneration", m_filesState.generation);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() { onFilesReply(reply); });
-}
-
-void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
-    if (reply->property("generation").toUuid() != m_detailsGeneration ||
-        reply->property("collectionGeneration").toUuid() != m_filesState.generation) {
-        reply->deleteLater();
-        return;
-    }
-    m_filesState.isLoading = false;
-    updateCollectionStatusUi();
-    if (reply->error() == QNetworkReply::NoError) {
-        QByteArray data = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonArray array = doc.array();
-
-        for (int i = 0; i < array.size(); ++i) {
-            QJsonObject obj = array[i].toObject();
-            QString filename = obj["filename"].toString();
-            QString status = obj["status"].toString();
-            int additions = obj["additions"].toInt();
-            int deletions = obj["deletions"].toInt();
-            QString blobUrl = obj["blob_url"].toString();
-
-            int row = m_filesTable->rowCount();
-            m_filesTable->insertRow(row);
-
-            auto* filenameItem = new QTableWidgetItem(filename);
-            filenameItem->setData(Qt::UserRole, blobUrl);
-
-            m_filesTable->setItem(row, 0, filenameItem);
-            m_filesTable->setItem(row, 1, new QTableWidgetItem(QString::number(additions)));
-            m_filesTable->setItem(row, 2, new QTableWidgetItem(QString::number(deletions)));
-            m_filesTable->setItem(row, 3, new QTableWidgetItem(status));
-        }
-
-        m_filesState.nextUrl.clear();
-        if (reply->hasRawHeader("Link")) {
-            m_filesState.nextUrl = parseNextLink(reply);
-            if (!m_filesState.nextUrl.isEmpty()) {
-                fetchFiles();
-            }
-        }
-
-        if (m_filesState.nextUrl.isEmpty()) {
-            m_filesState.isComplete = true;
-        }
-        updateCollectionStatusUi();
-    } else {
-        m_filesState.isFailed = true;
-        m_filesState.errorString = reply->errorString();
-        updateCollectionStatusUi();
-    }
-    reply->deleteLater();
-}
-
 void PullRequestWindow::onFileDoubleClicked(int row, int column) {
     Q_UNUSED(column);
     QTableWidgetItem* item = m_filesTable->item(row, 0);
@@ -832,7 +765,6 @@ void PullRequestWindow::onFileDoubleClicked(int row, int column) {
             QMessageBox::warning(this, tr("Security Warning"), tr("Blocked attempt to open an unsafe or invalid URL."));
         }
     }
-    m_commentsContainerLayout->addStretch();
 }
 
 void PullRequestWindow::addCommentToUI(const QString& author, const QString& body, const QString& createdAt) {
@@ -922,6 +854,82 @@ void PullRequestWindow::onPostCommentReply(QNetworkReply* reply) {
         addCommentToUI(author, body, createdAt);
     } else {
         QMessageBox::warning(this, tr("Error"), tr("Failed to post comment: %1").arg(reply->errorString()));
+    }
+    reply->deleteLater();
+}
+
+void PullRequestWindow::fetchFiles(const QString& urlStr) {
+    QString targetUrl = urlStr.isEmpty() ? m_filesState.nextUrl : urlStr;
+    if (targetUrl.isEmpty()) return;
+    m_filesState.isLoading = true;
+    updateCollectionStatusUi();
+    m_filesState.isFailed = false;
+    m_filesState.errorString.clear();
+    QUrl url(targetUrl);
+    QNetworkRequest request = m_client->createAuthenticatedRequest(url);
+    QNetworkReply* reply = m_manager->get(request);
+    reply->setProperty("generation", m_detailsGeneration);
+    reply->setProperty("collectionGeneration", m_filesState.generation);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() { onFilesReply(reply); });
+}
+
+void PullRequestWindow::onFilesReply(QNetworkReply* reply) {
+    if (reply->property("generation").toUuid() != m_detailsGeneration ||
+        reply->property("collectionGeneration").toUuid() != m_filesState.generation) {
+        reply->deleteLater();
+        return;
+    }
+    m_filesState.isLoading = false;
+    updateCollectionStatusUi();
+    if (reply->error() == QNetworkReply::NoError) {
+        QByteArray data = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonArray array = doc.array();
+
+        for (int i = 0; i < array.size(); ++i) {
+            QJsonObject obj = array[i].toObject();
+            QString filename = obj["filename"].toString();
+            int additions = obj["additions"].toInt();
+            int deletions = obj["deletions"].toInt();
+            int changes = obj["changes"].toInt();
+            QString blobUrl = obj["blob_url"].toString();
+
+            bool found = false;
+            for (int r = 0; r < m_filesTable->rowCount(); ++r) {
+                if (m_filesTable->item(r, 0)->text() == filename) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                int row = m_filesTable->rowCount();
+                m_filesTable->insertRow(row);
+                auto* filenameItem = new QTableWidgetItem(filename);
+                filenameItem->setData(Qt::UserRole, blobUrl);
+                m_filesTable->setItem(row, 0, filenameItem);
+                m_filesTable->setItem(row, 1, new QTableWidgetItem(QString::number(additions)));
+                m_filesTable->setItem(row, 2, new QTableWidgetItem(QString::number(deletions)));
+                m_filesTable->setItem(row, 3, new QTableWidgetItem(QString::number(changes)));
+            }
+        }
+
+        m_filesState.nextUrl.clear();
+        if (reply->hasRawHeader("Link")) {
+            m_filesState.nextUrl = parseNextLink(reply);
+            if (!m_filesState.nextUrl.isEmpty()) {
+                fetchFiles();
+            }
+        }
+
+        if (m_filesState.nextUrl.isEmpty()) {
+            m_filesState.isComplete = true;
+        }
+        updateCollectionStatusUi();
+    } else {
+        m_filesState.isFailed = true;
+        m_filesState.errorString = reply->errorString();
+        updateCollectionStatusUi();
     }
     reply->deleteLater();
 }

@@ -823,9 +823,6 @@ class TestRequestConsumers : public QObject {
         details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
         details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
         details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         QCOMPARE(prNetwork.requests.size(), 5);
