@@ -144,8 +144,7 @@ void PullRequestWindow::setupUi() {
     leftConvLayout->addLayout(convStatusLayout);
 
     connect(m_conversationRetryBtn, &QPushButton::clicked, this, [this]() {
-        if (m_timelineState.isFailed) updateConversationUi();
-        fetchTimeline();
+        if (m_timelineState.isFailed) fetchTimeline();
         if (m_reviewState.isFailed) fetchReviewComments();
     });
 
@@ -394,6 +393,8 @@ void PullRequestWindow::onPrDetailsReply(QNetworkReply* reply) {
         }
         m_milestoneLabel->setText(tr("<b>Milestone:</b> %1").arg(milestoneText));
         m_convMilestoneLabel->setText(tr("<b>Milestone:</b> %1").arg(milestoneText));
+
+        updateConversationUi();
 
         fetchTimeline();
         fetchReviewComments();

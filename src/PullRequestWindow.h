@@ -41,11 +41,14 @@ struct PREvent {
     }
 
     bool operator==(const PREvent& other) const {
-        if (type != other.type || timestamp != other.timestamp) {
+        if (type != other.type) {
             return false;
         }
         if (!id.isEmpty() && !other.id.isEmpty()) {
             return id == other.id;
+        }
+        if (timestamp != other.timestamp) {
+            return false;
         }
         return body == other.body && actionText == other.actionText && path == other.path && diffHunk == other.diffHunk;
     }

@@ -503,12 +503,7 @@ class TestRequestConsumers : public QObject {
         // PR details reply
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
+
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         // Details reply should spawn 4 collection fetches
@@ -545,12 +540,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
+
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         QCOMPARE(prNetwork.requests.size(), 5);  // details + 4 collections
@@ -640,12 +630,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         ControlledFakeReply* oldTimelineReply = prNetwork.requests[1].reply;
@@ -680,10 +665,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+
         details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
@@ -719,6 +701,38 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(pr.m_events[2].id, QString("101"));
     }
 
+    void testPrBodyRenderWhilePending() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["body"] = "This is the PR body text.";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Wait to process UI updates
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Timeline and reviews are STILL pending. (requests size is 5)
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Assert body widget is visible!
+        bool foundBody = false;
+        QList<QLabel*> labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l && l->text().contains("This is the PR body text.")) {
+                foundBody = true;
+                break;
+            }
+        }
+
+        QVERIFY(foundBody);
+    }
+
     void testPrDeduplication() {
         GitHubClient client;
         FakeNetworkAccessManager prNetwork;
@@ -729,12 +743,10 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         QJsonArray timeline;
+
         QJsonObject event1;
         event1["event"] = "commented";
         event1["user"] = QJsonObject{{"login", "user1"}};
@@ -742,15 +754,59 @@ class TestRequestConsumers : public QObject {
         event1["id"] = 101;
         event1["created_at"] = "2024-01-01T12:00:00Z";
         timeline.append(event1);
-        timeline.append(event1);  // Add duplicate
+
+        // Exact same duplicate
+        timeline.append(event1);
+
+        // Same ID, different timestamp (should dedupe!)
+        QJsonObject event2 = event1;
+        event2["created_at"] = "2024-01-01T12:00:01Z";
+        timeline.append(event2);
+
+        // Different ID, same text (should NOT dedupe!)
+        QJsonObject event3 = event1;
+        event3["id"] = 102;
+        timeline.append(event3);
 
         prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
         prNetwork.requests[2].reply->complete("[]");
 
-        // The duplicate should be filtered out
-        // Note: m_events will only have the body (if present) and the one comment
-        // (Size is 2 because details gives Body event + 1 comment)
-        QCOMPARE(pr.m_events.size(), 2);
+        // The exact duplicate and the same-ID duplicate should be filtered out
+        // We should have: Body event + event1 + event3
+        QCOMPARE(pr.m_events.size(), 3);
+    }
+
+    void testPrConversationRetryIndependent() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
+        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Timeline is loading. Review comments fails.
+        prNetwork.requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Error");
+
+        // Wait to process UI updates
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        QVERIFY(pr.m_timelineState.isLoading);
+        QVERIFY(pr.m_reviewState.isFailed);
+
+        pr.m_conversationRetryBtn->clicked();
+
+        // The review comments should retry, the timeline should NOT.
+        QCOMPARE(prNetwork.requests.size(), 6);
+        QVERIFY(prNetwork.requests[5].request.url().toString().contains("/comments"));
     }
 
     void testPrCollectionStates() {
@@ -763,9 +819,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         // Check initial state (Loading)
@@ -800,12 +854,7 @@ class TestRequestConsumers : public QObject {
 
         QJsonObject details;
         details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
-        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
-        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
-        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+
         prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
 
         QCOMPARE(prNetwork.requests.size(), 5);
