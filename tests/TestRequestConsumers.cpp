@@ -490,6 +490,562 @@ class TestRequestConsumers : public QObject {
         QVERIFY(pr.m_requestStatus->text().contains("cancelled"));
     }
 
+    void testPrPaginationMissingLink() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QCOMPARE(prNetwork.requests.size(), 1);
+
+        // PR details reply
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Details reply should spawn 4 collection fetches
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Timeline reply (index 1) - Missing Link Header
+        QJsonArray timeline;
+        QJsonObject event1;
+        event1["event"] = "commented";
+        event1["user"] = QJsonObject{{"login", "user1"}};
+        event1["body"] = "test comment";
+        event1["id"] = 100;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timeline.append(event1);
+        prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
+        prNetwork.requests[2].reply->complete("[]");
+
+        QVERIFY(pr.m_timelineState.isComplete);
+        QVERIFY(pr.m_timelineState.nextUrl.isEmpty());
+
+        // It shouldn't have launched a new timeline request
+        QCOMPARE(prNetwork.requests.size(), 5);
+    }
+
+    void testPrPaginationTimeline() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QCOMPARE(prNetwork.requests.size(), 1);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);  // details + 4 collections
+
+        // Timeline Page 1 (index 1) with Link header
+        QJsonArray timelinePg1;
+        QJsonObject event1;
+        event1["event"] = "commented";
+        event1["user"] = QJsonObject{{"login", "user1"}};
+        event1["body"] = "page 1 comment";
+        event1["id"] = 101;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timelinePg1.append(event1);
+
+        prNetwork.requests[1].reply->setRawHeader(
+            "Link", "<https://api.github.com/repos/o/r/issues/1/timeline?page=2>; rel=\"next\"");
+        prNetwork.requests[1].reply->complete(QJsonDocument(timelinePg1).toJson());
+
+        // State should indicate not complete, and spawned a new request
+        QVERIFY(!pr.m_timelineState.isComplete);
+        QCOMPARE(pr.m_timelineState.nextUrl, QString("https://api.github.com/repos/o/r/issues/1/timeline?page=2"));
+        QCOMPARE(prNetwork.requests.size(), 6);  // +1 timeline request
+        QCOMPARE(prNetwork.requests[5].request.url().toString(),
+                 QString("https://api.github.com/repos/o/r/issues/1/timeline?page=2"));
+
+        // Timeline Page 2 (index 5) - Last page (No Link header)
+        QJsonArray timelinePg2;
+        QJsonObject event2;
+        event2["event"] = "commented";
+        event2["user"] = QJsonObject{{"login", "user2"}};
+        event2["body"] = "page 2 comment";
+        event2["id"] = 102;
+        event2["created_at"] = "2024-01-01T12:05:00Z";
+        timelinePg2.append(event2);
+
+        prNetwork.requests[5].reply->complete(QJsonDocument(timelinePg2).toJson());
+
+        QVERIFY(pr.m_timelineState.isComplete);
+        qDebug() << "Link Header: " << prNetwork.requests[3].reply->hasRawHeader("Link")
+                 << prNetwork.requests[3].reply->rawHeader("Link");
+        qDebug() << "NextURL:" << pr.m_commitsState.nextUrl;
+        QCOMPARE(prNetwork.requests.size(), 6);  // No more requests
+    }
+
+    void testPrHostileTimelineInput() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QJsonArray timeline;
+        QJsonObject event1;
+        event1["event"] = "labeled";
+        event1["actor"] = QJsonObject{{"login", "<script>alert(1)</script>"}};
+        event1["label"] = QJsonObject{{"name", "<b>evil</b>"}};
+        event1["id"] = 101;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timeline.append(event1);
+
+        prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
+
+        bool foundEscaped = false;
+        for (const PREvent& ev : pr.m_events) {
+            if (ev.type == PREvent::TimelineEvent) {
+                QVERIFY(ev.actionText.contains("&lt;script&gt;"));
+                QVERIFY(ev.actionText.contains("&lt;b&gt;evil&lt;/b&gt;"));
+                QVERIFY(!ev.actionText.contains("<script>"));
+                foundEscaped = true;
+            }
+        }
+        QVERIFY(foundEscaped);
+    }
+
+    void testPrStaleReplyRejected() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        ControlledFakeReply* oldTimelineReply = prNetwork.requests[1].reply;
+
+        pr.fetchPrDetails();
+
+        QCOMPARE(prNetwork.requests.size(), 6);
+        prNetwork.requests[5].reply->complete(QJsonDocument(details).toJson());
+
+        for (int i = 0; i < prNetwork.requests.size(); i++) qDebug() << i << prNetwork.requests[i].request.url();
+        QCOMPARE(prNetwork.requests.size(), 10);
+
+        QJsonArray timeline;
+        QJsonObject event1;
+        event1["event"] = "commented";
+        event1["user"] = QJsonObject{{"login", "user1"}};
+        event1["body"] = "stale comment";
+        timeline.append(event1);
+        oldTimelineReply->complete(QJsonDocument(timeline).toJson());
+
+        QVERIFY(!pr.m_timelineState.isComplete);
+        QVERIFY(pr.m_events.size() <= 1);
+    }
+
+    void testPrDeterministicOrdering() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Timeline reply (index 1)
+        QJsonArray timeline;
+        QJsonObject event1;
+        event1["event"] = "commented";
+        event1["user"] = QJsonObject{{"login", "user1"}};
+        event1["body"] = "First timeline comment";
+        event1["id"] = 101;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timeline.append(event1);
+
+        // Review Comments reply (index 2)
+        QJsonArray reviews;
+        QJsonObject review1;
+        review1["user"] = QJsonObject{{"login", "user2"}};
+        review1["body"] = "Review comment";
+        review1["path"] = "src/main.cpp";
+        review1["diff_hunk"] = "@@ -1,1 +1,1 @@";
+        review1["id"] = 201;
+        review1["created_at"] = "2024-01-01T11:00:00Z";  // Earlier than timeline comment
+        reviews.append(review1);
+
+        // We complete them out of order: Review (index 2) then Timeline (index 1)
+        prNetwork.requests[2].reply->complete(QJsonDocument(reviews).toJson());
+        prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
+
+        // Check ordering: review1 should be before event1 despite network reply order
+        // m_events has size 3 because index 0 is body
+        QCOMPARE(pr.m_events.size(), 3);
+        QCOMPARE(pr.m_events[1].id, QString("201"));
+        QCOMPARE(pr.m_events[2].id, QString("101"));
+    }
+
+    void testPrBodyRenderWhilePending() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["body"] = "This is the PR body text.";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Wait to process UI updates
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Timeline and reviews are STILL pending. (requests size is 5)
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Assert body widget is visible!
+        bool foundBody = false;
+        QList<QLabel*> labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l && l->text().contains("This is the PR body text.")) {
+                foundBody = true;
+                break;
+            }
+        }
+        QVERIFY(foundBody);
+
+        // Now fail BOTH Timeline (req 1) and Review Comments (req 2)
+        prNetwork.requests[1].reply->completeWithError(QNetworkReply::InternalServerError, "Timeline Error");
+        prNetwork.requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Review Error");
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Body must STILL be visible
+        foundBody = false;
+        labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l && l->text().contains("This is the PR body text.")) {
+                foundBody = true;
+                break;
+            }
+        }
+        QVERIFY(foundBody);
+
+        // Verify Retry UI is actionable
+        bool retryVisible = false;
+        QList<QPushButton*> buttons = pr.findChildren<QPushButton*>();
+        for (QPushButton* btn : buttons) {
+            if (btn->text() == "Retry" && !btn->isHidden()) {
+                if (btn->parentWidget() && btn->parentWidget()->parentWidget() &&
+                    btn->parentWidget()->parentWidget()->objectName().isEmpty()) {
+                    retryVisible = true;
+                    break;
+                }
+            }
+        }
+        QVERIFY(retryVisible);
+    }
+
+    void testPrDeduplication() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["body"] = "Body";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QJsonArray timeline;
+
+        QJsonObject event1;
+        event1["event"] = "commented";
+        event1["user"] = QJsonObject{{"login", "user1"}};
+        event1["body"] = "First body text";
+        event1["id"] = 101;
+        event1["created_at"] = "2024-01-01T12:00:00Z";
+        timeline.append(event1);
+
+        // Different ID, same text (should NOT dedupe!)
+        QJsonObject event3 = event1;
+        event3["id"] = 102;
+        event3["created_at"] = "2024-01-01T12:05:00Z";
+        timeline.append(event3);
+
+        // Same ID as event1, different body and timestamp, separated by event3 (should dedupe!)
+        QJsonObject event2 = event1;
+        event2["body"] = "Different mutated body text";
+        event2["created_at"] = "2024-01-01T12:10:00Z";
+        timeline.append(event2);
+
+        prNetwork.requests[1].reply->complete(QJsonDocument(timeline).toJson());
+        prNetwork.requests[2].reply->complete("[]");
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // We should have: Body event + event1 + event3
+        QCOMPARE(pr.m_events.size(), 3);
+
+        // Verify order: Body -> event1 -> event3
+        // Also verify the duplicate (event2) did NOT render.
+        bool foundBody = false;
+        bool foundFirst = false;
+        bool foundSecond = false;
+        bool foundDuplicate = false;
+
+        QList<QLabel*> labels = pr.findChildren<QLabel*>();
+        for (QLabel* l : labels) {
+            if (l) {
+                if (l->text().contains("Body")) foundBody = true;
+                if (l->text().contains("First body text")) foundFirst = true;
+                if (l->text().contains("Different mutated body text")) foundDuplicate = true;
+            }
+        }
+
+        QVERIFY(foundBody);
+        QVERIFY(foundFirst);
+        // We appended event3 with the exact same text ("First body text") as event1, so finding "First body text"
+        // covers both.
+        QVERIFY(!foundDuplicate);
+
+        // We also want to assert the actual rendered count of conversation widgets.
+        int renderedEvents = 0;
+        for (int i = 0; i < pr.m_commentsContainerLayout->count(); ++i) {
+            if (pr.m_commentsContainerLayout->itemAt(i)->widget() != nullptr) {
+                renderedEvents++;
+            }
+        }
+        QCOMPARE(renderedEvents, 3);
+    }
+
+    void testPrConversationRetryIndependent() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        details["comments_url"] = "https://api.github.com/repos/o/r/issues/1/comments";
+        details["commits_url"] = "https://api.github.com/repos/o/r/pulls/1/commits";
+        details["review_comments_url"] = "https://api.github.com/repos/o/r/pulls/1/comments";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Timeline is loading. Review comments fails.
+        prNetwork.requests[2].reply->completeWithError(QNetworkReply::InternalServerError, "Error");
+
+        // Wait to process UI updates
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        QVERIFY(pr.m_timelineState.isLoading);
+        QVERIFY(pr.m_reviewState.isFailed);
+
+        pr.m_conversationRetryBtn->clicked();
+
+        // The review comments should retry, the timeline should NOT.
+        QCOMPARE(prNetwork.requests.size(), 6);
+        QVERIFY(prNetwork.requests[5].request.url().toString().contains("/comments"));
+    }
+
+    void testPrChangedFilesPaginationAndRetry() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        // Files is index 4
+        ControlledFakeReply* oldFilesReply = prNetwork.requests[4].reply;
+        oldFilesReply->setRawHeader("Link", "<https://api.github.com/p2>; rel=\"next\"");
+
+        QJsonArray filesPage1;
+        QJsonObject file1;
+        file1["filename"] = "file1.txt";
+        file1["status"] = "added";
+        file1["additions"] = 10;
+        file1["deletions"] = 0;
+        file1["blob_url"] = "";
+        filesPage1.append(file1);
+
+        oldFilesReply->complete(QJsonDocument(filesPage1).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 6);
+
+        // Page 2 fails
+        prNetwork.requests[5].reply->completeWithError(QNetworkReply::InternalServerError, "Error");
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Verify UI state (1 item rendered, retry button visible)
+        QCOMPARE(pr.m_filesTable->rowCount(), 1);
+        QCOMPARE(pr.m_filesTable->item(0, 0)->text(), QString("file1.txt"));
+
+        // Click Retry on the files retry button
+        QVERIFY(pr.m_filesRetryBtn != nullptr);
+        QVERIFY(!pr.m_filesRetryBtn->isHidden());
+
+        pr.m_filesRetryBtn->clicked();
+
+        QCOMPARE(prNetwork.requests.size(), 7);  // Page 2 re-requested
+
+        // Page 2 returns file1.txt (overlap/duplicate) and file2.txt
+        QJsonArray filesPage2;
+        filesPage2.append(file1);  // Duplicate
+        QJsonObject file2;
+        file2["filename"] = "file2.txt";
+        file2["status"] = "modified";
+        file2["additions"] = 5;
+        file2["deletions"] = 2;
+        file2["changes"] = 7;
+        file2["blob_url"] = "https://github.com/blob/2";
+        filesPage2.append(file2);
+
+        prNetwork.requests[6].reply->complete(QJsonDocument(filesPage2).toJson());
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        // Ensure no duplicates! Exact 4 headers and corresponding cell values, no duplicate filename rows.
+        QCOMPARE(pr.m_filesTable->columnCount(), 4);
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(0)->text(), QString("Filename"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(1)->text(), QString("Additions"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(2)->text(), QString("Deletions"));
+        QCOMPARE(pr.m_filesTable->horizontalHeaderItem(3)->text(), QString("Changes"));
+        QCOMPARE(pr.m_filesTable->rowCount(), 2);
+        QCOMPARE(pr.m_filesTable->item(0, 0)->text(), QString("file1.txt"));
+        QCOMPARE(pr.m_filesTable->item(1, 0)->text(), QString("file2.txt"));
+        QCOMPARE(pr.m_filesTable->item(1, 1)->text(), QString("5"));  // Additions
+        QCOMPARE(pr.m_filesTable->item(1, 2)->text(), QString("2"));  // Deletions
+        QCOMPARE(pr.m_filesTable->item(1, 3)->text(), QString("7"));  // Changes
+
+        // Verify file double-click does not mutate the Conversation layout
+        int initialLayoutCount = pr.m_commentsContainerLayout->count();
+        emit pr.m_filesTable->cellDoubleClicked(0, 0);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+
+        QCOMPARE(pr.m_commentsContainerLayout->count(), initialLayoutCount);
+    }
+
+    void testPrCollectionStates() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Check initial state (Loading)
+        QVERIFY(pr.m_commitsState.isLoading);
+        QVERIFY(pr.m_commitsStatusLabel->text().contains("Loading commits"));
+
+        // Commits completes empty
+        QJsonArray emptyCommits;
+        prNetwork.requests[3].reply->complete(QJsonDocument(emptyCommits).toJson());
+        QVERIFY(!pr.m_commitsState.isLoading);
+        QVERIFY(pr.m_commitsState.isComplete);
+        QVERIFY(pr.m_commitsStatusLabel->text().contains("No commits"));
+
+        // Files completes with data
+        QJsonArray files;
+        QJsonObject file1;
+        file1["filename"] = "test.txt";
+        files.append(file1);
+        prNetwork.requests[4].reply->complete(QJsonDocument(files).toJson());
+        QVERIFY(!pr.m_filesState.isLoading);
+        QVERIFY(pr.m_filesState.isComplete);
+        QVERIFY(!pr.m_filesStatusLabel->isVisible());
+    }
+
+    void testPrLaterPageFailureAndRetry() {
+        GitHubClient client;
+        FakeNetworkAccessManager prNetwork;
+        prNetwork.autoEmitFinished = false;
+        Notification notification;
+        notification.url = "https://api.github.com/repos/o/r/pulls/1";
+        PullRequestWindow pr(notification, &client, nullptr, &prNetwork);
+
+        QJsonObject details;
+        details["issue_url"] = "https://api.github.com/repos/o/r/issues/1";
+
+        prNetwork.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 5);
+
+        QJsonArray commits1;
+        QJsonObject commit1;
+        commit1["sha"] = "1111111";
+        commit1["commit"] = QJsonObject{{"message", "msg"},
+                                        {"author", QJsonObject{{"name", "author"}, {"date", "2024-01-01T12:00:00Z"}}}};
+        commits1.append(commit1);
+        prNetwork.requests[3].reply->setRawHeader(
+            "Link", "<https://api.github.com/repos/o/r/pulls/1/commits?page=2>; rel=\"next\"");
+        prNetwork.requests[3].reply->complete(QJsonDocument(commits1).toJson());
+
+        QCOMPARE(prNetwork.requests.size(), 6);
+        QVERIFY(!pr.m_commitsState.isComplete);
+
+        QCOMPARE(pr.m_commitsTable->rowCount(), 1);
+
+        prNetwork.requests[5].reply->completeWithError(QNetworkReply::InternalServerError, "Server Error", 500);
+
+        QVERIFY(pr.m_commitsState.isFailed);
+        QVERIFY(pr.m_commitsStatusLabel->text().contains("Server Error"));
+        QVERIFY(!pr.m_commitsRetryBtn->isHidden());
+
+        QCOMPARE(pr.m_commitsTable->rowCount(), 1);
+
+        pr.m_commitsRetryBtn->click();
+
+        QCOMPARE(prNetwork.requests.size(), 7);
+        QCOMPARE(prNetwork.requests[6].request.url().toString(),
+                 QString("https://api.github.com/repos/o/r/pulls/1/commits?page=2"));
+
+        QJsonArray commits2;
+        QJsonObject commit2;
+        commit2["sha"] = "2222222";
+        commit2["commit"] = QJsonObject{{"message", "msg2"},
+                                        {"author", QJsonObject{{"name", "author"}, {"date", "2024-01-01T12:00:00Z"}}}};
+        commits2.append(commit2);
+        prNetwork.requests[6].reply->complete(QJsonDocument(commits2).toJson());
+
+        QVERIFY(pr.m_commitsState.isComplete);
+        QVERIFY(!pr.m_commitsState.isFailed);
+        QCOMPARE(pr.m_commitsTable->rowCount(), 2);
+    }
+
     void testNotificationDetailsIgnoreOlderRequests() {
         GitHubClient client;
         auto* network = installNetwork(client);

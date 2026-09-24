@@ -18,6 +18,51 @@
 #include "GitHubClient.h"
 #include "Notification.h"
 
+struct PREvent {
+    QString id;
+    enum Type { Body, IssueComment, ReviewComment, TimelineEvent } type;
+    QDateTime timestamp;
+    QString author;
+    QString body;
+    QString path;
+    QString diffHunk;
+    QString actionText;
+
+    bool operator<(const PREvent& other) const {
+        if (timestamp != other.timestamp) return timestamp < other.timestamp;
+        if (type != other.type) return type < other.type;
+        if (!id.isEmpty() && !other.id.isEmpty() && id != other.id) return id < other.id;
+        if (id != other.id) return id < other.id;
+        if (author != other.author) return author < other.author;
+        if (body != other.body) return body < other.body;
+        if (actionText != other.actionText) return actionText < other.actionText;
+        if (path != other.path) return path < other.path;
+        return diffHunk < other.diffHunk;
+    }
+
+    bool operator==(const PREvent& other) const {
+        if (type != other.type) {
+            return false;
+        }
+        if (!id.isEmpty() && !other.id.isEmpty()) {
+            return id == other.id;
+        }
+        if (timestamp != other.timestamp) {
+            return false;
+        }
+        return body == other.body && actionText == other.actionText && path == other.path && diffHunk == other.diffHunk;
+    }
+};
+
+struct CollectionState {
+    QString nextUrl;
+    bool isLoading = false;
+    bool isComplete = false;
+    bool isFailed = false;
+    QString errorString;
+    QUuid generation;
+};
+
 class PullRequestWindow : public KXmlGuiWindow {
     Q_OBJECT
     friend class TestRequestConsumers;
@@ -30,16 +75,16 @@ class PullRequestWindow : public KXmlGuiWindow {
     void fetchPrDetails();
     void onPrDetailsReply(QNetworkReply* reply);
 
-    void fetchTimeline();
+    void fetchTimeline(const QString& urlStr = QString());
     void onTimelineReply(QNetworkReply* reply);
 
-    void fetchReviewComments();
+    void fetchReviewComments(const QString& urlStr = QString());
     void onReviewCommentsReply(QNetworkReply* reply);
 
-    void fetchCommits();
+    void fetchCommits(const QString& urlStr = QString());
     void onCommitsReply(QNetworkReply* reply);
 
-    void fetchFiles();
+    void fetchFiles(const QString& urlStr = QString());
     void onFilesReply(QNetworkReply* reply);
 
     void onFileDoubleClicked(int row, int column);
@@ -59,9 +104,21 @@ class PullRequestWindow : public KXmlGuiWindow {
 
     QTabWidget* m_tabWidget;
 
+    CollectionState m_timelineState;
+    CollectionState m_reviewState;
+    CollectionState m_commitsState;
+    CollectionState m_filesState;
+
+    QList<PREvent> m_events;
+    void updateConversationUi();
+    void updateCollectionStatusUi();
+    QString parseNextLink(QNetworkReply* reply);
+
     // Conversation Tab
     QWidget* m_conversationTab;
     QHBoxLayout* m_conversationLayout;
+    QLabel* m_conversationStatusLabel;
+    QPushButton* m_conversationRetryBtn;
     QScrollArea* m_commentsScrollArea;
     QWidget* m_commentsContainer;
     QVBoxLayout* m_commentsContainerLayout;
@@ -71,11 +128,15 @@ class PullRequestWindow : public KXmlGuiWindow {
     // Commits Tab
     QWidget* m_commitsTab;
     QVBoxLayout* m_commitsLayout;
+    QLabel* m_commitsStatusLabel;
+    QPushButton* m_commitsRetryBtn;
     QTableWidget* m_commitsTable;
 
     // Changed Files Tab
     QWidget* m_filesTab;
     QVBoxLayout* m_filesLayout;
+    QLabel* m_filesStatusLabel;
+    QPushButton* m_filesRetryBtn;
     QTableWidget* m_filesTable;
 
     // Conversation Tab RHS (Tool Window)
