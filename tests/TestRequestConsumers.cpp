@@ -2696,13 +2696,21 @@ class TestRequestConsumers : public QObject {
         timelineDataPage1.append(
             QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actor2"}}}});
 
+        // A second cross-referenced event identically lacking a timestamp/ID and with the same actor, but a distinct source fingerprint to avoid deduplication
+        timelineDataPage1.append(
+            QJsonObject{
+                {"event", "cross-referenced"},
+                {"actor", QJsonObject{{"login", "actor2"}}},
+                {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}
+            });
+
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
         fakeManager.requests[timelineReqIdx].reply->setRawHeader("Link", linkHeader);
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 4);  // Body + 3 events
+        QCOMPARE(window.m_events.size(), 5);  // Body + 4 events
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2720,7 +2728,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 4);
+        QCOMPARE(window.m_events.size(), 5);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2747,15 +2755,15 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 5);
+        QCOMPARE(window.m_events.size(), 6);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
 
-        // Verify malformed ID is parsed as the string itself
+        // Verify malformed string ID is safely ignored and treated as ID-less
         bool foundMalformed = false;
         for (const auto& ev : sortedEvents) {
-            if (ev.id == "malformed") {
+            if (ev.body == "Looks good" && ev.id.isEmpty() && ev.type == PREvent::IssueComment) {
                 foundMalformed = true;
                 break;
             }

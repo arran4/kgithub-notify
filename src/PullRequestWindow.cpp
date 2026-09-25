@@ -555,9 +555,10 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int ||
                     idVar.typeId() == QMetaType::Double) {
                     parsedId = QString::number(idVar.toLongLong());
-                } else if (idVar.typeId() == QMetaType::QString) {
-                    parsedId = idVar.toString();
                 }
+                // Invalid JSON strings for strictly numeric IDs should fall back to ID-less logic.
+                // We drop QString as a valid ID parser since all API events in scope have either a numeric `id` or no `id`.
+                // Commits use `sha` separately below.
             }
 
             if (event == "commented") {
@@ -638,6 +639,13 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     PREvent ev;
                     ev.id = parsedId;
                     ev.sourceFamily = event;
+                    if (event == "cross-referenced" && obj.contains("source") && obj["source"].isObject()) {
+                        QJsonObject sourceObj = obj["source"].toObject();
+                        if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
+                            // Extract URL or ID to disambiguate identical actor/timestamp references
+                            ev.sourceFingerprint = sourceObj["issue"].toObject()["url"].toString();
+                        }
+                    }
                     ev.type = PREvent::TimelineEvent;
                     ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                     ev.actionText = text;
