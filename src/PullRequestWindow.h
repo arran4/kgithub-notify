@@ -32,7 +32,7 @@ struct PREvent {
         if (timestamp != other.timestamp) return timestamp < other.timestamp;
         if (type != other.type) return type < other.type;
         if (!id.isEmpty() && !other.id.isEmpty() && id != other.id) return id < other.id;
-        if (id != other.id) return id < other.id;
+        if (id != other.id) return id < other.id; // Only applies if one is empty and the other isn't, providing deterministic fallback order
         if (author != other.author) return author < other.author;
         if (body != other.body) return body < other.body;
         if (actionText != other.actionText) return actionText < other.actionText;
@@ -50,7 +50,7 @@ struct PREvent {
         if (timestamp != other.timestamp) {
             return false;
         }
-        return body == other.body && actionText == other.actionText && path == other.path && diffHunk == other.diffHunk;
+        return author == other.author && body == other.body && actionText == other.actionText && path == other.path && diffHunk == other.diffHunk;
     }
 };
 

@@ -549,13 +549,23 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
             QJsonObject obj = val.toObject();
             QString event = obj["event"].toString();
 
+            QString parsedId;
+            if (obj.contains("id") && !obj["id"].isNull()) {
+                QVariant idVar = obj["id"].toVariant();
+                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int || idVar.typeId() == QMetaType::Double) {
+                    parsedId = QString::number(idVar.toLongLong());
+                } else if (idVar.typeId() == QMetaType::QString) {
+                    parsedId = idVar.toString();
+                }
+            }
+
             if (event == "commented") {
                 QString author = obj["user"].toObject()["login"].toString();
                 QString body = obj["body"].toString();
                 QString createdAt = obj["created_at"].toString();
 
                 PREvent ev;
-                ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                ev.id = parsedId;
                 ev.type = PREvent::IssueComment;
                 ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                 ev.author = author;
@@ -568,6 +578,9 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (event == "committed") {
                     QString sha = obj["sha"].toString().left(7);
                     QString author = obj["author"].toObject()["name"].toString();
+                    if (parsedId.isEmpty()) {
+                        parsedId = obj["sha"].toString(); // fallback id for commits
+                    }
                     text =
                         tr("<b>%1</b> added commit <code>%2</code>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped());
                     createdAt = obj["author"].toObject()["date"].toString();
@@ -599,11 +612,28 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
                     text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
+                } else {
+                    // Safe Fallback for unrecognized and unhandled events
+                    if (event == "reviewed") {
+                        createdAt = obj["submitted_at"].toString();
+                    }
+
+                    QString actor;
+                    if (obj.contains("actor")) {
+                        actor = obj["actor"].toObject()["login"].toString();
+                    } else if (obj.contains("user")) {
+                        actor = obj["user"].toObject()["login"].toString();
+                    }
+                    if (actor.isEmpty()) {
+                        text = tr("Unknown actor triggered <i>%1</i> event").arg(event.toHtmlEscaped());
+                    } else {
+                        text = tr("<b>%1</b> triggered <i>%2</i> event").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
+                    }
                 }
 
                 if (!text.isEmpty()) {
                     PREvent ev;
-                    ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                    ev.id = parsedId;
                     ev.type = PREvent::TimelineEvent;
                     ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                     ev.actionText = text;

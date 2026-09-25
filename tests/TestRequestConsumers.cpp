@@ -2449,6 +2449,269 @@ class TestRequestConsumers : public QObject {
         // Completing or interacting with reply afterwards must not crash
         fakeManager.requests[0].reply->complete(makeWorkItemSearchResponse(1, {"Orphaned Item"}));
     }
+
+    void testPullRequestTimelineSafeFallbackAndDeduplication() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+
+        Notification n;
+        n.id = "1";
+        n.url = "https://api.github.com/repos/o/r/issues/1";
+
+        PullRequestWindow window(n, &client, nullptr, &fakeManager);
+
+        // 1. Initial details request
+        QCOMPARE(fakeManager.requests.size(), 1);
+        QJsonObject details;
+        details["number"] = 1;
+        details["title"] = "Test PR";
+        details["state"] = "open";
+        details["user"] = QJsonObject{{"login", "creator"}};
+        details["created_at"] = "2023-01-01T10:00:00Z";
+        details["body"] = "PR Body";
+        QJsonObject pullRequestData;
+        pullRequestData["url"] = "https://api.github.com/repos/o/r/pulls/1";
+        details["pull_request"] = pullRequestData;
+
+        fakeManager.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // This triggers fetchTimeline, fetchReviewComments, fetchCommits, fetchFiles
+        QCOMPARE(fakeManager.requests.size(), 5);
+
+        // Find timeline request
+        int timelineReqIdx = -1;
+        for (int i = 1; i < 5; ++i) {
+            if (fakeManager.requests[i].request.url().toString().contains("timeline")) {
+                timelineReqIdx = i;
+                break;
+            }
+        }
+        QVERIFY(timelineReqIdx != -1);
+
+        // Construct timeline response
+        QJsonArray timelineData;
+
+        // A standard commented event
+        timelineData.append(QJsonObject{
+            {"event", "commented"},
+            {"id", 100},
+            {"user", QJsonObject{{"login", "commenter1"}}},
+            {"body", "Looks good"},
+            {"created_at", "2023-01-01T10:05:00Z"}
+        });
+
+        // A committed event (no id, no created_at)
+        timelineData.append(QJsonObject{
+            {"event", "committed"},
+            {"sha", "abc1234def"},
+            {"author", QJsonObject{{"name", "committer1"}, {"date", "2023-01-01T10:10:00Z"}}}
+        });
+
+        // An unknown/unsupported event
+        timelineData.append(QJsonObject{
+            {"event", "review_dismissed"},
+            {"id", 102},
+            {"actor", QJsonObject{{"login", "actor1"}}},
+            {"created_at", "2023-01-01T10:15:00Z"}
+        });
+
+        // Another unknown event to test deduplication doesn't collapse ID-less unknown events if they differ in time
+        timelineData.append(QJsonObject{
+            {"event", "review_dismissed"},
+            {"actor", QJsonObject{{"login", "actor2"}}},
+            {"created_at", "2023-01-01T10:20:00Z"}
+        });
+
+        // An ID-less unknown event with no actor but a user (edge case)
+        timelineData.append(QJsonObject{
+            {"event", "reviewed"},
+            {"user", QJsonObject{{"login", "actor3"}}},
+            {"submitted_at", "2023-01-01T10:25:00Z"}
+        });
+
+        fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineData).toJson());
+
+        // Complete the other requests to empty them out for cleanliness
+        for (int i = 1; i < 5; ++i) {
+            if (i != timelineReqIdx) {
+                fakeManager.requests[i].reply->complete("[]");
+            }
+        }
+
+        // Check parsed events count.
+        // We have 1 Body (from details), 5 from timeline response
+        QCOMPARE(window.m_events.size(), 6);
+
+        QList<PREvent> sortedEvents = window.m_events;
+        std::sort(sortedEvents.begin(), sortedEvents.end());
+
+        // Index 0 should be body
+        QCOMPARE(sortedEvents[0].type, PREvent::Body);
+
+        // Index 1 should be commented
+        QCOMPARE(sortedEvents[1].type, PREvent::IssueComment);
+        QCOMPARE(sortedEvents[1].id, QString("100"));
+        QCOMPARE(sortedEvents[1].author, QString("commenter1"));
+
+        // Index 2 should be committed
+        QCOMPARE(sortedEvents[2].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[2].id == "abc1234def");
+        QVERIFY(sortedEvents[2].actionText.contains("committer1"));
+        QVERIFY(sortedEvents[2].actionText.contains("abc1234"));
+
+        // Index 3 should be review_dismissed (actor1)
+        QCOMPARE(sortedEvents[3].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[3].id, QString("102"));
+        QVERIFY(sortedEvents[3].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[3].actionText.contains("review_dismissed"));
+
+        // Index 4 should be review_dismissed (actor2, ID-less)
+        QCOMPARE(sortedEvents[4].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[4].id.isEmpty());
+        QVERIFY(sortedEvents[4].actionText.contains("actor2"));
+        QVERIFY(sortedEvents[4].actionText.contains("review_dismissed"));
+
+        // Index 5 should be reviewed (actor3, ID-less)
+        QCOMPARE(sortedEvents[5].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[5].id.isEmpty());
+        QVERIFY(sortedEvents[5].actionText.contains("actor3"));
+        QVERIFY(sortedEvents[5].actionText.contains("reviewed"));
+
+        // Also verify updateConversationUi runs without crashing and deduplicates correctly
+        // (already run implicitly inside onTimelineReply, but we can verify children count)
+        // 1 body + 5 timeline = 6 conversation widgets
+        QCOMPARE(window.m_commentsContainerLayout->count(), 6);
+    }
+
+    void testPullRequestTimelineMalformedIdsAndLaterPageFailure() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+
+        Notification n;
+        n.id = "2";
+        n.url = "https://api.github.com/repos/o/r/issues/2";
+
+        PullRequestWindow window(n, &client, nullptr, &fakeManager);
+
+        // 1. Initial details request
+        QJsonObject details;
+        details["number"] = 2;
+        details["title"] = "Test PR 2";
+        details["state"] = "open";
+        details["user"] = QJsonObject{{"login", "creator"}};
+        details["created_at"] = "2023-01-01T10:00:00Z";
+        details["body"] = "PR Body 2";
+        QJsonObject pullRequestData;
+        pullRequestData["url"] = "https://api.github.com/repos/o/r/pulls/2";
+        details["pull_request"] = pullRequestData;
+
+        fakeManager.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        // Find timeline request
+        int timelineReqIdx = -1;
+        for (int i = 1; i < fakeManager.requests.size(); ++i) {
+            if (fakeManager.requests[i].request.url().toString().contains("timeline")) {
+                timelineReqIdx = i;
+                break;
+            }
+        }
+        QVERIFY(timelineReqIdx != -1);
+
+        // Construct timeline response page 1
+        QJsonArray timelineDataPage1;
+
+        // A commented event with malformed string ID
+        timelineDataPage1.append(QJsonObject{
+            {"event", "commented"},
+            {"id", "malformed"},
+            {"user", QJsonObject{{"login", "commenter1"}}},
+            {"body", "Looks good"},
+            {"created_at", "2023-01-01T10:05:00Z"}
+        });
+
+        // Event missing timestamp entirely
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actor2"}}}
+        });
+
+        // Add link header to simulate pagination
+        QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
+        fakeManager.requests[timelineReqIdx].reply->setRawHeader("Link", linkHeader);
+        fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
+
+        // Verify page 1 populated properly and next page was queued
+        QCOMPARE(window.m_events.size(), 3); // Body + 2 events
+
+        // Find timeline request page 2
+        int timelineReqIdx2 = -1;
+        for (int i = 1; i < fakeManager.requests.size(); ++i) {
+            if (fakeManager.requests[i].request.url().toString().contains("timeline?page=2") && !fakeManager.requests[i].reply->isFinished()) {
+                timelineReqIdx2 = i;
+                break;
+            }
+        }
+        QVERIFY(timelineReqIdx2 != -1);
+
+        // Fail page 2
+        fakeManager.requests[timelineReqIdx2].reply->completeWithError(QNetworkReply::InternalServerError, "Server error", 500);
+
+        // Verify events persist after failure
+        QCOMPARE(window.m_events.size(), 3);
+
+        // Verify retry works
+        window.m_conversationRetryBtn->click();
+
+        // Find timeline request page 2 retry
+        int timelineReqIdx3 = -1;
+        for (int i = timelineReqIdx2 + 1; i < fakeManager.requests.size(); ++i) {
+            if (fakeManager.requests[i].request.url().toString().contains("timeline?page=2") && !fakeManager.requests[i].reply->isFinished()) {
+                timelineReqIdx3 = i;
+                break;
+            }
+        }
+        QVERIFY(timelineReqIdx3 != -1);
+
+        // Complete retry
+        QJsonArray timelineDataPage2;
+        timelineDataPage2.append(QJsonObject{
+            {"event", "commented"},
+            {"id", 200},
+            {"user", QJsonObject{{"login", "commenter3"}}},
+            {"body", "Still good"},
+            {"created_at", "2023-01-01T10:15:00Z"}
+        });
+
+        fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
+
+        // Verify state
+        QCOMPARE(window.m_events.size(), 4);
+
+        QList<PREvent> sortedEvents = window.m_events;
+        std::sort(sortedEvents.begin(), sortedEvents.end());
+
+        // Verify malformed ID is parsed as the string itself
+        bool foundMalformed = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.id == "malformed") {
+                foundMalformed = true;
+                break;
+            }
+        }
+        QVERIFY(foundMalformed);
+
+        // Verify event without timestamp is handled
+        bool foundEmptyTimestamp = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.actionText.contains("cross-referenced") && ev.actionText.contains("actor2") && ev.id.isEmpty() && !ev.timestamp.isValid()) {
+                foundEmptyTimestamp = true;
+                break;
+            }
+        }
+        QVERIFY(foundEmptyTimestamp);
+    }
 };
 
 QTEST_MAIN(TestRequestConsumers)
