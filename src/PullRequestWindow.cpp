@@ -552,7 +552,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
             QString parsedId;
             if (obj.contains("id") && !obj["id"].isNull()) {
                 QVariant idVar = obj["id"].toVariant();
-                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int || idVar.typeId() == QMetaType::Double) {
+                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int ||
+                    idVar.typeId() == QMetaType::Double) {
                     parsedId = QString::number(idVar.toLongLong());
                 } else if (idVar.typeId() == QMetaType::QString) {
                     parsedId = idVar.toString();
@@ -566,6 +567,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
 
                 PREvent ev;
                 ev.id = parsedId;
+                ev.sourceFamily = event;
                 ev.type = PREvent::IssueComment;
                 ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                 ev.author = author;
@@ -579,7 +581,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString sha = obj["sha"].toString().left(7);
                     QString author = obj["author"].toObject()["name"].toString();
                     if (parsedId.isEmpty()) {
-                        parsedId = obj["sha"].toString(); // fallback id for commits
+                        parsedId = obj["sha"].toString();  // fallback id for commits
                     }
                     text =
                         tr("<b>%1</b> added commit <code>%2</code>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped());
@@ -627,13 +629,15 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     if (actor.isEmpty()) {
                         text = tr("Unknown actor triggered <i>%1</i> event").arg(event.toHtmlEscaped());
                     } else {
-                        text = tr("<b>%1</b> triggered <i>%2</i> event").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
+                        text =
+                            tr("<b>%1</b> triggered <i>%2</i> event").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
                     }
                 }
 
                 if (!text.isEmpty()) {
                     PREvent ev;
                     ev.id = parsedId;
+                    ev.sourceFamily = event;
                     ev.type = PREvent::TimelineEvent;
                     ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                     ev.actionText = text;

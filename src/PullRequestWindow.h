@@ -20,6 +20,8 @@
 
 struct PREvent {
     QString id;
+    QString
+        sourceFamily;  // E.g., the raw event string like 'labeled', 'committed', 'review_dismissed' for stable identity
     enum Type { Body, IssueComment, ReviewComment, TimelineEvent } type;
     QDateTime timestamp;
     QString author;
@@ -31,8 +33,12 @@ struct PREvent {
     bool operator<(const PREvent& other) const {
         if (timestamp != other.timestamp) return timestamp < other.timestamp;
         if (type != other.type) return type < other.type;
+        if (sourceFamily != other.sourceFamily) return sourceFamily < other.sourceFamily;
         if (!id.isEmpty() && !other.id.isEmpty() && id != other.id) return id < other.id;
-        if (id != other.id) return id < other.id; // Only applies if one is empty and the other isn't, providing deterministic fallback order
+        if (id != other.id)
+            return id <
+                   other
+                       .id;  // Only applies if one is empty and the other isn't, providing deterministic fallback order
         if (author != other.author) return author < other.author;
         if (body != other.body) return body < other.body;
         if (actionText != other.actionText) return actionText < other.actionText;
@@ -44,13 +50,17 @@ struct PREvent {
         if (type != other.type) {
             return false;
         }
+        if (sourceFamily != other.sourceFamily) {
+            return false;
+        }
         if (!id.isEmpty() && !other.id.isEmpty()) {
             return id == other.id;
         }
         if (timestamp != other.timestamp) {
             return false;
         }
-        return author == other.author && body == other.body && actionText == other.actionText && path == other.path && diffHunk == other.diffHunk;
+        return author == other.author && body == other.body && actionText == other.actionText && path == other.path &&
+               diffHunk == other.diffHunk;
     }
 };
 
