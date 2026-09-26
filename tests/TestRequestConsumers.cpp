@@ -2595,9 +2595,33 @@ class TestRequestConsumers : public QObject {
 
         QCOMPARE(sortedEvents[2].type, PREvent::TimelineEvent);
         QCOMPARE(sortedEvents[2].id, QString("101"));
+        QVERIFY(sortedEvents[2].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[2].actionText.contains("assignee1"));
 
         QCOMPARE(sortedEvents[3].type, PREvent::TimelineEvent);
         QCOMPARE(sortedEvents[3].id, QString("102"));
+        QVERIFY(sortedEvents[3].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[3].actionText.contains("assignee1"));
+
+        QCOMPARE(sortedEvents[4].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[4].id, QString("103"));
+        QVERIFY(sortedEvents[4].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[4].actionText.contains("bug"));
+
+        QCOMPARE(sortedEvents[5].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[5].id, QString("104"));
+        QVERIFY(sortedEvents[5].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[5].actionText.contains("closed"));
+
+        QCOMPARE(sortedEvents[6].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[6].id, QString("105"));
+        QVERIFY(sortedEvents[6].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[6].actionText.contains("reopened"));
+
+        QCOMPARE(sortedEvents[7].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[7].id, QString("106"));
+        QVERIFY(sortedEvents[7].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[7].actionText.contains("deadbee")); // It gets .left(7)
 
         QCOMPARE(sortedEvents[8].type, PREvent::TimelineEvent);
         QVERIFY(sortedEvents[8].id == "abc1234def");
@@ -2730,12 +2754,33 @@ class TestRequestConsumers : public QObject {
         QJsonArray timelineDataPage1;
 
         // A commented event with malformed string ID
-        // The ID parsing logic now keeps strings as valid IDs so it handles malformed strings without failing to 0
+        // The ID parsing logic now ignores strings since true IDs are ints/longlongs
         timelineDataPage1.append(QJsonObject{{"event", "commented"},
                                              {"id", "malformed"},
                                              {"user", QJsonObject{{"login", "commenter1"}}},
                                              {"body", "Looks good"},
                                              {"created_at", "2023-01-01T10:05:00Z"}});
+
+        // A second commented event identically malformed to verify deduplication distinction
+        timelineDataPage1.append(QJsonObject{{"event", "commented"},
+                                             {"id", "malformed"},
+                                             {"user", QJsonObject{{"login", "commenter2"}}},
+                                             {"body", "Looks great"},
+                                             {"created_at", "2023-01-01T10:05:00Z"}});
+
+        // Event with an invalid malformed timestamp string
+        timelineDataPage1.append(QJsonObject{{"event", "commented"},
+                                             {"id", 333},
+                                             {"user", QJsonObject{{"login", "commenter_invalid_time"}}},
+                                             {"body", "Time is broken"},
+                                             {"created_at", "not-a-valid-date-string"}});
+
+        // Null ID explicitly provided
+        timelineDataPage1.append(QJsonObject{{"event", "commented"},
+                                             {"id", QJsonValue::Null},
+                                             {"user", QJsonObject{{"login", "commenter_null"}}},
+                                             {"body", "Null ID"},
+                                             {"created_at", "2023-01-01T10:05:30Z"}});
 
         // Event with an invalid object ID type. This should properly map to empty
         timelineDataPage1.append(QJsonObject{{"event", "commented"},
@@ -2769,7 +2814,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 6);  // Body + 5 events
+        QCOMPARE(window.m_events.size(), 9);  // Body + 8 events
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2787,7 +2832,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 6);
+        QCOMPARE(window.m_events.size(), 9);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2814,7 +2859,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 7);
+        QCOMPARE(window.m_events.size(), 10);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
