@@ -639,10 +639,30 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     ev.sourceFamily = event;
                     if (event == "cross-referenced" && obj.contains("source") && obj["source"].isObject()) {
                         QJsonObject sourceObj = obj["source"].toObject();
-                        if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
-                            // Extract URL or ID to disambiguate identical actor/timestamp references
-                            ev.sourceFingerprint = sourceObj["issue"].toObject()["url"].toString();
+
+                        QString fp;
+                        if (sourceObj.contains("type")) {
+                            fp += sourceObj["type"].toString() + ":";
                         }
+
+                        if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
+                            QJsonObject issueObj = sourceObj["issue"].toObject();
+
+                            if (issueObj.contains("id") && !issueObj["id"].isNull()) {
+                                QVariant idVar = issueObj["id"].toVariant();
+                                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int) {
+                                    fp += "id=" + QString::number(idVar.toLongLong());
+                                }
+                            } else if (issueObj.contains("node_id")) {
+                                fp += "node_id=" + issueObj["node_id"].toString();
+                            } else if (issueObj.contains("url")) {
+                                fp += "url=" + issueObj["url"].toString();
+                            } else if (issueObj.contains("number") && issueObj.contains("repository")) {
+                                fp += "repo=" + issueObj["repository"].toObject()["full_name"].toString() +
+                                      "#number=" + QString::number(issueObj["number"].toVariant().toLongLong());
+                            }
+                        }
+                        ev.sourceFingerprint = fp;
                     }
                     ev.type = PREvent::TimelineEvent;
                     ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);

@@ -2621,7 +2621,7 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[7].type, PREvent::TimelineEvent);
         QCOMPARE(sortedEvents[7].id, QString("106"));
         QVERIFY(sortedEvents[7].actionText.contains("actor1"));
-        QVERIFY(sortedEvents[7].actionText.contains("deadbee")); // It gets .left(7)
+        QVERIFY(sortedEvents[7].actionText.contains("deadbee"));  // It gets .left(7)
 
         QCOMPARE(sortedEvents[8].type, PREvent::TimelineEvent);
         QVERIFY(sortedEvents[8].id == "abc1234def");
@@ -2800,13 +2800,22 @@ class TestRequestConsumers : public QObject {
         timelineDataPage1.append(
             QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actor2"}}}});
 
-        // A second cross-referenced event identically lacking a timestamp/ID and with the same actor, but a distinct source fingerprint to avoid deduplication
+        // A second cross-referenced event identically lacking a timestamp/ID and with the same actor, but a distinct
+        // source fingerprint to avoid deduplication
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actor2"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}});
+
+        // A third exact duplicated cross-reference to prove deduplication
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actor2"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}});
+
+        // A fallback event testing HTML escaping
         timelineDataPage1.append(
-            QJsonObject{
-                {"event", "cross-referenced"},
-                {"actor", QJsonObject{{"login", "actor2"}}},
-                {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}
-            });
+            QJsonObject{{"event", "<script>alert(1)</script>"}, {"actor", QJsonObject{{"login", "<b>hacker</b>"}}}});
 
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
@@ -2814,7 +2823,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 9);  // Body + 8 events
+        QCOMPARE(window.m_events.size(), 10);  // Body + 9 events
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2832,7 +2841,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 9);
+        QCOMPARE(window.m_events.size(), 10);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2859,7 +2868,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 10);
+        QCOMPARE(window.m_events.size(), 11);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -2875,15 +2884,26 @@ class TestRequestConsumers : public QObject {
         QVERIFY(foundMalformed);
 
         // Verify event without timestamp is handled
-        bool foundEmptyTimestamp = false;
+        int emptyTimestampCount = 0;
         for (const auto& ev : sortedEvents) {
             if (ev.actionText.contains("cross-referenced") && ev.actionText.contains("actor2") && ev.id.isEmpty() &&
                 !ev.timestamp.isValid()) {
-                foundEmptyTimestamp = true;
+                emptyTimestampCount++;
+            }
+        }
+        QCOMPARE(emptyTimestampCount, 2);  // 1 without source URL, 1 with source URL
+
+        // Verify HTML escaping on generic fallback
+        bool foundHacker = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.actionText.contains("&lt;b&gt;hacker&lt;/b&gt;") &&
+                ev.actionText.contains("&lt;script&gt;alert(1)&lt;/script&gt;") && ev.id.isEmpty() &&
+                !ev.timestamp.isValid()) {
+                foundHacker = true;
                 break;
             }
         }
-        QVERIFY(foundEmptyTimestamp);
+        QVERIFY(foundHacker);
     }
 };
 

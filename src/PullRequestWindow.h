@@ -20,8 +20,10 @@
 
 struct PREvent {
     QString id;
-    QString sourceFamily;  // E.g., the raw event string like 'labeled', 'committed', 'review_dismissed' for stable identity
-    QString sourceFingerprint; // A serialized deterministic subset of source-specific keys required to disambiguate identical-family ID-less events (e.g. cross-referenced 'source')
+    QString
+        sourceFamily;  // E.g., the raw event string like 'labeled', 'committed', 'review_dismissed' for stable identity
+    QString sourceFingerprint;  // A serialized deterministic subset of source-specific keys required to disambiguate
+                                // identical-family ID-less events (e.g. cross-referenced 'source')
     enum Type { Body, IssueComment, ReviewComment, TimelineEvent } type;
     QDateTime timestamp;
     QString author;
@@ -37,7 +39,9 @@ struct PREvent {
         if (sourceFingerprint != other.sourceFingerprint) return sourceFingerprint < other.sourceFingerprint;
         if (!id.isEmpty() && !other.id.isEmpty() && id != other.id) return id < other.id;
         if (id != other.id)
-            return id < other.id;  // Only applies if one is empty and the other isn't, providing deterministic fallback order
+            return id <
+                   other
+                       .id;  // Only applies if one is empty and the other isn't, providing deterministic fallback order
         if (author != other.author) return author < other.author;
         if (body != other.body) return body < other.body;
         if (actionText != other.actionText) return actionText < other.actionText;
