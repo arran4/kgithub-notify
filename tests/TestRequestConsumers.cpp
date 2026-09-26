@@ -2782,6 +2782,20 @@ class TestRequestConsumers : public QObject {
                                              {"body", "Null ID"},
                                              {"created_at", "2023-01-01T10:05:30Z"}});
 
+        // Nested malformed ID, but valid node_id fallback
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actor2"}}},
+            {"source",
+             QJsonObject{{"issue", QJsonObject{{"id", QJsonObject{{"invalid", "data"}}}, {"node_id", "node123"}}}}}});
+
+        // Nested malformed ID, but valid node_id fallback #2 identical minus node_id so they do not deduplicate.
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actor2"}}},
+            {"source",
+             QJsonObject{{"issue", QJsonObject{{"id", QJsonObject{{"invalid", "data"}}}, {"node_id", "node124"}}}}}});
+
         // Event with an invalid object ID type. This should properly map to empty
         timelineDataPage1.append(QJsonObject{{"event", "commented"},
                                              {"id", QJsonObject{{"invalid_type", 1}}},
@@ -2823,7 +2837,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 10);  // Body + 9 events
+        QCOMPARE(window.m_events.size(), 13);  // Body + 12 events
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2841,7 +2855,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 10);
+        QCOMPARE(window.m_events.size(), 13);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2868,7 +2882,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 11);
+        QCOMPARE(window.m_events.size(), 14);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -2891,7 +2905,7 @@ class TestRequestConsumers : public QObject {
                 emptyTimestampCount++;
             }
         }
-        QCOMPARE(emptyTimestampCount, 2);  // 1 without source URL, 1 with source URL
+        QCOMPARE(emptyTimestampCount, 3);  // 1 without source URL, 1 with source URL, 1 with node_id
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
@@ -2904,6 +2918,26 @@ class TestRequestConsumers : public QObject {
             }
         }
         QVERIFY(foundHacker);
+
+        // Verify commenter_null survived and remains ID-less
+        bool foundNull = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.author == "commenter_null" && ev.id.isEmpty()) {
+                foundNull = true;
+                break;
+            }
+        }
+        QVERIFY(foundNull);
+
+        // Verify commenter_invalid_time survived with invalid timestamp
+        bool foundInvalidTime = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.author == "commenter_invalid_time" && ev.id.isEmpty() && !ev.timestamp.isValid()) {
+                foundInvalidTime = true;
+                break;
+            }
+        }
+        QVERIFY(foundInvalidTime);
     }
 };
 

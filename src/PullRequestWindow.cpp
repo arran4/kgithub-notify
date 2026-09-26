@@ -648,18 +648,32 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                         if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
                             QJsonObject issueObj = sourceObj["issue"].toObject();
 
+                            bool foundId = false;
                             if (issueObj.contains("id") && !issueObj["id"].isNull()) {
                                 QVariant idVar = issueObj["id"].toVariant();
                                 if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int) {
                                     fp += "id=" + QString::number(idVar.toLongLong());
+                                    foundId = true;
                                 }
-                            } else if (issueObj.contains("node_id")) {
+                            }
+
+                            if (!foundId && issueObj.contains("node_id") && !issueObj["node_id"].isNull() &&
+                                issueObj["node_id"].toVariant().typeId() == QMetaType::QString &&
+                                !issueObj["node_id"].toString().isEmpty()) {
                                 fp += "node_id=" + issueObj["node_id"].toString();
-                            } else if (issueObj.contains("url")) {
+                            } else if (!foundId && issueObj.contains("url") && !issueObj["url"].isNull() &&
+                                       issueObj["url"].toVariant().typeId() == QMetaType::QString &&
+                                       !issueObj["url"].toString().isEmpty()) {
                                 fp += "url=" + issueObj["url"].toString();
-                            } else if (issueObj.contains("number") && issueObj.contains("repository")) {
-                                fp += "repo=" + issueObj["repository"].toObject()["full_name"].toString() +
-                                      "#number=" + QString::number(issueObj["number"].toVariant().toLongLong());
+                            } else if (!foundId && issueObj.contains("number") && issueObj.contains("repository_url") &&
+                                       !issueObj["repository_url"].isNull() &&
+                                       issueObj["repository_url"].toVariant().typeId() == QMetaType::QString &&
+                                       !issueObj["repository_url"].toString().isEmpty()) {
+                                QVariant numVar = issueObj["number"].toVariant();
+                                if (numVar.typeId() == QMetaType::LongLong || numVar.typeId() == QMetaType::Int) {
+                                    fp += "repo=" + issueObj["repository_url"].toString() +
+                                          "#number=" + QString::number(numVar.toLongLong());
+                                }
                             }
                         }
                         ev.sourceFingerprint = fp;
