@@ -552,13 +552,11 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
             QString parsedId;
             if (obj.contains("id") && !obj["id"].isNull()) {
                 QVariant idVar = obj["id"].toVariant();
-                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int ||
-                    idVar.typeId() == QMetaType::Double) {
+                // Reject Doubles/fractions. Reject Strings. Only allow integers/LongLongs.
+                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int) {
                     parsedId = QString::number(idVar.toLongLong());
                 }
-                // Invalid JSON strings for strictly numeric IDs should fall back to ID-less logic.
-                // We drop QString as a valid ID parser since all API events in scope have either a numeric `id` or no `id`.
-                // Commits use `sha` separately below.
+                // Invalid JSON strings or fractional doubles for strictly numeric IDs fall back to ID-less logic.
             }
 
             if (event == "commented") {

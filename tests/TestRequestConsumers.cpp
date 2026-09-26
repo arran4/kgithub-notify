@@ -2492,12 +2492,46 @@ class TestRequestConsumers : public QObject {
         // Construct timeline response
         QJsonArray timelineData;
 
-        // A standard commented event
+        // Ensure previously supported regression events exist.
         timelineData.append(QJsonObject{{"event", "commented"},
                                         {"id", 100},
                                         {"user", QJsonObject{{"login", "commenter1"}}},
                                         {"body", "Looks good"},
                                         {"created_at", "2023-01-01T10:05:00Z"}});
+
+        timelineData.append(QJsonObject{{"event", "assigned"},
+                                        {"id", 101},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"assignee", QJsonObject{{"login", "assignee1"}}},
+                                        {"created_at", "2023-01-01T10:06:00Z"}});
+
+        timelineData.append(QJsonObject{{"event", "unassigned"},
+                                        {"id", 102},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"assignee", QJsonObject{{"login", "assignee1"}}},
+                                        {"created_at", "2023-01-01T10:07:00Z"}});
+
+        timelineData.append(QJsonObject{{"event", "unlabeled"},
+                                        {"id", 103},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"label", QJsonObject{{"name", "bug"}}},
+                                        {"created_at", "2023-01-01T10:08:00Z"}});
+
+        timelineData.append(QJsonObject{{"event", "closed"},
+                                        {"id", 104},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"created_at", "2023-01-01T10:09:00Z"}});
+
+        timelineData.append(QJsonObject{{"event", "reopened"},
+                                        {"id", 105},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"created_at", "2023-01-01T10:09:30Z"}});
+
+        timelineData.append(QJsonObject{{"event", "merged"},
+                                        {"id", 106},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"commit_id", "deadbeef"},
+                                        {"created_at", "2023-01-01T10:09:45Z"}});
 
         // A committed event (no id, no created_at)
         timelineData.append(
@@ -2531,8 +2565,8 @@ class TestRequestConsumers : public QObject {
         }
 
         // Check parsed events count.
-        // We have 1 Body (from details), 5 from timeline response
-        QCOMPARE(window.m_events.size(), 6);
+        // We have 1 Body (from details), 11 from timeline response
+        QCOMPARE(window.m_events.size(), 12);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -2545,34 +2579,52 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[1].id, QString("100"));
         QCOMPARE(sortedEvents[1].author, QString("commenter1"));
 
-        // Index 2 should be committed
-        QCOMPARE(sortedEvents[2].type, PREvent::TimelineEvent);
-        QVERIFY(sortedEvents[2].id == "abc1234def");
-        QVERIFY(sortedEvents[2].actionText.contains("committer1"));
-        QVERIFY(sortedEvents[2].actionText.contains("abc1234"));
+        // We know we added 6 new previously supported events + 1 committed + 3 fallbacks. They sort by timestamp:
+        // 10:00 - Body (idx 0)
+        // 10:05 - commented (idx 1)
+        // 10:06 - assigned (idx 2)
+        // 10:07 - unassigned (idx 3)
+        // 10:08 - unlabeled (idx 4)
+        // 10:09 - closed (idx 5)
+        // 10:09:30 - reopened (idx 6)
+        // 10:09:45 - merged (idx 7)
+        // 10:10:00 - committed (idx 8)
+        // 10:15:00 - review_dismissed (idx 9)
+        // 10:20:00 - review_dismissed (ID-less) (idx 10)
+        // 10:25:00 - reviewed (ID-less) (idx 11)
 
-        // Index 3 should be review_dismissed (actor1)
+        QCOMPARE(sortedEvents[2].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[2].id, QString("101"));
+
         QCOMPARE(sortedEvents[3].type, PREvent::TimelineEvent);
         QCOMPARE(sortedEvents[3].id, QString("102"));
-        QVERIFY(sortedEvents[3].actionText.contains("actor1"));
-        QVERIFY(sortedEvents[3].actionText.contains("review_dismissed"));
 
-        // Index 4 should be review_dismissed (actor2, ID-less)
-        QCOMPARE(sortedEvents[4].type, PREvent::TimelineEvent);
-        QVERIFY(sortedEvents[4].id.isEmpty());
-        QVERIFY(sortedEvents[4].actionText.contains("actor2"));
-        QVERIFY(sortedEvents[4].actionText.contains("review_dismissed"));
+        QCOMPARE(sortedEvents[8].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[8].id == "abc1234def");
+        QVERIFY(sortedEvents[8].actionText.contains("committer1"));
+        QVERIFY(sortedEvents[8].actionText.contains("abc1234"));
 
-        // Index 5 should be reviewed (actor3, ID-less)
-        QCOMPARE(sortedEvents[5].type, PREvent::TimelineEvent);
-        QVERIFY(sortedEvents[5].id.isEmpty());
-        QVERIFY(sortedEvents[5].actionText.contains("actor3"));
-        QVERIFY(sortedEvents[5].actionText.contains("reviewed"));
+        // Index 9 should be review_dismissed (actor1)
+        QCOMPARE(sortedEvents[9].type, PREvent::TimelineEvent);
+        QCOMPARE(sortedEvents[9].id, QString("102"));
+        QVERIFY(sortedEvents[9].actionText.contains("actor1"));
+        QVERIFY(sortedEvents[9].actionText.contains("review_dismissed"));
+
+        // Index 10 should be review_dismissed (actor2, ID-less)
+        QCOMPARE(sortedEvents[10].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[10].id.isEmpty());
+        QVERIFY(sortedEvents[10].actionText.contains("actor2"));
+        QVERIFY(sortedEvents[10].actionText.contains("review_dismissed"));
+
+        // Index 11 should be reviewed (actor3, ID-less)
+        QCOMPARE(sortedEvents[11].type, PREvent::TimelineEvent);
+        QVERIFY(sortedEvents[11].id.isEmpty());
+        QVERIFY(sortedEvents[11].actionText.contains("actor3"));
+        QVERIFY(sortedEvents[11].actionText.contains("reviewed"));
 
         // Also verify updateConversationUi runs without crashing and deduplicates correctly
         // (already run implicitly inside onTimelineReply, but we can verify children count)
-        // 1 body + 5 timeline = 6 conversation widgets
-        QCOMPARE(window.m_commentsContainerLayout->count(), 6);
+        QCOMPARE(window.m_commentsContainerLayout->count(), 12);
     }
 
     void testPullRequestTimelineSourceAwareIdentity() {
@@ -2692,6 +2744,13 @@ class TestRequestConsumers : public QObject {
                                              {"body", "Looks good again"},
                                              {"created_at", "2023-01-01T10:06:00Z"}});
 
+        // Event with a fractional ID. Should be treated as malformed/ID-less
+        timelineDataPage1.append(QJsonObject{{"event", "commented"},
+                                             {"id", 3.14159},
+                                             {"user", QJsonObject{{"login", "commenter_fraction"}}},
+                                             {"body", "Fractional looks good"},
+                                             {"created_at", "2023-01-01T10:07:00Z"}});
+
         // Event missing timestamp entirely
         timelineDataPage1.append(
             QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actor2"}}}});
@@ -2710,7 +2769,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 5);  // Body + 4 events
+        QCOMPARE(window.m_events.size(), 6);  // Body + 5 events
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2728,7 +2787,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 5);
+        QCOMPARE(window.m_events.size(), 6);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2755,7 +2814,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 6);
+        QCOMPARE(window.m_events.size(), 7);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
