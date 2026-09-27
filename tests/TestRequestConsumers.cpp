@@ -2837,7 +2837,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 13);  // Body + 12 events
+        QCOMPARE(window.m_events.size(), 12);  // Body + 11 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -2855,7 +2855,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 13);
+        QCOMPARE(window.m_events.size(), 12);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -2882,7 +2882,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 14);
+        QCOMPARE(window.m_events.size(), 13);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -2899,13 +2899,23 @@ class TestRequestConsumers : public QObject {
 
         // Verify event without timestamp is handled
         int emptyTimestampCount = 0;
+        bool foundNode123 = false;
+        bool foundNode124 = false;
+        bool foundUrl99 = false;
         for (const auto& ev : sortedEvents) {
             if (ev.actionText.contains("cross-referenced") && ev.actionText.contains("actor2") && ev.id.isEmpty() &&
                 !ev.timestamp.isValid()) {
                 emptyTimestampCount++;
+                if (ev.sourceFingerprint.contains("node123")) foundNode123 = true;
+                if (ev.sourceFingerprint.contains("node124")) foundNode124 = true;
+                if (ev.sourceFingerprint.contains("issues/99")) foundUrl99 = true;
             }
         }
-        QCOMPARE(emptyTimestampCount, 3);  // 1 without source URL, 1 with source URL, 1 with node_id
+        QCOMPARE(emptyTimestampCount, 4);  // 1 without source URL, 1 with node123, 1 with node124, 1 with URL issues/99
+                                           // (the duplicated issues/99 was deduplicated)
+        QVERIFY(foundNode123);
+        QVERIFY(foundNode124);
+        QVERIFY(foundUrl99);
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
@@ -2932,7 +2942,7 @@ class TestRequestConsumers : public QObject {
         // Verify commenter_invalid_time survived with invalid timestamp
         bool foundInvalidTime = false;
         for (const auto& ev : sortedEvents) {
-            if (ev.author == "commenter_invalid_time" && ev.id.isEmpty() && !ev.timestamp.isValid()) {
+            if (ev.author == "commenter_invalid_time" && ev.id == "333" && !ev.timestamp.isValid()) {
                 foundInvalidTime = true;
                 break;
             }
