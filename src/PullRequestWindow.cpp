@@ -549,13 +549,24 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
             QJsonObject obj = val.toObject();
             QString event = obj["event"].toString();
 
+            QString parsedId;
+            if (obj.contains("id") && !obj["id"].isNull()) {
+                QVariant idVar = obj["id"].toVariant();
+                // Reject Doubles/fractions. Reject Strings. Only allow integers/LongLongs.
+                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int) {
+                    parsedId = QString::number(idVar.toLongLong());
+                }
+                // Invalid JSON strings or fractional doubles for strictly numeric IDs fall back to ID-less logic.
+            }
+
             if (event == "commented") {
                 QString author = obj["user"].toObject()["login"].toString();
                 QString body = obj["body"].toString();
                 QString createdAt = obj["created_at"].toString();
 
                 PREvent ev;
-                ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                ev.id = parsedId;
+                ev.sourceFamily = event;
                 ev.type = PREvent::IssueComment;
                 ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                 ev.author = author;
@@ -568,6 +579,9 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                 if (event == "committed") {
                     QString sha = obj["sha"].toString().left(7);
                     QString author = obj["author"].toObject()["name"].toString();
+                    if (parsedId.isEmpty()) {
+                        parsedId = obj["sha"].toString();  // fallback id for commits
+                    }
                     text =
                         tr("<b>%1</b> added commit <code>%2</code>").arg(author.toHtmlEscaped(), sha.toHtmlEscaped());
                     createdAt = obj["author"].toObject()["date"].toString();
@@ -599,11 +613,71 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
                     text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
+                } else {
+                    // Safe Fallback for unrecognized and unhandled events
+                    if (event == "reviewed") {
+                        createdAt = obj["submitted_at"].toString();
+                    }
+
+                    QString actor;
+                    if (obj.contains("actor")) {
+                        actor = obj["actor"].toObject()["login"].toString();
+                    } else if (obj.contains("user")) {
+                        actor = obj["user"].toObject()["login"].toString();
+                    }
+                    if (actor.isEmpty()) {
+                        text = tr("Unknown actor triggered <i>%1</i> event").arg(event.toHtmlEscaped());
+                    } else {
+                        text =
+                            tr("<b>%1</b> triggered <i>%2</i> event").arg(actor.toHtmlEscaped(), event.toHtmlEscaped());
+                    }
                 }
 
                 if (!text.isEmpty()) {
                     PREvent ev;
-                    ev.id = QString::number(obj["id"].toVariant().toLongLong());
+                    ev.id = parsedId;
+                    ev.sourceFamily = event;
+                    if (event == "cross-referenced" && obj.contains("source") && obj["source"].isObject()) {
+                        QJsonObject sourceObj = obj["source"].toObject();
+
+                        QString fp;
+                        if (sourceObj.contains("type")) {
+                            fp += sourceObj["type"].toString() + ":";
+                        }
+
+                        if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
+                            QJsonObject issueObj = sourceObj["issue"].toObject();
+
+                            bool foundId = false;
+                            if (issueObj.contains("id") && !issueObj["id"].isNull()) {
+                                QVariant idVar = issueObj["id"].toVariant();
+                                if (idVar.typeId() == QMetaType::LongLong || idVar.typeId() == QMetaType::Int) {
+                                    fp += "id=" + QString::number(idVar.toLongLong());
+                                    foundId = true;
+                                }
+                            }
+
+                            if (!foundId && issueObj.contains("node_id") && !issueObj["node_id"].isNull() &&
+                                issueObj["node_id"].toVariant().typeId() == QMetaType::QString &&
+                                !issueObj["node_id"].toString().isEmpty()) {
+                                fp += "node_id=" + issueObj["node_id"].toString();
+                            } else if (!foundId && issueObj.contains("url") && !issueObj["url"].isNull() &&
+                                       issueObj["url"].toVariant().typeId() == QMetaType::QString &&
+                                       !issueObj["url"].toString().isEmpty()) {
+                                fp += "url=" + issueObj["url"].toString();
+                            } else if (!foundId && issueObj.contains("number") && issueObj.contains("repository_url") &&
+                                       !issueObj["repository_url"].isNull() &&
+                                       issueObj["repository_url"].toVariant().typeId() == QMetaType::QString &&
+                                       !issueObj["repository_url"].toString().isEmpty()) {
+                                QVariant numVar = issueObj["number"].toVariant();
+                                if (numVar.typeId() == QMetaType::LongLong || numVar.typeId() == QMetaType::Int) {
+                                    fp += "repo=" + issueObj["repository_url"].toString() +
+                                          "#number=" + QString::number(numVar.toLongLong());
+                                }
+                            }
+                        }
+                        ev.sourceFingerprint = fp;
+                    }
                     ev.type = PREvent::TimelineEvent;
                     ev.timestamp = QDateTime::fromString(createdAt, Qt::ISODate);
                     ev.actionText = text;
