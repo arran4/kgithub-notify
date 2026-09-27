@@ -15,7 +15,7 @@
 | `connected` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
 | `convert_to_draft` | Planned (#297) | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | PR lifecycle |
 | `converted_note_to_issue` | Not applicable | N/A | N/A | N/A | None | Issue-only project event (Legacy/GraphQL) |
-| `converted_to_discussion` | Not applicable | N/A | N/A | N/A | None | Issue-only event (Legacy/GraphQL) |
+| `converted_to_discussion` | Not applicable | N/A | N/A | N/A | None | Current REST event; issue-only / not applicable to PRs |
 | `cross-referenced` | Planned (#298) | None | `created_at` | `actor.login` / `source` | `testPullRequestTimelineMalformedIdsAndLaterPageFailure` | Missing `id`, nested `source` requires stable fingerprinting |
 | `demilestoned` | Planned (#298) | `id` | `created_at` | `actor.login` / `milestone` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Metadata family |
 | `deployed` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
@@ -31,7 +31,7 @@
 | `merged` | Supported | `id` | `created_at` | `actor.login` / `commit_id` | `testPullRequestTimelineSafeFallbackAndDeduplication` | |
 | `milestoned` | Planned (#298) | `id` | `created_at` | `actor.login` / `milestone` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Metadata family |
 | `moved_columns_in_project` | Planned (#298) | `id` | `created_at` | `actor.login` / `project_card` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Project family (Legacy/GraphQL event) |
-| `pinned` | Not applicable | N/A | N/A | N/A | None | Issue-only event (GraphQL/historical) |
+| `pinned` | Not applicable | N/A | N/A | N/A | None | Current REST event; issue-only / not applicable to PRs |
 | `ready_for_review` | Planned (#297) | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | PR lifecycle |
 | `referenced` | Planned (#298) | `commit_id` | `created_at` | `actor.login` / `commit_url` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Reference family |
 | `removed_from_project` | Planned (#298) | `id` | `created_at` | `actor.login` / `project_card` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Project family (Legacy/GraphQL event) |
@@ -42,11 +42,11 @@
 | `review_requested` | Planned (#297) | `id` | `created_at` | `actor.login` / `requested_reviewer` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | Review family |
 | `reviewed` | Planned (#297) | `id` | `submitted_at` | `user.login` / `body`, `state` | `testPullRequestTimelineSourceAwareIdentity` | Timestamp is `submitted_at`, actor is `user` |
 | `subscribed` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
-| `transferred` | Not applicable | N/A | N/A | N/A | None | Issue-only event (GraphQL/historical) |
+| `transferred` | Not applicable | N/A | N/A | N/A | None | Current REST event; issue-only / not applicable to PRs |
 | `unassigned` | Supported | `id` | `created_at` | `actor.login` / `assignee` | `testPullRequestTimelineSafeFallbackAndDeduplication` | |
 | `unlabeled` | Supported | `id` | `created_at` | `actor.login` / `label.name` | `testPullRequestTimelineSafeFallbackAndDeduplication` | |
 | `unlocked` | Planned (#298) | `id` | `created_at` | `actor.login` / `lock_reason` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | PR metadata lifecycle |
 | `unmarked_as_duplicate` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
-| `unpinned` | Not applicable | N/A | N/A | N/A | None | Issue-only event (GraphQL/historical) |
+| `unpinned` | Not applicable | N/A | N/A | N/A | None | Current REST event; issue-only / not applicable to PRs |
 | `unsubscribed` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
 | `user_blocked` | Safe Fallback | `id` | `created_at` | `actor.login` | `testPullRequestTimelineSafeFallbackAndDeduplication` (representative: `review_dismissed`) | |
