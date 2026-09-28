@@ -2753,6 +2753,7 @@ class TestRequestConsumers : public QObject {
                                         {"user", QJsonObject{{"login", "reviewer1"}}},
                                         {"state", "approved"},
                                         {"body", "Looks good <b>"},
+                                        {"commit_id", "fedcba987654321"},
                                         {"submitted_at", "2023-01-01T10:05:00Z"}});
         // reviewed (missing actor)
         timelineData.append(QJsonObject{{"event", "reviewed"},
@@ -2780,15 +2781,15 @@ class TestRequestConsumers : public QObject {
         timelineData.append(QJsonObject{{"event", "review_requested"},
                                         {"id", 2021},
                                         {"actor", QJsonObject{{"login", "actor_ignored"}}},
-                                        {"review_requester", QJsonObject{{"login", "requester1"}}},
-                                        {"requested_reviewer", QJsonObject{{"login", "reviewer3"}}},
+                                        {"review_requester", QJsonObject{{"login", "requester1<"}}},
+                                        {"requested_reviewer", QJsonObject{{"login", "reviewer3<"}}},
                                         {"created_at", "2023-01-01T10:07:10Z"}});
 
         // review_request_removed
         timelineData.append(QJsonObject{{"event", "review_request_removed"},
                                         {"id", 203},
                                         {"actor", QJsonObject{{"login", "actor2"}}},
-                                        {"requested_team", QJsonObject{{"name", "team1"}}},
+                                        {"requested_reviewer", QJsonObject{{"login", "reviewer4<"}}},
                                         {"created_at", "2023-01-01T10:08:00Z"}});
 
         // convert_to_draft
@@ -2816,6 +2817,11 @@ class TestRequestConsumers : public QObject {
                                         {"created_at", "2023-01-01T10:12:00Z"}});
 
         // head_ref_force_pushed
+        timelineData.append(QJsonObject{{"event", "head_ref_force_pushed"},
+                                        {"id", 208},
+                                        {"actor", QJsonObject{{"login", "actor<7>"}}},
+                                        {"commit_id", "abcdef123456"},
+                                        {"created_at", "2023-01-01T10:13:00Z"}});
 
         // base_ref_changed
         timelineData.append(QJsonObject{{"event", "base_ref_changed"},
@@ -2849,8 +2855,8 @@ class TestRequestConsumers : public QObject {
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
 
-        // Body + 14 distinct events
-        QCOMPARE(sortedEvents.size(), 15);
+        // Body + 15 distinct events
+        QCOMPARE(sortedEvents.size(), 16);
 
         int i = 0;
         if (sortedEvents[i].type == PREvent::TimelineEvent && sortedEvents[i].sourceFamily == "reviewed")
@@ -2862,6 +2868,7 @@ class TestRequestConsumers : public QObject {
 
         // 1: reviewed (normal)
         QVERIFY(sortedEvents[i].actionText.contains("<b>reviewer1</b> reviewed this"));
+        QVERIFY(sortedEvents[i].actionText.contains("fedcba9"));
         QVERIFY(sortedEvents[i].actionText.contains("approved"));
         QVERIFY(sortedEvents[i].actionText.contains("&lt;b&gt;"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("reviewed"));
@@ -2887,12 +2894,13 @@ class TestRequestConsumers : public QObject {
         i++;
 
         // 5: review_requested (with review_requester)
-        QVERIFY(sortedEvents[i].actionText.contains("<b>requester1</b> requested a review from <b>reviewer3</b>"));
+        QVERIFY(
+            sortedEvents[i].actionText.contains("<b>requester1&lt;</b> requested a review from <b>reviewer3&lt;</b>"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_requested"));
         i++;
 
         // 6: review_request_removed
-        QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> removed a review request for <b>team1</b>"));
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> removed a review request for <b>reviewer4&lt;</b>"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
         i++;
 
@@ -2916,7 +2924,13 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[i].sourceFamily, QString("head_ref_restored"));
         i++;
 
-        // 11: base_ref_changed
+        // 11: head_ref_force_pushed
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor&lt;7&gt;</b> force-pushed the head branch"));
+        QVERIFY(sortedEvents[i].actionText.contains("abcdef1"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("head_ref_force_pushed"));
+        i++;
+
+        // 12: base_ref_changed
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor7</b> changed the base branch"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("base_ref_changed"));
         i++;
@@ -2931,11 +2945,16 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[i].sourceFamily, QString("automatic_base_change_succeeded"));
         i++;
 
-        if (i < sortedEvents.size()) {
-            // 15: ID-less missing timestamp
-            QVERIFY(sortedEvents[i].actionText.contains("<b>actor9</b> reviewed this"));
-            QCOMPARE(sortedEvents[i].sourceFamily, QString("reviewed"));
+        // Ensure ID-less missing timestamp event is correctly identified and handled
+        // We know it is the first event of TimelineEvent because its timestamp is invalid
+        bool foundIdLess = false;
+        for (const auto& ev : sortedEvents) {
+            if (ev.sourceFamily == "reviewed" && ev.id.isEmpty() && !ev.timestamp.isValid()) {
+                foundIdLess = true;
+                QVERIFY(ev.actionText.contains("<b>actor9</b> reviewed this"));
+            }
         }
+        QVERIFY(foundIdLess);
     }
 
     void testPullRequestTimelineMalformedIdsAndLaterPageFailure() {

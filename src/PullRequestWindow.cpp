@@ -626,6 +626,10 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     if (!body.isEmpty()) {
                         text += tr("<br/><i>%1</i>").arg(body.toHtmlEscaped());
                     }
+                    QString commitId = obj["commit_id"].toString();
+                    if (!commitId.isEmpty()) {
+                        text += tr(" at <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
                 } else if (event == "review_dismissed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QJsonObject dismissedReview = obj["dismissed_review"].toObject();
@@ -683,6 +687,10 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     text = tr("<b>%1</b> force-pushed the head branch")
                                .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    QString commitId = obj["commit_id"].toString();
+                    if (!commitId.isEmpty()) {
+                        text += tr(" to <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
                 } else if (event == "base_ref_changed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     text = tr("<b>%1</b> changed the base branch")
