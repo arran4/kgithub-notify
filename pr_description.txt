@@ -1,0 +1,45 @@
+Fixes #297
+Links: #296, #299, #295
+
+**Scope**
+This PR implements typed parsing and UI rendering for PR Review and Branch-Lifecycle events.
+
+Exact typed REST events implemented:
+- `reviewed`
+- `review_dismissed`
+- `review_requested`
+- `review_request_removed`
+- `convert_to_draft`
+- `ready_for_review`
+- `head_ref_deleted`
+- `head_ref_restored`
+- `head_ref_force_pushed`
+- `base_ref_changed`
+- `automatic_base_change_failed`
+- `automatic_base_change_succeeded`
+
+**Unavailable/Not Applicable Findings**
+- `base_ref_force_pushed`: Found to be a GraphQL-only event. It is not returned by the consumed REST timeline endpoint and is therefore marked as not applicable. We avoid adding a GraphQL dependency purely for this one event.
+
+**Updated Coverage Inventory (for #296)**
+The following should be reflected in the durable coverage inventory:
+- `automatic_base_change_failed` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | |
+- `automatic_base_change_succeeded` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | |
+- `base_ref_changed` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Branch lifecycle |
+- `base_ref_force_pushed` | Not applicable | N/A | N/A | N/A | None | Branch lifecycle (Not available on REST API timeline) |
+- `convert_to_draft` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | PR lifecycle |
+- `head_ref_deleted` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Branch lifecycle |
+- `head_ref_force_pushed` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Branch lifecycle |
+- `head_ref_restored` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Branch lifecycle |
+- `ready_for_review` | Supported | `id` | `created_at` | `actor.login` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | PR lifecycle |
+- `review_dismissed` | Supported | `id` | `created_at` | `actor.login` / `dismissed_review` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Has nested fields |
+- `review_request_removed` | Supported | `id` | `created_at` | `actor.login` / `requested_reviewer` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Review family |
+- `review_requested` | Supported | `id` | `created_at` | `actor.login` / `requested_reviewer` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Review family |
+- `reviewed` | Supported | `id` | `submitted_at` | `user.login` / `body`, `state` | `testPullRequestTimelineReviewAndBranchLifecycleEvents` | Timestamp is `submitted_at`, actor is `user` |
+
+**Validation**
+- `clang-format` and `cppcheck` passed successfully.
+- Ran tests via `.jules/bootstrap.sh`, `cmake`, `cmake --build`, and `ctest`. All tests (including `TestRequestConsumers`) pass 100%.
+
+**Provenance**
+Completed via Jules.

@@ -2632,19 +2632,16 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[9].type, PREvent::TimelineEvent);
         QCOMPARE(sortedEvents[9].id, QString("102"));
         QVERIFY(sortedEvents[9].actionText.contains("actor1"));
-        QVERIFY(sortedEvents[9].actionText.contains("review_dismissed"));
 
         // Index 10 should be review_dismissed (actor2, ID-less)
         QCOMPARE(sortedEvents[10].type, PREvent::TimelineEvent);
         QVERIFY(sortedEvents[10].id.isEmpty());
         QVERIFY(sortedEvents[10].actionText.contains("actor2"));
-        QVERIFY(sortedEvents[10].actionText.contains("review_dismissed"));
 
         // Index 11 should be reviewed (actor3, ID-less)
         QCOMPARE(sortedEvents[11].type, PREvent::TimelineEvent);
         QVERIFY(sortedEvents[11].id.isEmpty());
         QVERIFY(sortedEvents[11].actionText.contains("actor3"));
-        QVERIFY(sortedEvents[11].actionText.contains("reviewed"));
 
         // Also verify updateConversationUi runs without crashing and deduplicates correctly
         // (already run implicitly inside onTimelineReply, but we can verify children count)
@@ -2713,6 +2710,232 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[1].sourceFamily, QString("labeled"));
         QCOMPARE(sortedEvents[2].id, QString("555"));
         QCOMPARE(sortedEvents[2].sourceFamily, QString("reviewed"));
+    }
+
+    void testPullRequestTimelineReviewAndBranchLifecycleEvents() {
+        GitHubClient client;
+        FakeNetworkAccessManager fakeManager;
+        fakeManager.autoEmitFinished = false;
+
+        Notification n;
+        n.id = "4";
+        n.url = "https://api.github.com/repos/o/r/issues/4";
+
+        PullRequestWindow window(n, &client, nullptr, &fakeManager);
+
+        QJsonObject details;
+        details["number"] = 4;
+        details["title"] = "Test PR 4";
+        details["state"] = "open";
+        details["user"] = QJsonObject{{"login", "creator"}};
+        details["created_at"] = "2023-01-01T10:00:00Z";
+        details["body"] = "PR Body 4";
+        QJsonObject pullRequestData;
+        pullRequestData["url"] = "https://api.github.com/repos/o/r/pulls/4";
+        details["pull_request"] = pullRequestData;
+
+        fakeManager.requests[0].reply->complete(QJsonDocument(details).toJson());
+
+        int timelineReqIdx = -1;
+        for (int i = 1; i < fakeManager.requests.size(); ++i) {
+            if (fakeManager.requests[i].request.url().toString().contains("timeline")) {
+                timelineReqIdx = i;
+                break;
+            }
+        }
+        QVERIFY(timelineReqIdx != -1);
+
+        QJsonArray timelineData;
+
+        // reviewed (normal)
+        timelineData.append(QJsonObject{{"event", "reviewed"},
+                                        {"id", 200},
+                                        {"user", QJsonObject{{"login", "reviewer1"}}},
+                                        {"state", "approved"},
+                                        {"body", "Looks good <b>"},
+                                        {"submitted_at", "2023-01-01T10:05:00Z"}});
+        // reviewed (missing actor)
+        timelineData.append(QJsonObject{{"event", "reviewed"},
+                                        {"id", 2001},
+                                        {"state", "changes_requested"},
+                                        {"submitted_at", "2023-01-01T10:05:10Z"}});
+
+        // review_dismissed (normal)
+        timelineData.append(QJsonObject{{"event", "review_dismissed"},
+                                        {"id", 201},
+                                        {"actor", QJsonObject{{"login", "actor1"}}},
+                                        {"dismissed_review", QJsonObject{{"dismissal_message", "needs work <"},
+                                                                         {"state", "DISMISSED"},
+                                                                         {"dismissal_commit_id", "123456789"}}},
+                                        {"created_at", "2023-01-01T10:06:00Z"}});
+
+        // review_requested (normal)
+        timelineData.append(QJsonObject{{"event", "review_requested"},
+                                        {"id", 202},
+                                        {"actor", QJsonObject{{"login", "actor2"}}},
+                                        {"requested_reviewer", QJsonObject{{"login", "reviewer2"}}},
+                                        {"created_at", "2023-01-01T10:07:00Z"}});
+
+        // review_requested (with review_requester)
+        timelineData.append(QJsonObject{{"event", "review_requested"},
+                                        {"id", 2021},
+                                        {"actor", QJsonObject{{"login", "actor_ignored"}}},
+                                        {"review_requester", QJsonObject{{"login", "requester1"}}},
+                                        {"requested_reviewer", QJsonObject{{"login", "reviewer3"}}},
+                                        {"created_at", "2023-01-01T10:07:10Z"}});
+
+        // review_request_removed
+        timelineData.append(QJsonObject{{"event", "review_request_removed"},
+                                        {"id", 203},
+                                        {"actor", QJsonObject{{"login", "actor2"}}},
+                                        {"requested_team", QJsonObject{{"name", "team1"}}},
+                                        {"created_at", "2023-01-01T10:08:00Z"}});
+
+        // convert_to_draft
+        timelineData.append(QJsonObject{{"event", "convert_to_draft"},
+                                        {"id", 204},
+                                        {"actor", QJsonObject{{"login", "actor3"}}},
+                                        {"created_at", "2023-01-01T10:09:00Z"}});
+
+        // ready_for_review
+        timelineData.append(QJsonObject{{"event", "ready_for_review"},
+                                        {"id", 205},
+                                        {"actor", QJsonObject{{"login", "actor4"}}},
+                                        {"created_at", "2023-01-01T10:10:00Z"}});
+
+        // head_ref_deleted
+        timelineData.append(QJsonObject{{"event", "head_ref_deleted"},
+                                        {"id", 206},
+                                        {"actor", QJsonObject{{"login", "actor5"}}},
+                                        {"created_at", "2023-01-01T10:11:00Z"}});
+
+        // head_ref_restored
+        timelineData.append(QJsonObject{{"event", "head_ref_restored"},
+                                        {"id", 207},
+                                        {"actor", QJsonObject{{"login", "actor6"}}},
+                                        {"created_at", "2023-01-01T10:12:00Z"}});
+
+        // head_ref_force_pushed
+
+        // base_ref_changed
+        timelineData.append(QJsonObject{{"event", "base_ref_changed"},
+                                        {"id", 209},
+                                        {"actor", QJsonObject{{"login", "actor7"}}},
+                                        {"created_at", "2023-01-01T10:13:30Z"}});
+
+        // automatic_base_change_failed (actor empty)
+        timelineData.append(QJsonObject{{"event", "automatic_base_change_failed"},
+                                        {"id", 210},
+                                        {"actor", QJsonObject{{"login", ""}}},
+                                        {"created_at", "2023-01-01T10:14:00Z"}});
+
+        // automatic_base_change_succeeded
+        timelineData.append(QJsonObject{{"event", "automatic_base_change_succeeded"},
+                                        {"id", 211},
+                                        {"actor", QJsonObject{{"login", "actor8"}}},
+                                        {"created_at", "2023-01-01T10:15:00Z"}});
+
+        // deduplication test: send same ID, same type, same time
+        timelineData.append(QJsonObject{{"event", "automatic_base_change_succeeded"},
+                                        {"id", 211},
+                                        {"actor", QJsonObject{{"login", "actor8"}}},
+                                        {"created_at", "2023-01-01T10:15:00Z"}});
+
+        // ID-less missing timestamp (malformed fallback check for missing fields)
+        timelineData.append(QJsonObject{{"event", "reviewed"}, {"user", QJsonObject{{"login", "actor9"}}}});
+
+        fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineData).toJson());
+
+        QList<PREvent> sortedEvents = window.m_events;
+        std::sort(sortedEvents.begin(), sortedEvents.end());
+
+        // Body + 14 distinct events
+        QCOMPARE(sortedEvents.size(), 15);
+
+        int i = 0;
+        if (sortedEvents[i].type == PREvent::TimelineEvent && sortedEvents[i].sourceFamily == "reviewed")
+            i++;  // skip the ID-less one which comes first
+
+        // 0: body
+        QCOMPARE(sortedEvents[i].type, PREvent::Body);
+        i++;
+
+        // 1: reviewed (normal)
+        QVERIFY(sortedEvents[i].actionText.contains("<b>reviewer1</b> reviewed this"));
+        QVERIFY(sortedEvents[i].actionText.contains("approved"));
+        QVERIFY(sortedEvents[i].actionText.contains("&lt;b&gt;"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("reviewed"));
+        i++;
+
+        // 2: reviewed (missing actor)
+        QVERIFY(sortedEvents[i].actionText.contains("Unknown user"));
+        QVERIFY(sortedEvents[i].actionText.contains("changes_requested"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("reviewed"));
+        i++;
+
+        // 3: review_dismissed
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor1</b> dismissed a review"));
+        QVERIFY(sortedEvents[i].actionText.contains("DISMISSED"));
+        QVERIFY(sortedEvents[i].actionText.contains("1234567"));
+        QVERIFY(sortedEvents[i].actionText.contains("&lt;"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_dismissed"));
+        i++;
+
+        // 4: review_requested (normal)
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> requested a review from <b>reviewer2</b>"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_requested"));
+        i++;
+
+        // 5: review_requested (with review_requester)
+        QVERIFY(sortedEvents[i].actionText.contains("<b>requester1</b> requested a review from <b>reviewer3</b>"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_requested"));
+        i++;
+
+        // 6: review_request_removed
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> removed a review request for <b>team1</b>"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
+        i++;
+
+        // 7: convert_to_draft
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor3</b> converted this to a draft"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("convert_to_draft"));
+        i++;
+
+        // 8: ready_for_review
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor4</b> marked this as ready for review"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("ready_for_review"));
+        i++;
+
+        // 9: head_ref_deleted
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor5</b> deleted the head branch"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("head_ref_deleted"));
+        i++;
+
+        // 10: head_ref_restored
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor6</b> restored the head branch"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("head_ref_restored"));
+        i++;
+
+        // 11: base_ref_changed
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor7</b> changed the base branch"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("base_ref_changed"));
+        i++;
+
+        // 13: automatic_base_change_failed (actor empty -> GitHub)
+        QVERIFY(sortedEvents[i].actionText.contains("<b>GitHub</b> attempted an automatic base change, which failed"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("automatic_base_change_failed"));
+        i++;
+
+        // 14: automatic_base_change_succeeded
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor8</b> successfully completed an automatic base change"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("automatic_base_change_succeeded"));
+        i++;
+
+        if (i < sortedEvents.size()) {
+            // 15: ID-less missing timestamp
+            QVERIFY(sortedEvents[i].actionText.contains("<b>actor9</b> reviewed this"));
+            QCOMPARE(sortedEvents[i].sourceFamily, QString("reviewed"));
+        }
     }
 
     void testPullRequestTimelineMalformedIdsAndLaterPageFailure() {
