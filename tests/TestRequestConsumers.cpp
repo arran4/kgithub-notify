@@ -2784,18 +2784,18 @@ class TestRequestConsumers : public QObject {
                                         {"requested_reviewer", QJsonObject{{"login", "reviewer2"}}},
                                         {"created_at", "2023-01-01T10:07:00Z"}});
 
-        // review_requested (with review_requester)
+        // review_requested (with review_requester fallback)
         timelineData.append(QJsonObject{{"event", "review_requested"},
                                         {"id", 2021},
-                                        {"actor", QJsonObject{{"login", "actor_ignored"}}},
                                         {"review_requester", QJsonObject{{"login", "requester1<"}}},
                                         {"requested_reviewer", QJsonObject{{"login", "reviewer3<"}}},
                                         {"created_at", "2023-01-01T10:07:10Z"}});
 
-        // review_request_removed
+        // review_request_removed (actor precedence over requester)
         timelineData.append(QJsonObject{{"event", "review_request_removed"},
                                         {"id", 203},
                                         {"actor", QJsonObject{{"login", "actor2"}}},
+                                        {"review_requester", QJsonObject{{"login", "requester_ignored"}}},
                                         {"requested_reviewer", QJsonObject{{"login", "reviewer4<"}}},
                                         {"created_at", "2023-01-01T10:08:00Z"}});
 
@@ -2915,7 +2915,7 @@ class TestRequestConsumers : public QObject {
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_requested"));
         i++;
 
-        // 6: review_request_removed
+        // 6: review_request_removed (actor precedence over requester)
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> removed a review request for <b>reviewer4&lt;</b>"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
         i++;
