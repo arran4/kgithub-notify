@@ -657,8 +657,6 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString reviewer;
                     if (obj.contains("requested_reviewer")) {
                         reviewer = obj["requested_reviewer"].toObject()["login"].toString();
-                    } else if (obj.contains("requested_team")) {
-                        reviewer = obj["requested_team"].toObject()["name"].toString();
                     }
                     QString safeActor = actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped();
                     QString safeReviewer = reviewer.isEmpty() ? tr("Unknown user") : reviewer.toHtmlEscaped();

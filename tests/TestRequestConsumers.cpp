@@ -2765,10 +2765,17 @@ class TestRequestConsumers : public QObject {
         timelineData.append(QJsonObject{{"event", "review_dismissed"},
                                         {"id", 201},
                                         {"actor", QJsonObject{{"login", "actor1"}}},
-                                        {"dismissed_review", QJsonObject{{"dismissal_message", "needs work <"},
-                                                                         {"state", "DISMISSED"},
+                                        {"dismissed_review", QJsonObject{{"review_id", 987654321},
+                                                                         {"dismissal_message", "needs work <"},
+                                                                         {"state", "changes_requested"},
                                                                          {"dismissal_commit_id", "123456789"}}},
                                         {"created_at", "2023-01-01T10:06:00Z"}});
+
+        // review_dismissed (partial/missing dismissed_review)
+        timelineData.append(QJsonObject{{"event", "review_dismissed"},
+                                        {"id", 2011},
+                                        {"actor", QJsonObject{{"login", "actor1b"}}},
+                                        {"created_at", "2023-01-01T10:06:10Z"}});
 
         // review_requested (normal)
         timelineData.append(QJsonObject{{"event", "review_requested"},
@@ -2855,8 +2862,8 @@ class TestRequestConsumers : public QObject {
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
 
-        // Body + 15 distinct events
-        QCOMPARE(sortedEvents.size(), 16);
+        // Body + 16 distinct events
+        QCOMPARE(sortedEvents.size(), 17);
 
         int i = 0;
         if (sortedEvents[i].type == PREvent::TimelineEvent && sortedEvents[i].sourceFamily == "reviewed")
@@ -2867,6 +2874,8 @@ class TestRequestConsumers : public QObject {
         i++;
 
         // 1: reviewed (normal)
+        QCOMPARE(sortedEvents[i].id, QString("200"));
+        QCOMPARE(sortedEvents[i].timestamp.toString(Qt::ISODate), QString("2023-01-01T10:05:00Z"));
         QVERIFY(sortedEvents[i].actionText.contains("<b>reviewer1</b> reviewed this"));
         QVERIFY(sortedEvents[i].actionText.contains("fedcba9"));
         QVERIFY(sortedEvents[i].actionText.contains("approved"));
@@ -2881,10 +2890,17 @@ class TestRequestConsumers : public QObject {
         i++;
 
         // 3: review_dismissed
+        QCOMPARE(sortedEvents[i].id, QString("201"));
+        QCOMPARE(sortedEvents[i].timestamp.toString(Qt::ISODate), QString("2023-01-01T10:06:00Z"));
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor1</b> dismissed a review"));
-        QVERIFY(sortedEvents[i].actionText.contains("DISMISSED"));
+        QVERIFY(sortedEvents[i].actionText.contains("changes_requested"));
         QVERIFY(sortedEvents[i].actionText.contains("1234567"));
         QVERIFY(sortedEvents[i].actionText.contains("&lt;"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_dismissed"));
+        i++;
+
+        // 3b: review_dismissed (partial)
+        QVERIFY(sortedEvents[i].actionText.contains("<b>actor1b</b> dismissed a review"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_dismissed"));
         i++;
 
