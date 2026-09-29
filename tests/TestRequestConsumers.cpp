@@ -2941,12 +2941,16 @@ class TestRequestConsumers : public QObject {
         i++;
 
         // 11: head_ref_force_pushed
+        QCOMPARE(sortedEvents[i].id, QString("208"));
+        QCOMPARE(sortedEvents[i].timestamp.toString(Qt::ISODate), QString("2023-01-01T10:13:00Z"));
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor&lt;7&gt;</b> force-pushed the head branch"));
         QVERIFY(sortedEvents[i].actionText.contains("abcdef1"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("head_ref_force_pushed"));
         i++;
 
         // 12: base_ref_changed
+        QCOMPARE(sortedEvents[i].id, QString("209"));
+        QCOMPARE(sortedEvents[i].timestamp.toString(Qt::ISODate), QString("2023-01-01T10:13:30Z"));
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor7</b> changed the base branch"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("base_ref_changed"));
         i++;
