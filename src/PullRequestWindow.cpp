@@ -650,7 +650,7 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     }
                 } else if (event == "review_requested" || event == "review_request_removed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
-                    if (actor.isEmpty() && obj.contains("review_requester")) {
+                    if (event == "review_requested" && actor.isEmpty() && obj.contains("review_requester")) {
                         actor = obj["review_requester"].toObject()["login"].toString();
                     }
                     QString reviewer;

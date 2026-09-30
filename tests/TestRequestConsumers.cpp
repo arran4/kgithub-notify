@@ -2799,6 +2799,13 @@ class TestRequestConsumers : public QObject {
                                         {"requested_reviewer", QJsonObject{{"login", "reviewer4<"}}},
                                         {"created_at", "2023-01-01T10:08:00Z"}});
 
+        // review_request_removed (missing actor, requester present but should NOT be used)
+        timelineData.append(QJsonObject{{"event", "review_request_removed"},
+                                        {"id", 2031},
+                                        {"review_requester", QJsonObject{{"login", "original_requester<"}}},
+                                        {"requested_reviewer", QJsonObject{{"login", "reviewer5"}}},
+                                        {"created_at", "2023-01-01T10:08:30Z"}});
+
         // convert_to_draft
         timelineData.append(QJsonObject{{"event", "convert_to_draft"},
                                         {"id", 204},
@@ -2862,8 +2869,8 @@ class TestRequestConsumers : public QObject {
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
 
-        // Body + 16 distinct events
-        QCOMPARE(sortedEvents.size(), 17);
+        // Body + 17 distinct events
+        QCOMPARE(sortedEvents.size(), 18);
 
         int i = 0;
         if (sortedEvents[i].type == PREvent::TimelineEvent && sortedEvents[i].sourceFamily == "reviewed")
@@ -2917,6 +2924,13 @@ class TestRequestConsumers : public QObject {
 
         // 6: review_request_removed (actor precedence over requester)
         QVERIFY(sortedEvents[i].actionText.contains("<b>actor2</b> removed a review request for <b>reviewer4&lt;</b>"));
+        QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
+        i++;
+
+        // 6b: review_request_removed (missing actor, no fallback to requester)
+        QCOMPARE(sortedEvents[i].id, QString("2031"));
+        QVERIFY(sortedEvents[i].actionText.contains("<b>Unknown user</b> removed a review request for <b>reviewer5</b>"));
+        QVERIFY(!sortedEvents[i].actionText.contains("original_requester"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
         i++;
 
