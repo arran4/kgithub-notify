@@ -613,11 +613,95 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     QString assignee = obj["assignee"].toObject()["login"].toString();
                     text = tr("<b>%1</b> unassigned <b>%2</b>").arg(actor.toHtmlEscaped(), assignee.toHtmlEscaped());
+                } else if (event == "reviewed") {
+                    createdAt = obj["submitted_at"].toString();
+                    QString actor = obj["user"].toObject()["login"].toString();
+                    QString state = obj["state"].toString();
+                    QString body = obj["body"].toString();
+                    text =
+                        tr("<b>%1</b> reviewed this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (!state.isEmpty()) {
+                        text += tr(" (state: <b>%1</b>)").arg(state.toHtmlEscaped());
+                    }
+                    if (!body.isEmpty()) {
+                        text += tr("<br/><i>%1</i>").arg(body.toHtmlEscaped());
+                    }
+                    QString commitId = obj["commit_id"].toString();
+                    if (!commitId.isEmpty()) {
+                        text += tr(" at <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
+                } else if (event == "review_dismissed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QJsonObject dismissedReview = obj["dismissed_review"].toObject();
+                    QString dismissalMessage = dismissedReview["dismissal_message"].toString();
+                    QString reviewState = dismissedReview["state"].toString();
+                    QString commitId = dismissedReview["dismissal_commit_id"].toString();
+
+                    text = tr("<b>%1</b> dismissed a review")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (!reviewState.isEmpty()) {
+                        text += tr(" (state: <b>%1</b>)").arg(reviewState.toHtmlEscaped());
+                    }
+                    if (!commitId.isEmpty()) {
+                        text += tr(" at <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
+                    if (!dismissalMessage.isEmpty()) {
+                        text += tr("<br/><i>%1</i>").arg(dismissalMessage.toHtmlEscaped());
+                    }
+                } else if (event == "review_requested" || event == "review_request_removed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    if (actor.isEmpty() && obj.contains("review_requester")) {
+                        actor = obj["review_requester"].toObject()["login"].toString();
+                    }
+                    QString reviewer;
+                    if (obj.contains("requested_reviewer")) {
+                        reviewer = obj["requested_reviewer"].toObject()["login"].toString();
+                    }
+                    QString safeActor = actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped();
+                    QString safeReviewer = reviewer.isEmpty() ? tr("Unknown user") : reviewer.toHtmlEscaped();
+                    if (event == "review_requested") {
+                        text = tr("<b>%1</b> requested a review from <b>%2</b>").arg(safeActor, safeReviewer);
+                    } else {
+                        text = tr("<b>%1</b> removed a review request for <b>%2</b>").arg(safeActor, safeReviewer);
+                    }
+                } else if (event == "convert_to_draft") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> converted this to a draft")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "ready_for_review") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> marked this as ready for review")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "head_ref_deleted") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> deleted the head branch")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "head_ref_restored") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> restored the head branch")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "head_ref_force_pushed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> force-pushed the head branch")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    QString commitId = obj["commit_id"].toString();
+                    if (!commitId.isEmpty()) {
+                        text += tr(" to <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
+                } else if (event == "base_ref_changed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> changed the base branch")
+                               .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "automatic_base_change_failed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    if (actor.isEmpty()) actor = "GitHub";
+                    text = tr("<b>%1</b> attempted an automatic base change, which failed").arg(actor.toHtmlEscaped());
+                } else if (event == "automatic_base_change_succeeded") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    if (actor.isEmpty()) actor = "GitHub";
+                    text = tr("<b>%1</b> successfully completed an automatic base change").arg(actor.toHtmlEscaped());
                 } else {
                     // Safe Fallback for unrecognized and unhandled events
-                    if (event == "reviewed") {
-                        createdAt = obj["submitted_at"].toString();
-                    }
 
                     QString actor;
                     if (obj.contains("actor")) {
