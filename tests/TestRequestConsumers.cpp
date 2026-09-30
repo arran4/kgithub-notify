@@ -2929,7 +2929,8 @@ class TestRequestConsumers : public QObject {
 
         // 6b: review_request_removed (missing actor, no fallback to requester)
         QCOMPARE(sortedEvents[i].id, QString("2031"));
-        QVERIFY(sortedEvents[i].actionText.contains("<b>Unknown user</b> removed a review request for <b>reviewer5</b>"));
+        QVERIFY(
+            sortedEvents[i].actionText.contains("<b>Unknown user</b> removed a review request for <b>reviewer5</b>"));
         QVERIFY(!sortedEvents[i].actionText.contains("original_requester"));
         QCOMPARE(sortedEvents[i].sourceFamily, QString("review_request_removed"));
         i++;
