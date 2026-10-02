@@ -3146,40 +3146,67 @@ class TestRequestConsumers : public QObject {
             QJsonObject{{"event", "<script>alert(1)</script>"}, {"actor", QJsonObject{{"login", "<b>hacker</b>"}}}});
 
         // Referenced event
-        timelineDataPage1.append(QJsonObject{
-            {"event", "referenced"}, {"actor", QJsonObject{{"login", "ref_actor"}}}, {"commit_id", "abc123def456"}});
+        timelineDataPage1.append(QJsonObject{{"event", "referenced"},
+                                             {"actor", QJsonObject{{"login", "ref_actor"}}},
+                                             {"commit_id", "abc123def456"},
+                                             {"id", 8000},
+                                             {"created_at", "2023-01-01T11:00:00Z"}});
 
         // Mentioned event
-        timelineDataPage1.append(QJsonObject{{"event", "mentioned"}, {"actor", QJsonObject{{"login", "ment_actor"}}}});
+        timelineDataPage1.append(QJsonObject{{"event", "mentioned"},
+                                             {"actor", QJsonObject{{"login", "ment_actor"}}},
+                                             {"id", 8001},
+                                             {"created_at", "2023-01-01T11:01:00Z"}});
 
         // Connected / Disconnected
-        timelineDataPage1.append(QJsonObject{{"event", "connected"}, {"actor", QJsonObject{{"login", "conn_actor"}}}});
-        timelineDataPage1.append(
-            QJsonObject{{"event", "disconnected"}, {"actor", QJsonObject{{"login", "disconn_actor"}}}});
+        timelineDataPage1.append(QJsonObject{{"event", "connected"},
+                                             {"actor", QJsonObject{{"login", "conn_actor"}}},
+                                             {"id", 8002},
+                                             {"created_at", "2023-01-01T11:02:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "disconnected"},
+                                             {"actor", QJsonObject{{"login", "disconn_actor"}}},
+                                             {"id", 8003},
+                                             {"created_at", "2023-01-01T11:03:00Z"}});
 
         // Duplicate marks
-        timelineDataPage1.append(
-            QJsonObject{{"event", "marked_as_duplicate"}, {"actor", QJsonObject{{"login", "dup_actor"}}}});
-        timelineDataPage1.append(
-            QJsonObject{{"event", "unmarked_as_duplicate"}, {"actor", QJsonObject{{"login", "undup_actor"}}}});
+        timelineDataPage1.append(QJsonObject{{"event", "marked_as_duplicate"},
+                                             {"actor", QJsonObject{{"login", "dup_actor"}}},
+                                             {"id", 8004},
+                                             {"created_at", "2023-01-01T11:04:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "unmarked_as_duplicate"},
+                                             {"actor", QJsonObject{{"login", "undup_actor"}}},
+                                             {"id", 8005},
+                                             {"created_at", "2023-01-01T11:05:00Z"}});
 
         // Renamed
         timelineDataPage1.append(QJsonObject{{"event", "renamed"},
                                              {"actor", QJsonObject{{"login", "ren_actor"}}},
-                                             {"rename", QJsonObject{{"from", "Old<Name>"}, {"to", "New<Name>"}}}});
+                                             {"rename", QJsonObject{{"from", "Old<Name>"}, {"to", "New<Name>"}}},
+                                             {"id", 8006},
+                                             {"created_at", "2023-01-01T11:06:00Z"}});
 
         // Milestones
         timelineDataPage1.append(QJsonObject{{"event", "milestoned"},
                                              {"actor", QJsonObject{{"login", "mile_actor"}}},
-                                             {"milestone", QJsonObject{{"title", "v1.0"}}}});
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}},
+                                             {"id", 8007},
+                                             {"created_at", "2023-01-01T11:07:00Z"}});
         timelineDataPage1.append(QJsonObject{{"event", "demilestoned"},
                                              {"actor", QJsonObject{{"login", "demile_actor"}}},
-                                             {"milestone", QJsonObject{{"title", "v1.0"}}}});
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}},
+                                             {"id", 8008},
+                                             {"created_at", "2023-01-01T11:08:00Z"}});
 
         // Locked / Unlocked
-        timelineDataPage1.append(QJsonObject{
-            {"event", "locked"}, {"actor", QJsonObject{{"login", "lock_actor"}}}, {"lock_reason", "resolved"}});
-        timelineDataPage1.append(QJsonObject{{"event", "unlocked"}, {"actor", QJsonObject{{"login", "unlock_actor"}}}});
+        timelineDataPage1.append(QJsonObject{{"event", "locked"},
+                                             {"actor", QJsonObject{{"login", "lock_actor"}}},
+                                             {"lock_reason", "resolved"},
+                                             {"id", 8009},
+                                             {"created_at", "2023-01-01T11:09:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "unlocked"},
+                                             {"actor", QJsonObject{{"login", "unlock_actor"}}},
+                                             {"id", 8010},
+                                             {"created_at", "2023-01-01T11:10:00Z"}});
 
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
@@ -3271,6 +3298,8 @@ class TestRequestConsumers : public QObject {
         bool foundCrossReferencedParsed = false;
         bool foundCrossReferencedPR = false;
         bool foundCrossReferencedUnsafe = false;
+        bool foundCrossReferencedMissingActor = false;
+        bool foundCrossReferencedPrivate = false;
         for (const auto& ev : sortedEvents) {
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains(
@@ -3283,12 +3312,24 @@ class TestRequestConsumers : public QObject {
                 foundCrossReferencedPR = true;
             }
             if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actorUnsafe</b> mentioned this")) {
+                QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for unsafe URLs
                 foundCrossReferencedUnsafe = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>Unknown user</b> mentioned this in issue <a "
+                                       "href=\"https://github.com/o/r/issues/102\">o/r#102</a>")) {
+                foundCrossReferencedMissingActor = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText == "<b>actorPrivate</b> mentioned this") {
+                QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for private source
+                foundCrossReferencedPrivate = true;
             }
         }
         QVERIFY(foundCrossReferencedParsed);
         QVERIFY(foundCrossReferencedPR);
         QVERIFY(foundCrossReferencedUnsafe);
+        QVERIFY(foundCrossReferencedMissingActor);
+        QVERIFY(foundCrossReferencedPrivate);
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
@@ -3317,35 +3358,68 @@ class TestRequestConsumers : public QObject {
 
         for (const auto& ev : sortedEvents) {
             if (ev.sourceFamily == "referenced" &&
-                ev.actionText.contains("<b>ref_actor</b> referenced this in commit <code>abc123d</code>"))
+                ev.actionText.contains("<b>ref_actor</b> referenced this in commit <code>abc123d</code>")) {
+                QCOMPARE(ev.id, QString("8000"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:00:00Z"));
                 foundReferenced = true;
-            if (ev.sourceFamily == "mentioned" && ev.actionText.contains("<b>ment_actor</b> was mentioned"))
+            }
+            if (ev.sourceFamily == "mentioned" && ev.actionText.contains("<b>ment_actor</b> was mentioned")) {
+                QCOMPARE(ev.id, QString("8001"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:01:00Z"));
                 foundMentioned = true;
-            if (ev.sourceFamily == "connected" && ev.actionText.contains("<b>conn_actor</b> connected this"))
+            }
+            if (ev.sourceFamily == "connected" && ev.actionText.contains("<b>conn_actor</b> connected this")) {
+                QCOMPARE(ev.id, QString("8002"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:02:00Z"));
                 foundConnected = true;
-            if (ev.sourceFamily == "disconnected" && ev.actionText.contains("<b>disconn_actor</b> disconnected this"))
+            }
+            if (ev.sourceFamily == "disconnected" && ev.actionText.contains("<b>disconn_actor</b> disconnected this")) {
+                QCOMPARE(ev.id, QString("8003"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:03:00Z"));
                 foundDisconnected = true;
+            }
             if (ev.sourceFamily == "marked_as_duplicate" &&
-                ev.actionText.contains("<b>dup_actor</b> marked this as a duplicate"))
+                ev.actionText.contains("<b>dup_actor</b> marked this as a duplicate")) {
+                QCOMPARE(ev.id, QString("8004"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:04:00Z"));
                 foundMarkedDup = true;
+            }
             if (ev.sourceFamily == "unmarked_as_duplicate" &&
-                ev.actionText.contains("<b>undup_actor</b> unmarked this as a duplicate"))
+                ev.actionText.contains("<b>undup_actor</b> unmarked this as a duplicate")) {
+                QCOMPARE(ev.id, QString("8005"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:05:00Z"));
                 foundUnmarkedDup = true;
+            }
             if (ev.sourceFamily == "renamed" &&
                 ev.actionText.contains(
-                    "<b>ren_actor</b> renamed this from <b>Old&lt;Name&gt;</b> to <b>New&lt;Name&gt;</b>"))
+                    "<b>ren_actor</b> renamed this from <b>Old&lt;Name&gt;</b> to <b>New&lt;Name&gt;</b>")) {
+                QCOMPARE(ev.id, QString("8006"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:06:00Z"));
                 foundRenamed = true;
+            }
             if (ev.sourceFamily == "milestoned" &&
-                ev.actionText.contains("<b>mile_actor</b> added this to a milestone (<b>v1.0</b>)"))
+                ev.actionText.contains("<b>mile_actor</b> added this to a milestone (<b>v1.0</b>)")) {
+                QCOMPARE(ev.id, QString("8007"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:07:00Z"));
                 foundMilestoned = true;
+            }
             if (ev.sourceFamily == "demilestoned" &&
-                ev.actionText.contains("<b>demile_actor</b> removed this from a milestone (<b>v1.0</b>)"))
+                ev.actionText.contains("<b>demile_actor</b> removed this from a milestone (<b>v1.0</b>)")) {
+                QCOMPARE(ev.id, QString("8008"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:08:00Z"));
                 foundDemilestoned = true;
+            }
             if (ev.sourceFamily == "locked" &&
-                ev.actionText.contains("<b>lock_actor</b> locked this as <b>resolved</b>"))
+                ev.actionText.contains("<b>lock_actor</b> locked this as <b>resolved</b>")) {
+                QCOMPARE(ev.id, QString("8009"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:09:00Z"));
                 foundLocked = true;
-            if (ev.sourceFamily == "unlocked" && ev.actionText.contains("<b>unlock_actor</b> unlocked this"))
+            }
+            if (ev.sourceFamily == "unlocked" && ev.actionText.contains("<b>unlock_actor</b> unlocked this")) {
+                QCOMPARE(ev.id, QString("8010"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:10:00Z"));
                 foundUnlocked = true;
+            }
         }
 
         QVERIFY(foundReferenced);

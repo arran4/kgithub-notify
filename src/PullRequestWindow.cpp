@@ -783,9 +783,9 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                             if (issueObj.contains("repository_url") && !issueObj["repository_url"].isNull()) {
                                 QString repoUrl = issueObj["repository_url"].toString();
                                 if (repoUrl.startsWith("https://api.github.com/repos/")) {
-                                    QString repoName = repoUrl.mid(29);
-                                    if (!repoName.isEmpty()) {
-                                        issueRef += repoName + "#";
+                                    QStringList parts = repoUrl.mid(29).split('/', Qt::SkipEmptyParts);
+                                    if (parts.size() >= 2) {
+                                        issueRef += parts[0] + "/" + parts[1] + "#";
                                     }
                                 }
                             }
