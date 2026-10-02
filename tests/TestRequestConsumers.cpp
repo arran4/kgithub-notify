@@ -3101,7 +3101,7 @@ class TestRequestConsumers : public QObject {
                                                          {"repository_url", "https://api.github.com/repos/o/r"},
                                                          {"number", 99}}}}}});
 
-        // Pull request cross reference (with ID and timestamp to test valid chronology)
+        // Pull request cross reference (with timestamp to test valid chronology)
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"created_at", "2023-01-01T11:11:00Z"},
@@ -3112,7 +3112,7 @@ class TestRequestConsumers : public QObject {
                                                          {"repository_url", "https://api.github.com/repos/o/r"},
                                                          {"number", 100}}}}}});
 
-        // Issue cross-reference with ID and timestamp to test valid chronology
+        // Issue cross-reference with timestamp to test valid chronology
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"created_at", "2023-01-01T11:12:00Z"},
@@ -3322,7 +3322,11 @@ class TestRequestConsumers : public QObject {
         bool foundCrossReferencedMissingActor = false;
         bool foundCrossReferencedPrivate = false;
         bool foundCrossReferencedMalformedRepo = false;
-        for (const auto& ev : sortedEvents) {
+
+        int crossRefPRIndex = -1;
+        int crossRefNormalIndex = -1;
+        for (int i = 0; i < sortedEvents.size(); ++i) {
+            const auto& ev = sortedEvents[i];
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains(
                     "<b>actor2</b> mentioned this in issue <a href=\"https://github.com/o/r/issues/99\">o/r#99</a>")) {
@@ -3334,6 +3338,7 @@ class TestRequestConsumers : public QObject {
                 QVERIFY(ev.id.isEmpty());
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:11:00Z"));
                 foundCrossReferencedPR = true;
+                crossRefPRIndex = i;
             }
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains("<b>actorNormal</b> mentioned this in issue <a "
@@ -3341,6 +3346,7 @@ class TestRequestConsumers : public QObject {
                 QVERIFY(ev.id.isEmpty());
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
                 foundCrossReferencedNormal = true;
+                crossRefNormalIndex = i;
             }
             if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actorUnsafe</b> mentioned this")) {
                 QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for unsafe URLs
@@ -3369,6 +3375,10 @@ class TestRequestConsumers : public QObject {
         QVERIFY(foundCrossReferencedMissingActor);
         QVERIFY(foundCrossReferencedPrivate);
         QVERIFY(foundCrossReferencedMalformedRepo);
+
+        QVERIFY(crossRefPRIndex != -1);
+        QVERIFY(crossRefNormalIndex != -1);
+        QVERIFY(crossRefPRIndex < crossRefNormalIndex);
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
