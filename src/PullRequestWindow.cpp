@@ -780,10 +780,13 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                                 isPullRequest = true;
                             }
 
-                            if (issueObj.contains("repository") && issueObj["repository"].isObject()) {
-                                QString repoName = issueObj["repository"].toObject()["full_name"].toString();
-                                if (!repoName.isEmpty()) {
-                                    issueRef += repoName + "#";
+                            if (issueObj.contains("repository_url") && !issueObj["repository_url"].isNull()) {
+                                QString repoUrl = issueObj["repository_url"].toString();
+                                if (repoUrl.startsWith("https://api.github.com/repos/")) {
+                                    QString repoName = repoUrl.mid(29);
+                                    if (!repoName.isEmpty()) {
+                                        issueRef += repoName + "#";
+                                    }
                                 }
                             }
                             int number = issueObj["number"].toInt();

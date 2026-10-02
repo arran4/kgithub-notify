@@ -3098,8 +3098,8 @@ class TestRequestConsumers : public QObject {
             {"actor", QJsonObject{{"login", "actor2"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
                                                          {"url", "https://api.github.com/repos/o/r/issues/99"},
-                                                         {"number", 99},
-                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 99}}}}}});
 
         // Pull request cross reference
         timelineDataPage1.append(QJsonObject{
@@ -3108,8 +3108,8 @@ class TestRequestConsumers : public QObject {
             {"source", QJsonObject{{"issue", QJsonObject{{"pull_request", QJsonObject{{"url", "..."}}},
                                                          {"html_url", "https://github.com/o/r/pull/100"},
                                                          {"url", "https://api.github.com/repos/o/r/pulls/100"},
-                                                         {"number", 100},
-                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 100}}}}}});
 
         // Unsafe URL cross-reference
         timelineDataPage1.append(QJsonObject{
@@ -3117,8 +3117,20 @@ class TestRequestConsumers : public QObject {
             {"actor", QJsonObject{{"login", "actorUnsafe"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "javascript:alert(1)"},
                                                          {"url", "https://api.github.com/repos/o/r/issues/101"},
-                                                         {"number", 101},
-                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 101}}}}}});
+
+        // Missing actor cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/102"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/102"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 102}}}}}});
+
+        // Inaccessible/Private source cross-reference
+        timelineDataPage1.append(
+            QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actorPrivate"}}}});
 
         // A third exact duplicated cross-reference to prove deduplication
         timelineDataPage1.append(QJsonObject{
@@ -3126,8 +3138,8 @@ class TestRequestConsumers : public QObject {
             {"actor", QJsonObject{{"login", "actor2"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
                                                          {"url", "https://api.github.com/repos/o/r/issues/99"},
-                                                         {"number", 99},
-                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 99}}}}}});
 
         // A fallback event testing HTML escaping
         timelineDataPage1.append(
@@ -3175,7 +3187,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 25);  // Body + 24 events (after 1 dedup)
+        QCOMPARE(window.m_events.size(), 27);  // Body + 26 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -3193,7 +3205,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 25);
+        QCOMPARE(window.m_events.size(), 27);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -3220,7 +3232,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 26);
+        QCOMPARE(window.m_events.size(), 28);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
