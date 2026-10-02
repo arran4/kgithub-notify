@@ -3101,15 +3101,28 @@ class TestRequestConsumers : public QObject {
                                                          {"repository_url", "https://api.github.com/repos/o/r"},
                                                          {"number", 99}}}}}});
 
-        // Pull request cross reference
+        // Pull request cross reference (with ID and timestamp to test valid chronology)
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
+            {"id", 8011},
+            {"created_at", "2023-01-01T11:11:00Z"},
             {"actor", QJsonObject{{"login", "actorPR"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"pull_request", QJsonObject{{"url", "..."}}},
                                                          {"html_url", "https://github.com/o/r/pull/100"},
                                                          {"url", "https://api.github.com/repos/o/r/pulls/100"},
                                                          {"repository_url", "https://api.github.com/repos/o/r"},
                                                          {"number", 100}}}}}});
+
+        // Issue cross-reference with ID and timestamp to test valid chronology
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"id", 8012},
+            {"created_at", "2023-01-01T11:12:00Z"},
+            {"actor", QJsonObject{{"login", "actorNormal"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/1000"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/1000"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 1000}}}}}});
 
         // Unsafe URL cross-reference
         timelineDataPage1.append(QJsonObject{
@@ -3131,6 +3144,15 @@ class TestRequestConsumers : public QObject {
         // Inaccessible/Private source cross-reference
         timelineDataPage1.append(
             QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actorPrivate"}}}});
+
+        // Extra path components in repository_url (malformed) cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actorMalformedRepo"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/103"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/103"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r/extra"},
+                                                         {"number", 103}}}}}});
 
         // A third exact duplicated cross-reference to prove deduplication
         timelineDataPage1.append(QJsonObject{
@@ -3214,7 +3236,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 27);  // Body + 26 events (after 1 dedup)
+        QCOMPARE(window.m_events.size(), 29);  // Body + 28 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -3232,7 +3254,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 27);
+        QCOMPARE(window.m_events.size(), 29);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -3259,7 +3281,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 28);
+        QCOMPARE(window.m_events.size(), 30);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -3297,9 +3319,11 @@ class TestRequestConsumers : public QObject {
         // Verify actionText for cross-referenced
         bool foundCrossReferencedParsed = false;
         bool foundCrossReferencedPR = false;
+        bool foundCrossReferencedNormal = false;
         bool foundCrossReferencedUnsafe = false;
         bool foundCrossReferencedMissingActor = false;
         bool foundCrossReferencedPrivate = false;
+        bool foundCrossReferencedMalformedRepo = false;
         for (const auto& ev : sortedEvents) {
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains(
@@ -3309,7 +3333,16 @@ class TestRequestConsumers : public QObject {
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains("<b>actorPR</b> mentioned this in pull request <a "
                                        "href=\"https://github.com/o/r/pull/100\">o/r#100</a>")) {
+                QCOMPARE(ev.id, QString("8011"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:11:00Z"));
                 foundCrossReferencedPR = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>actorNormal</b> mentioned this in issue <a "
+                                       "href=\"https://github.com/o/r/issues/1000\">o/r#1000</a>")) {
+                QCOMPARE(ev.id, QString("8012"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
+                foundCrossReferencedNormal = true;
             }
             if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actorUnsafe</b> mentioned this")) {
                 QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for unsafe URLs
@@ -3324,12 +3357,20 @@ class TestRequestConsumers : public QObject {
                 QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for private source
                 foundCrossReferencedPrivate = true;
             }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText ==
+                                                             "<b>actorMalformedRepo</b> mentioned this in issue <a "
+                                                             "href=\"https://github.com/o/r/issues/103\">103</a>") {
+                // If repository parsing fails to extract repo name, it just outputs the number.
+                foundCrossReferencedMalformedRepo = true;
+            }
         }
         QVERIFY(foundCrossReferencedParsed);
         QVERIFY(foundCrossReferencedPR);
+        QVERIFY(foundCrossReferencedNormal);
         QVERIFY(foundCrossReferencedUnsafe);
         QVERIFY(foundCrossReferencedMissingActor);
         QVERIFY(foundCrossReferencedPrivate);
+        QVERIFY(foundCrossReferencedMalformedRepo);
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;

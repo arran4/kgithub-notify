@@ -781,10 +781,11 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                             }
 
                             if (issueObj.contains("repository_url") && !issueObj["repository_url"].isNull()) {
-                                QString repoUrl = issueObj["repository_url"].toString();
-                                if (repoUrl.startsWith("https://api.github.com/repos/")) {
-                                    QStringList parts = repoUrl.mid(29).split('/', Qt::SkipEmptyParts);
-                                    if (parts.size() >= 2) {
+                                QUrl repoQUrl(issueObj["repository_url"].toString());
+                                if (repoQUrl.isValid() && repoQUrl.host() == "api.github.com" &&
+                                    repoQUrl.path().startsWith("/repos/")) {
+                                    QStringList parts = repoQUrl.path().mid(7).split('/', Qt::SkipEmptyParts);
+                                    if (parts.size() == 2) {
                                         issueRef += parts[0] + "/" + parts[1] + "#";
                                     }
                                 }
