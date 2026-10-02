@@ -700,6 +700,88 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     QString actor = obj["actor"].toObject()["login"].toString();
                     if (actor.isEmpty()) actor = "GitHub";
                     text = tr("<b>%1</b> successfully completed an automatic base change").arg(actor.toHtmlEscaped());
+                } else if (event == "referenced") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString commitId = obj["commit_id"].toString();
+                    text = tr("<b>%1</b> referenced this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (!commitId.isEmpty()) {
+                        text += tr(" in commit <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
+                } else if (event == "mentioned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> was mentioned").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "connected") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> connected this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "disconnected") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> disconnected this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "marked_as_duplicate") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> marked this as a duplicate").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "unmarked_as_duplicate") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> unmarked this as a duplicate").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                } else if (event == "renamed") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString from = obj["rename"].toObject()["from"].toString();
+                    QString to = obj["rename"].toObject()["to"].toString();
+                    text = tr("<b>%1</b> renamed this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (!from.isEmpty() || !to.isEmpty()) {
+                        text += tr(" from <b>%1</b> to <b>%2</b>").arg(from.toHtmlEscaped(), to.toHtmlEscaped());
+                    }
+                } else if (event == "milestoned" || event == "demilestoned") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString milestone = obj["milestone"].toObject()["title"].toString();
+                    QString safeActor = actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped();
+                    if (event == "milestoned") {
+                        text = tr("<b>%1</b> added this to a milestone").arg(safeActor);
+                    } else {
+                        text = tr("<b>%1</b> removed this from a milestone").arg(safeActor);
+                    }
+                    if (!milestone.isEmpty()) {
+                        text += tr(" (<b>%1</b>)").arg(milestone.toHtmlEscaped());
+                    }
+                } else if (event == "locked" || event == "unlocked") {
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    QString reason = obj["lock_reason"].toString();
+                    QString safeActor = actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped();
+                    if (event == "locked") {
+                        text = tr("<b>%1</b> locked this").arg(safeActor);
+                        if (!reason.isEmpty()) {
+                            text += tr(" as <b>%1</b>").arg(reason.toHtmlEscaped());
+                        }
+                    } else {
+                        text = tr("<b>%1</b> unlocked this").arg(safeActor);
+                    }
+                } else if (event == "cross-referenced") {
+                    // Note: "References made by this PR" (outgoing) are not represented in the REST timeline API
+                    // for this PR itself. They only appear on the target's timeline. We only render incoming references.
+                    QString actor = obj["actor"].toObject()["login"].toString();
+                    text = tr("<b>%1</b> mentioned this").arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (obj.contains("source") && obj["source"].isObject()) {
+                        QJsonObject sourceObj = obj["source"].toObject();
+                        if (sourceObj.contains("issue") && sourceObj["issue"].isObject()) {
+                            QJsonObject issueObj = sourceObj["issue"].toObject();
+                            QString url = issueObj["html_url"].toString();
+                            if (!url.isEmpty() && (url.startsWith("http://") || url.startsWith("https://"))) {
+                                QString issueRef;
+                                if (issueObj.contains("repository") && issueObj["repository"].isObject()) {
+                                    QString repoName = issueObj["repository"].toObject()["full_name"].toString();
+                                    if (!repoName.isEmpty()) {
+                                        issueRef += repoName + "#";
+                                    }
+                                }
+                                int number = issueObj["number"].toInt();
+                                if (number != 0) {
+                                    issueRef += QString::number(number);
+                                }
+                                if (!issueRef.isEmpty()) {
+                                    text += tr(" in <a href=\"%1\">%2</a>").arg(url.toHtmlEscaped(), issueRef.toHtmlEscaped());
+                                }
+                            }
+                        }
+                    }
                 } else {
                     // Safe Fallback for unrecognized and unhandled events
 
