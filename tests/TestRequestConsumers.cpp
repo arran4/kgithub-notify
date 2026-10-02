@@ -3096,17 +3096,137 @@ class TestRequestConsumers : public QObject {
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"actor", QJsonObject{{"login", "actor2"}}},
-            {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}});
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/99"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 99}}}}}});
+
+        // Pull request cross reference (with timestamp to test valid chronology)
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"created_at", "2023-01-01T11:11:00Z"},
+            {"actor", QJsonObject{{"login", "actorPR"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"pull_request", QJsonObject{{"url", "..."}}},
+                                                         {"html_url", "https://github.com/o/r/pull/100"},
+                                                         {"url", "https://api.github.com/repos/o/r/pulls/100"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 100}}}}}});
+
+        // Issue cross-reference with timestamp to test valid chronology
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"created_at", "2023-01-01T11:12:00Z"},
+            {"actor", QJsonObject{{"login", "actorNormal"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/1000"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/1000"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 1000}}}}}});
+
+        // Unsafe URL cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actorUnsafe"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "javascript:alert(1)"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/101"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 101}}}}}});
+
+        // Missing actor cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/102"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/102"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 102}}}}}});
+
+        // Inaccessible/Private source cross-reference
+        timelineDataPage1.append(
+            QJsonObject{{"event", "cross-referenced"}, {"actor", QJsonObject{{"login", "actorPrivate"}}}});
+
+        // Extra path components in repository_url (malformed) cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actorMalformedRepo"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/103"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/103"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r/extra"},
+                                                         {"number", 103}}}}}});
 
         // A third exact duplicated cross-reference to prove deduplication
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"actor", QJsonObject{{"login", "actor2"}}},
-            {"source", QJsonObject{{"issue", QJsonObject{{"url", "https://api.github.com/repos/o/r/issues/99"}}}}}});
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/99"},
+                                                         {"repository_url", "https://api.github.com/repos/o/r"},
+                                                         {"number", 99}}}}}});
 
         // A fallback event testing HTML escaping
         timelineDataPage1.append(
             QJsonObject{{"event", "<script>alert(1)</script>"}, {"actor", QJsonObject{{"login", "<b>hacker</b>"}}}});
+
+        // Referenced event
+        timelineDataPage1.append(QJsonObject{{"event", "referenced"},
+                                             {"actor", QJsonObject{{"login", "ref_actor"}}},
+                                             {"commit_id", "abc123def456"},
+                                             {"id", 8000},
+                                             {"created_at", "2023-01-01T11:00:00Z"}});
+
+        // Mentioned event
+        timelineDataPage1.append(QJsonObject{{"event", "mentioned"},
+                                             {"actor", QJsonObject{{"login", "ment_actor"}}},
+                                             {"id", 8001},
+                                             {"created_at", "2023-01-01T11:01:00Z"}});
+
+        // Connected / Disconnected
+        timelineDataPage1.append(QJsonObject{{"event", "connected"},
+                                             {"actor", QJsonObject{{"login", "conn_actor"}}},
+                                             {"id", 8002},
+                                             {"created_at", "2023-01-01T11:02:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "disconnected"},
+                                             {"actor", QJsonObject{{"login", "disconn_actor"}}},
+                                             {"id", 8003},
+                                             {"created_at", "2023-01-01T11:03:00Z"}});
+
+        // Duplicate marks
+        timelineDataPage1.append(QJsonObject{{"event", "marked_as_duplicate"},
+                                             {"actor", QJsonObject{{"login", "dup_actor"}}},
+                                             {"id", 8004},
+                                             {"created_at", "2023-01-01T11:04:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "unmarked_as_duplicate"},
+                                             {"actor", QJsonObject{{"login", "undup_actor"}}},
+                                             {"id", 8005},
+                                             {"created_at", "2023-01-01T11:05:00Z"}});
+
+        // Renamed
+        timelineDataPage1.append(QJsonObject{{"event", "renamed"},
+                                             {"actor", QJsonObject{{"login", "ren_actor"}}},
+                                             {"rename", QJsonObject{{"from", "Old<Name>"}, {"to", "New<Name>"}}},
+                                             {"id", 8006},
+                                             {"created_at", "2023-01-01T11:06:00Z"}});
+
+        // Milestones
+        timelineDataPage1.append(QJsonObject{{"event", "milestoned"},
+                                             {"actor", QJsonObject{{"login", "mile_actor"}}},
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}},
+                                             {"id", 8007},
+                                             {"created_at", "2023-01-01T11:07:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "demilestoned"},
+                                             {"actor", QJsonObject{{"login", "demile_actor"}}},
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}},
+                                             {"id", 8008},
+                                             {"created_at", "2023-01-01T11:08:00Z"}});
+
+        // Locked / Unlocked
+        timelineDataPage1.append(QJsonObject{{"event", "locked"},
+                                             {"actor", QJsonObject{{"login", "lock_actor"}}},
+                                             {"lock_reason", "resolved"},
+                                             {"id", 8009},
+                                             {"created_at", "2023-01-01T11:09:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "unlocked"},
+                                             {"actor", QJsonObject{{"login", "unlock_actor"}}},
+                                             {"id", 8010},
+                                             {"created_at", "2023-01-01T11:10:00Z"}});
 
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
@@ -3114,7 +3234,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 12);  // Body + 11 events (after 1 dedup)
+        QCOMPARE(window.m_events.size(), 29);  // Body + 28 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -3132,7 +3252,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 12);
+        QCOMPARE(window.m_events.size(), 29);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -3159,7 +3279,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 13);
+        QCOMPARE(window.m_events.size(), 30);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -3180,7 +3300,7 @@ class TestRequestConsumers : public QObject {
         bool foundNode124 = false;
         bool foundUrl99 = false;
         for (const auto& ev : sortedEvents) {
-            if (ev.actionText.contains("cross-referenced") && ev.actionText.contains("actor2") && ev.id.isEmpty() &&
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("actor2") && ev.id.isEmpty() &&
                 !ev.timestamp.isValid()) {
                 emptyTimestampCount++;
                 if (ev.sourceFingerprint.contains("node123")) foundNode123 = true;
@@ -3194,6 +3314,72 @@ class TestRequestConsumers : public QObject {
         QVERIFY(foundNode124);
         QVERIFY(foundUrl99);
 
+        // Verify actionText for cross-referenced
+        bool foundCrossReferencedParsed = false;
+        bool foundCrossReferencedPR = false;
+        bool foundCrossReferencedNormal = false;
+        bool foundCrossReferencedUnsafe = false;
+        bool foundCrossReferencedMissingActor = false;
+        bool foundCrossReferencedPrivate = false;
+        bool foundCrossReferencedMalformedRepo = false;
+
+        int crossRefPRIndex = -1;
+        int crossRefNormalIndex = -1;
+        for (int i = 0; i < sortedEvents.size(); ++i) {
+            const auto& ev = sortedEvents[i];
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains(
+                    "<b>actor2</b> mentioned this in issue <a href=\"https://github.com/o/r/issues/99\">o/r#99</a>")) {
+                foundCrossReferencedParsed = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>actorPR</b> mentioned this in pull request <a "
+                                       "href=\"https://github.com/o/r/pull/100\">o/r#100</a>")) {
+                QVERIFY(ev.id.isEmpty());
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:11:00Z"));
+                foundCrossReferencedPR = true;
+                crossRefPRIndex = i;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>actorNormal</b> mentioned this in issue <a "
+                                       "href=\"https://github.com/o/r/issues/1000\">o/r#1000</a>")) {
+                QVERIFY(ev.id.isEmpty());
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
+                foundCrossReferencedNormal = true;
+                crossRefNormalIndex = i;
+            }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actorUnsafe</b> mentioned this")) {
+                QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for unsafe URLs
+                foundCrossReferencedUnsafe = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>Unknown user</b> mentioned this in issue <a "
+                                       "href=\"https://github.com/o/r/issues/102\">o/r#102</a>")) {
+                foundCrossReferencedMissingActor = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText == "<b>actorPrivate</b> mentioned this") {
+                QVERIFY(!ev.actionText.contains("href="));  // Assert no href is emitted for private source
+                foundCrossReferencedPrivate = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText ==
+                                                             "<b>actorMalformedRepo</b> mentioned this in issue <a "
+                                                             "href=\"https://github.com/o/r/issues/103\">103</a>") {
+                // If repository parsing fails to extract repo name, it just outputs the number.
+                foundCrossReferencedMalformedRepo = true;
+            }
+        }
+        QVERIFY(foundCrossReferencedParsed);
+        QVERIFY(foundCrossReferencedPR);
+        QVERIFY(foundCrossReferencedNormal);
+        QVERIFY(foundCrossReferencedUnsafe);
+        QVERIFY(foundCrossReferencedMissingActor);
+        QVERIFY(foundCrossReferencedPrivate);
+        QVERIFY(foundCrossReferencedMalformedRepo);
+
+        QVERIFY(crossRefPRIndex != -1);
+        QVERIFY(crossRefNormalIndex != -1);
+        QVERIFY(crossRefPRIndex < crossRefNormalIndex);
+
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
         for (const auto& ev : sortedEvents) {
@@ -3205,6 +3391,97 @@ class TestRequestConsumers : public QObject {
             }
         }
         QVERIFY(foundHacker);
+
+        // Verify newly added event types
+        bool foundReferenced = false;
+        bool foundMentioned = false;
+        bool foundConnected = false;
+        bool foundDisconnected = false;
+        bool foundMarkedDup = false;
+        bool foundUnmarkedDup = false;
+        bool foundRenamed = false;
+        bool foundMilestoned = false;
+        bool foundDemilestoned = false;
+        bool foundLocked = false;
+        bool foundUnlocked = false;
+
+        for (const auto& ev : sortedEvents) {
+            if (ev.sourceFamily == "referenced" &&
+                ev.actionText.contains("<b>ref_actor</b> referenced this in commit <code>abc123d</code>")) {
+                QCOMPARE(ev.id, QString("8000"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:00:00Z"));
+                foundReferenced = true;
+            }
+            if (ev.sourceFamily == "mentioned" && ev.actionText.contains("<b>ment_actor</b> was mentioned")) {
+                QCOMPARE(ev.id, QString("8001"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:01:00Z"));
+                foundMentioned = true;
+            }
+            if (ev.sourceFamily == "connected" && ev.actionText.contains("<b>conn_actor</b> connected this")) {
+                QCOMPARE(ev.id, QString("8002"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:02:00Z"));
+                foundConnected = true;
+            }
+            if (ev.sourceFamily == "disconnected" && ev.actionText.contains("<b>disconn_actor</b> disconnected this")) {
+                QCOMPARE(ev.id, QString("8003"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:03:00Z"));
+                foundDisconnected = true;
+            }
+            if (ev.sourceFamily == "marked_as_duplicate" &&
+                ev.actionText.contains("<b>dup_actor</b> marked this as a duplicate")) {
+                QCOMPARE(ev.id, QString("8004"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:04:00Z"));
+                foundMarkedDup = true;
+            }
+            if (ev.sourceFamily == "unmarked_as_duplicate" &&
+                ev.actionText.contains("<b>undup_actor</b> unmarked this as a duplicate")) {
+                QCOMPARE(ev.id, QString("8005"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:05:00Z"));
+                foundUnmarkedDup = true;
+            }
+            if (ev.sourceFamily == "renamed" &&
+                ev.actionText.contains(
+                    "<b>ren_actor</b> renamed this from <b>Old&lt;Name&gt;</b> to <b>New&lt;Name&gt;</b>")) {
+                QCOMPARE(ev.id, QString("8006"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:06:00Z"));
+                foundRenamed = true;
+            }
+            if (ev.sourceFamily == "milestoned" &&
+                ev.actionText.contains("<b>mile_actor</b> added this to a milestone (<b>v1.0</b>)")) {
+                QCOMPARE(ev.id, QString("8007"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:07:00Z"));
+                foundMilestoned = true;
+            }
+            if (ev.sourceFamily == "demilestoned" &&
+                ev.actionText.contains("<b>demile_actor</b> removed this from a milestone (<b>v1.0</b>)")) {
+                QCOMPARE(ev.id, QString("8008"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:08:00Z"));
+                foundDemilestoned = true;
+            }
+            if (ev.sourceFamily == "locked" &&
+                ev.actionText.contains("<b>lock_actor</b> locked this as <b>resolved</b>")) {
+                QCOMPARE(ev.id, QString("8009"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:09:00Z"));
+                foundLocked = true;
+            }
+            if (ev.sourceFamily == "unlocked" && ev.actionText.contains("<b>unlock_actor</b> unlocked this")) {
+                QCOMPARE(ev.id, QString("8010"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:10:00Z"));
+                foundUnlocked = true;
+            }
+        }
+
+        QVERIFY(foundReferenced);
+        QVERIFY(foundMentioned);
+        QVERIFY(foundConnected);
+        QVERIFY(foundDisconnected);
+        QVERIFY(foundMarkedDup);
+        QVERIFY(foundUnmarkedDup);
+        QVERIFY(foundRenamed);
+        QVERIFY(foundMilestoned);
+        QVERIFY(foundDemilestoned);
+        QVERIFY(foundLocked);
+        QVERIFY(foundUnlocked);
 
         // Verify commenter_null survived and remains ID-less
         bool foundNull = false;
