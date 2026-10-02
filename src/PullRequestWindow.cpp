@@ -782,8 +782,8 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
 
                             if (issueObj.contains("repository_url") && !issueObj["repository_url"].isNull()) {
                                 QUrl repoQUrl(issueObj["repository_url"].toString());
-                                if (repoQUrl.isValid() && repoQUrl.host() == "api.github.com" &&
-                                    repoQUrl.path().startsWith("/repos/")) {
+                                if (repoQUrl.isValid() && repoQUrl.scheme() == "https" &&
+                                    repoQUrl.host() == "api.github.com" && repoQUrl.path().startsWith("/repos/")) {
                                     QStringList parts = repoQUrl.path().mid(7).split('/', Qt::SkipEmptyParts);
                                     if (parts.size() == 2) {
                                         issueRef += parts[0] + "/" + parts[1] + "#";

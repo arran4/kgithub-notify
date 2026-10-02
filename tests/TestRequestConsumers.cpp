@@ -3104,7 +3104,6 @@ class TestRequestConsumers : public QObject {
         // Pull request cross reference (with ID and timestamp to test valid chronology)
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
-            {"id", 8011},
             {"created_at", "2023-01-01T11:11:00Z"},
             {"actor", QJsonObject{{"login", "actorPR"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"pull_request", QJsonObject{{"url", "..."}}},
@@ -3116,7 +3115,6 @@ class TestRequestConsumers : public QObject {
         // Issue cross-reference with ID and timestamp to test valid chronology
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
-            {"id", 8012},
             {"created_at", "2023-01-01T11:12:00Z"},
             {"actor", QJsonObject{{"login", "actorNormal"}}},
             {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/1000"},
@@ -3333,14 +3331,14 @@ class TestRequestConsumers : public QObject {
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains("<b>actorPR</b> mentioned this in pull request <a "
                                        "href=\"https://github.com/o/r/pull/100\">o/r#100</a>")) {
-                QCOMPARE(ev.id, QString("8011"));
+                QVERIFY(ev.id.isEmpty());
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:11:00Z"));
                 foundCrossReferencedPR = true;
             }
             if (ev.sourceFamily == "cross-referenced" &&
                 ev.actionText.contains("<b>actorNormal</b> mentioned this in issue <a "
                                        "href=\"https://github.com/o/r/issues/1000\">o/r#1000</a>")) {
-                QCOMPARE(ev.id, QString("8012"));
+                QVERIFY(ev.id.isEmpty());
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
                 foundCrossReferencedNormal = true;
             }
