@@ -3096,23 +3096,38 @@ class TestRequestConsumers : public QObject {
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"actor", QJsonObject{{"login", "actor2"}}},
-            {"source", QJsonObject{{"issue", QJsonObject{
-                {"html_url", "https://github.com/o/r/issues/99"},
-                {"url", "https://api.github.com/repos/o/r/issues/99"},
-                {"number", 99},
-                {"repository", QJsonObject{{"full_name", "o/r"}}}
-            }}}}});
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/99"},
+                                                         {"number", 99},
+                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+
+        // Pull request cross reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actorPR"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"pull_request", QJsonObject{{"url", "..."}}},
+                                                         {"html_url", "https://github.com/o/r/pull/100"},
+                                                         {"url", "https://api.github.com/repos/o/r/pulls/100"},
+                                                         {"number", 100},
+                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
+
+        // Unsafe URL cross-reference
+        timelineDataPage1.append(QJsonObject{
+            {"event", "cross-referenced"},
+            {"actor", QJsonObject{{"login", "actorUnsafe"}}},
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "javascript:alert(1)"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/101"},
+                                                         {"number", 101},
+                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
 
         // A third exact duplicated cross-reference to prove deduplication
         timelineDataPage1.append(QJsonObject{
             {"event", "cross-referenced"},
             {"actor", QJsonObject{{"login", "actor2"}}},
-            {"source", QJsonObject{{"issue", QJsonObject{
-                {"html_url", "https://github.com/o/r/issues/99"},
-                {"url", "https://api.github.com/repos/o/r/issues/99"},
-                {"number", 99},
-                {"repository", QJsonObject{{"full_name", "o/r"}}}
-            }}}}});
+            {"source", QJsonObject{{"issue", QJsonObject{{"html_url", "https://github.com/o/r/issues/99"},
+                                                         {"url", "https://api.github.com/repos/o/r/issues/99"},
+                                                         {"number", 99},
+                                                         {"repository", QJsonObject{{"full_name", "o/r"}}}}}}}});
 
         // A fallback event testing HTML escaping
         timelineDataPage1.append(
@@ -3120,66 +3135,39 @@ class TestRequestConsumers : public QObject {
 
         // Referenced event
         timelineDataPage1.append(QJsonObject{
-            {"event", "referenced"},
-            {"actor", QJsonObject{{"login", "ref_actor"}}},
-            {"commit_id", "abc123def456"}
-        });
+            {"event", "referenced"}, {"actor", QJsonObject{{"login", "ref_actor"}}}, {"commit_id", "abc123def456"}});
 
         // Mentioned event
-        timelineDataPage1.append(QJsonObject{
-            {"event", "mentioned"},
-            {"actor", QJsonObject{{"login", "ment_actor"}}}
-        });
+        timelineDataPage1.append(QJsonObject{{"event", "mentioned"}, {"actor", QJsonObject{{"login", "ment_actor"}}}});
 
         // Connected / Disconnected
-        timelineDataPage1.append(QJsonObject{
-            {"event", "connected"},
-            {"actor", QJsonObject{{"login", "conn_actor"}}}
-        });
-        timelineDataPage1.append(QJsonObject{
-            {"event", "disconnected"},
-            {"actor", QJsonObject{{"login", "disconn_actor"}}}
-        });
+        timelineDataPage1.append(QJsonObject{{"event", "connected"}, {"actor", QJsonObject{{"login", "conn_actor"}}}});
+        timelineDataPage1.append(
+            QJsonObject{{"event", "disconnected"}, {"actor", QJsonObject{{"login", "disconn_actor"}}}});
 
         // Duplicate marks
-        timelineDataPage1.append(QJsonObject{
-            {"event", "marked_as_duplicate"},
-            {"actor", QJsonObject{{"login", "dup_actor"}}}
-        });
-        timelineDataPage1.append(QJsonObject{
-            {"event", "unmarked_as_duplicate"},
-            {"actor", QJsonObject{{"login", "undup_actor"}}}
-        });
+        timelineDataPage1.append(
+            QJsonObject{{"event", "marked_as_duplicate"}, {"actor", QJsonObject{{"login", "dup_actor"}}}});
+        timelineDataPage1.append(
+            QJsonObject{{"event", "unmarked_as_duplicate"}, {"actor", QJsonObject{{"login", "undup_actor"}}}});
 
         // Renamed
-        timelineDataPage1.append(QJsonObject{
-            {"event", "renamed"},
-            {"actor", QJsonObject{{"login", "ren_actor"}}},
-            {"rename", QJsonObject{{"from", "Old<Name>"}, {"to", "New<Name>"}}}
-        });
+        timelineDataPage1.append(QJsonObject{{"event", "renamed"},
+                                             {"actor", QJsonObject{{"login", "ren_actor"}}},
+                                             {"rename", QJsonObject{{"from", "Old<Name>"}, {"to", "New<Name>"}}}});
 
         // Milestones
-        timelineDataPage1.append(QJsonObject{
-            {"event", "milestoned"},
-            {"actor", QJsonObject{{"login", "mile_actor"}}},
-            {"milestone", QJsonObject{{"title", "v1.0"}}}
-        });
-        timelineDataPage1.append(QJsonObject{
-            {"event", "demilestoned"},
-            {"actor", QJsonObject{{"login", "demile_actor"}}},
-            {"milestone", QJsonObject{{"title", "v1.0"}}}
-        });
+        timelineDataPage1.append(QJsonObject{{"event", "milestoned"},
+                                             {"actor", QJsonObject{{"login", "mile_actor"}}},
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}}});
+        timelineDataPage1.append(QJsonObject{{"event", "demilestoned"},
+                                             {"actor", QJsonObject{{"login", "demile_actor"}}},
+                                             {"milestone", QJsonObject{{"title", "v1.0"}}}});
 
         // Locked / Unlocked
         timelineDataPage1.append(QJsonObject{
-            {"event", "locked"},
-            {"actor", QJsonObject{{"login", "lock_actor"}}},
-            {"lock_reason", "resolved"}
-        });
-        timelineDataPage1.append(QJsonObject{
-            {"event", "unlocked"},
-            {"actor", QJsonObject{{"login", "unlock_actor"}}}
-        });
+            {"event", "locked"}, {"actor", QJsonObject{{"login", "lock_actor"}}}, {"lock_reason", "resolved"}});
+        timelineDataPage1.append(QJsonObject{{"event", "unlocked"}, {"actor", QJsonObject{{"login", "unlock_actor"}}}});
 
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
@@ -3187,7 +3175,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 23);  // Body + 22 events (after 1 dedup)
+        QCOMPARE(window.m_events.size(), 25);  // Body + 24 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -3205,7 +3193,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 23);
+        QCOMPARE(window.m_events.size(), 25);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -3232,7 +3220,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 24);
+        QCOMPARE(window.m_events.size(), 26);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -3269,12 +3257,26 @@ class TestRequestConsumers : public QObject {
 
         // Verify actionText for cross-referenced
         bool foundCrossReferencedParsed = false;
+        bool foundCrossReferencedPR = false;
+        bool foundCrossReferencedUnsafe = false;
         for (const auto& ev : sortedEvents) {
-            if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actor2</b> mentioned this in <a href=\"https://github.com/o/r/issues/99\">o/r#99</a>")) {
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains(
+                    "<b>actor2</b> mentioned this in issue <a href=\"https://github.com/o/r/issues/99\">o/r#99</a>")) {
                 foundCrossReferencedParsed = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" &&
+                ev.actionText.contains("<b>actorPR</b> mentioned this in pull request <a "
+                                       "href=\"https://github.com/o/r/pull/100\">o/r#100</a>")) {
+                foundCrossReferencedPR = true;
+            }
+            if (ev.sourceFamily == "cross-referenced" && ev.actionText.contains("<b>actorUnsafe</b> mentioned this")) {
+                foundCrossReferencedUnsafe = true;
             }
         }
         QVERIFY(foundCrossReferencedParsed);
+        QVERIFY(foundCrossReferencedPR);
+        QVERIFY(foundCrossReferencedUnsafe);
 
         // Verify HTML escaping on generic fallback
         bool foundHacker = false;
@@ -3302,17 +3304,36 @@ class TestRequestConsumers : public QObject {
         bool foundUnlocked = false;
 
         for (const auto& ev : sortedEvents) {
-            if (ev.sourceFamily == "referenced" && ev.actionText.contains("<b>ref_actor</b> referenced this in commit <code>abc123d</code>")) foundReferenced = true;
-            if (ev.sourceFamily == "mentioned" && ev.actionText.contains("<b>ment_actor</b> was mentioned")) foundMentioned = true;
-            if (ev.sourceFamily == "connected" && ev.actionText.contains("<b>conn_actor</b> connected this")) foundConnected = true;
-            if (ev.sourceFamily == "disconnected" && ev.actionText.contains("<b>disconn_actor</b> disconnected this")) foundDisconnected = true;
-            if (ev.sourceFamily == "marked_as_duplicate" && ev.actionText.contains("<b>dup_actor</b> marked this as a duplicate")) foundMarkedDup = true;
-            if (ev.sourceFamily == "unmarked_as_duplicate" && ev.actionText.contains("<b>undup_actor</b> unmarked this as a duplicate")) foundUnmarkedDup = true;
-            if (ev.sourceFamily == "renamed" && ev.actionText.contains("<b>ren_actor</b> renamed this from <b>Old&lt;Name&gt;</b> to <b>New&lt;Name&gt;</b>")) foundRenamed = true;
-            if (ev.sourceFamily == "milestoned" && ev.actionText.contains("<b>mile_actor</b> added this to a milestone (<b>v1.0</b>)")) foundMilestoned = true;
-            if (ev.sourceFamily == "demilestoned" && ev.actionText.contains("<b>demile_actor</b> removed this from a milestone (<b>v1.0</b>)")) foundDemilestoned = true;
-            if (ev.sourceFamily == "locked" && ev.actionText.contains("<b>lock_actor</b> locked this as <b>resolved</b>")) foundLocked = true;
-            if (ev.sourceFamily == "unlocked" && ev.actionText.contains("<b>unlock_actor</b> unlocked this")) foundUnlocked = true;
+            if (ev.sourceFamily == "referenced" &&
+                ev.actionText.contains("<b>ref_actor</b> referenced this in commit <code>abc123d</code>"))
+                foundReferenced = true;
+            if (ev.sourceFamily == "mentioned" && ev.actionText.contains("<b>ment_actor</b> was mentioned"))
+                foundMentioned = true;
+            if (ev.sourceFamily == "connected" && ev.actionText.contains("<b>conn_actor</b> connected this"))
+                foundConnected = true;
+            if (ev.sourceFamily == "disconnected" && ev.actionText.contains("<b>disconn_actor</b> disconnected this"))
+                foundDisconnected = true;
+            if (ev.sourceFamily == "marked_as_duplicate" &&
+                ev.actionText.contains("<b>dup_actor</b> marked this as a duplicate"))
+                foundMarkedDup = true;
+            if (ev.sourceFamily == "unmarked_as_duplicate" &&
+                ev.actionText.contains("<b>undup_actor</b> unmarked this as a duplicate"))
+                foundUnmarkedDup = true;
+            if (ev.sourceFamily == "renamed" &&
+                ev.actionText.contains(
+                    "<b>ren_actor</b> renamed this from <b>Old&lt;Name&gt;</b> to <b>New&lt;Name&gt;</b>"))
+                foundRenamed = true;
+            if (ev.sourceFamily == "milestoned" &&
+                ev.actionText.contains("<b>mile_actor</b> added this to a milestone (<b>v1.0</b>)"))
+                foundMilestoned = true;
+            if (ev.sourceFamily == "demilestoned" &&
+                ev.actionText.contains("<b>demile_actor</b> removed this from a milestone (<b>v1.0</b>)"))
+                foundDemilestoned = true;
+            if (ev.sourceFamily == "locked" &&
+                ev.actionText.contains("<b>lock_actor</b> locked this as <b>resolved</b>"))
+                foundLocked = true;
+            if (ev.sourceFamily == "unlocked" && ev.actionText.contains("<b>unlock_actor</b> unlocked this"))
+                foundUnlocked = true;
         }
 
         QVERIFY(foundReferenced);
