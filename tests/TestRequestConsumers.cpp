@@ -3228,13 +3228,30 @@ class TestRequestConsumers : public QObject {
                                              {"id", 8010},
                                              {"created_at", "2023-01-01T11:10:00Z"}});
 
+        // Deployed / Deployment Environment Changed
+        timelineDataPage1.append(QJsonObject{{"event", "deployed"},
+                                             {"actor", QJsonObject{{"login", "deploy_actor"}}},
+                                             {"id", 8011},
+                                             {"commit_id", "abc123def"},
+                                             {"created_at", "2023-01-01T11:11:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "deployment_environment_changed"},
+                                             {"actor", QJsonObject{{"login", "env_actor"}}},
+                                             {"id", 8012},
+                                             {"created_at", "2023-01-01T11:12:00Z"}});
+        timelineDataPage1.append(
+            QJsonObject{{"event", "deployed"}, {"id", 8013}, {"created_at", "2023-01-01T11:13:00Z"}});
+        timelineDataPage1.append(QJsonObject{{"event", "deployment_environment_changed"},
+                                             {"id", QJsonObject{{"invalid", "data"}}},
+                                             {"actor", QJsonObject{{"login", "<b>env_hacker</b>"}}},
+                                             {"created_at", "not-a-valid-date-string"}});
+
         // Add link header to simulate pagination
         QByteArray linkHeader = "<https://api.github.com/repositories/1/issues/1/timeline?page=2>; rel=\"next\"";
         fakeManager.requests[timelineReqIdx].reply->setRawHeader("Link", linkHeader);
         fakeManager.requests[timelineReqIdx].reply->complete(QJsonDocument(timelineDataPage1).toJson());
 
         // Verify page 1 populated properly and next page was queued
-        QCOMPARE(window.m_events.size(), 29);  // Body + 28 events (after 1 dedup)
+        QCOMPARE(window.m_events.size(), 33);  // Body + 32 events (after 1 dedup)
 
         // Find timeline request page 2
         int timelineReqIdx2 = -1;
@@ -3252,7 +3269,7 @@ class TestRequestConsumers : public QObject {
                                                                        "Server error", 500);
 
         // Verify events persist after failure
-        QCOMPARE(window.m_events.size(), 29);
+        QCOMPARE(window.m_events.size(), 33);
 
         // Verify retry works
         window.m_conversationRetryBtn->click();
@@ -3279,7 +3296,7 @@ class TestRequestConsumers : public QObject {
         fakeManager.requests[timelineReqIdx3].reply->complete(QJsonDocument(timelineDataPage2).toJson());
 
         // Verify state
-        QCOMPARE(window.m_events.size(), 30);
+        QCOMPARE(window.m_events.size(), 34);
 
         QList<PREvent> sortedEvents = window.m_events;
         std::sort(sortedEvents.begin(), sortedEvents.end());
@@ -3404,6 +3421,10 @@ class TestRequestConsumers : public QObject {
         bool foundDemilestoned = false;
         bool foundLocked = false;
         bool foundUnlocked = false;
+        bool foundDeployed = false;
+        bool foundDeploymentEnvironmentChanged = false;
+        bool foundDeployedMissingActor = false;
+        bool foundDeploymentEnvironmentChangedInvalidTimeAndId = false;
 
         for (const auto& ev : sortedEvents) {
             if (ev.sourceFamily == "referenced" &&
@@ -3469,6 +3490,30 @@ class TestRequestConsumers : public QObject {
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:10:00Z"));
                 foundUnlocked = true;
             }
+            if (ev.sourceFamily == "deployed" &&
+                ev.actionText.contains("<b>deploy_actor</b> deployed this with commit <code>abc123d</code>")) {
+                QCOMPARE(ev.id, QString("8011"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:11:00Z"));
+                foundDeployed = true;
+            }
+            if (ev.sourceFamily == "deployment_environment_changed" &&
+                ev.actionText.contains("<b>env_actor</b> changed the deployment environment")) {
+                QCOMPARE(ev.id, QString("8012"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
+                foundDeploymentEnvironmentChanged = true;
+            }
+            if (ev.sourceFamily == "deployed" && ev.actionText.contains("<b>Unknown user</b> deployed this") &&
+                !ev.actionText.contains("commit")) {
+                QCOMPARE(ev.id, QString("8013"));
+                QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:13:00Z"));
+                foundDeployedMissingActor = true;
+            }
+            if (ev.sourceFamily == "deployment_environment_changed" &&
+                ev.actionText.contains("<b>&lt;b&gt;env_hacker&lt;/b&gt;</b> changed the deployment environment")) {
+                QVERIFY(ev.id.isEmpty());
+                QVERIFY(!ev.timestamp.isValid());
+                foundDeploymentEnvironmentChangedInvalidTimeAndId = true;
+            }
         }
 
         QVERIFY(foundReferenced);
@@ -3482,6 +3527,10 @@ class TestRequestConsumers : public QObject {
         QVERIFY(foundDemilestoned);
         QVERIFY(foundLocked);
         QVERIFY(foundUnlocked);
+        QVERIFY(foundDeployed);
+        QVERIFY(foundDeploymentEnvironmentChanged);
+        QVERIFY(foundDeployedMissingActor);
+        QVERIFY(foundDeploymentEnvironmentChangedInvalidTimeAndId);
 
         // Verify commenter_null survived and remains ID-less
         bool foundNull = false;
