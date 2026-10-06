@@ -3438,6 +3438,8 @@ class TestRequestConsumers : public QObject {
         bool foundDeploymentEnvironmentChangedInvalidTimeAndId = false;
         bool foundDupDeployed = false;
         bool foundEnvChangedSameTime = false;
+        int index8012 = -1;
+        int index8014 = -1;
 
         for (int i = 0; i < sortedEvents.size(); ++i) {
             const auto& ev = sortedEvents[i];
@@ -3511,10 +3513,12 @@ class TestRequestConsumers : public QObject {
                 foundDeployed = true;
             }
             if (ev.sourceFamily == "deployment_environment_changed" &&
-                ev.actionText.contains("<b>env_actor</b> changed the deployment environment")) {
+                ev.actionText.contains(
+                    "<b>env_actor</b> changed the deployment environment at commit <code>def456a</code>")) {
                 QCOMPARE(ev.id, QString("8012"));
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
                 foundDeploymentEnvironmentChanged = true;
+                index8012 = i;
             }
             if (ev.sourceFamily == "deployed" && ev.actionText.contains("<b>Unknown user</b> deployed this") &&
                 !ev.actionText.contains("commit")) {
@@ -3538,19 +3542,16 @@ class TestRequestConsumers : public QObject {
                 QCOMPARE(ev.id, QString("8014"));
                 QCOMPARE(ev.timestamp.toString(Qt::ISODate), QString("2023-01-01T11:12:00Z"));
                 foundEnvChangedSameTime = true;
-
-                // Assert deterministic relative ordering based on ID (8012 vs 8014) given same timestamp
-                if (i > 0) {
-                    const auto& prevEv = sortedEvents[i - 1];
-                    if (prevEv.timestamp == ev.timestamp) {
-                        QVERIFY(prevEv.id < ev.id);
-                    }
-                }
+                index8014 = i;
             }
         }
 
         // Deduplication assert
         QVERIFY(!foundDupDeployed);
+
+        QVERIFY(index8012 != -1);
+        QVERIFY(index8014 != -1);
+        QVERIFY(index8012 < index8014);
 
         QVERIFY(foundReferenced);
         QVERIFY(foundMentioned);
