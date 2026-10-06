@@ -771,8 +771,12 @@ void PullRequestWindow::onTimelineReply(QNetworkReply* reply) {
                     }
                 } else if (event == "deployment_environment_changed") {
                     QString actor = obj["actor"].toObject()["login"].toString();
+                    QString commitId = obj["commit_id"].toString();
                     text = tr("<b>%1</b> changed the deployment environment")
                                .arg(actor.isEmpty() ? tr("Unknown user") : actor.toHtmlEscaped());
+                    if (!commitId.isEmpty()) {
+                        text += tr(" at commit <code>%1</code>").arg(commitId.left(7).toHtmlEscaped());
+                    }
                 } else if (event == "cross-referenced") {
                     // Note: "References made by this PR" (outgoing) are not represented in the REST timeline API
                     // for this PR itself. They only appear on the target's timeline. We only render incoming
